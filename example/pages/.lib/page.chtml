@@ -1,0 +1,14 @@
+<c:arg name="title"></c:arg>
+<html>
+  <head>
+    <title c:if="title != nil">${title} - To-Do App Example</title>
+    <title c:else>To-Do App Example</title>
+    <script src="https://unpkg.com/htmx.org@1.9.11" integrity="sha384-0gxUXCCR8yv9FM2b+U3FDbsKthCI66oH5IA9fHppQq9DDMHuMauqq1ZHBpJxQ0J0" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.11/dist/ext/ws.js"></script>
+
+  </head>
+  <body>
+    <h1 c:if="title != nil">${title}</h1>
+    <div>${_}</div>
+  </body>
+</html>
