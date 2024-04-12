@@ -1,0 +1,9 @@
+<c:arg name="path"></c:arg>
+<c:arg name="$req"></c:arg>
+<c:arg name="$rep"></c:arg>
+
+<c:page title="Page Not Found">
+  <b>Oops! Page you are looking for does not exist: ${ path }</b>
+
+  <pre>${ toJSON($req) }</pre>
+</c:page>

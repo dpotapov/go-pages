@@ -1,0 +1,5 @@
+<c:arg name="title"></c:arg>
+
+<h1 c:if="title != ''">${title}</h1>
+
+<div>${_}</div>

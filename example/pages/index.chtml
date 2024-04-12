@@ -1,0 +1,11 @@
+<c:page>
+  <h2>To-Do list</h2>
+  <div hx-ext="ws" ws-connect="/todos">
+    <c:todos></c:todos>
+
+    <form id="form" ws-send hx-on--ws-after-send="this.reset()">
+      <input name="todo" />
+      <input type="submit" value="Add" />
+    </form>
+  </div>
+</c:page>
