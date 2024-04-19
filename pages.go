@@ -160,7 +160,7 @@ func (h *Handler) servePage(w http.ResponseWriter, r *http.Request, fsPath strin
 		rc := make(chan struct{}) // renderer event channel
 		done := make(chan error)  // channel to communicate the completion of the rendering loop
 
-		scope.onChange(func() {
+		scope.setOnChangeCallback(func() {
 			select {
 			case rc <- struct{}{}:
 			default:
