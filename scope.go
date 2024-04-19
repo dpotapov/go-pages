@@ -1,6 +1,8 @@
 package pages
 
 import (
+	"sync"
+
 	"pages/chtml"
 )
 
@@ -9,6 +11,8 @@ type scope struct {
 	chtml.Scope
 	closed     chan struct{}
 	onChangeCB func()
+
+	mu sync.Mutex // protects onChangeCB
 }
 
 var _ chtml.Scope = (*scope)(nil)
@@ -32,12 +36,16 @@ func (s *scope) Spawn(vars map[string]any) chtml.Scope {
 }
 
 func (s *scope) Touch() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.onChangeCB != nil {
 		s.onChangeCB()
 	}
 }
 
-func (s *scope) onChange(cb func()) {
+func (s *scope) setOnChangeCallback(cb func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.onChangeCB = cb
 }
 
@@ -45,6 +53,9 @@ func (s *scope) close() {
 	if s.closed == nil {
 		return
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	s.onChangeCB = nil
 	close(s.closed)
 	s.closed = nil
