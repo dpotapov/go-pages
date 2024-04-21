@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"pages/chtml"
+	"github.com/dpotapov/go-pages/chtml"
 )
 
 func TestHttpRequestComponent_Execute(t *testing.T) {

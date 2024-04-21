@@ -17,7 +17,7 @@ import (
 	"strings"
 	"sync"
 
-	"pages/chtml"
+	"github.com/dpotapov/go-pages/chtml"
 
 	"github.com/gorilla/websocket"
 	"golang.org/x/net/html"
