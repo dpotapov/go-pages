@@ -1,4 +1,4 @@
-module pages
+module github.com/dpotapov/go-pages
 
 go 1.22
 
