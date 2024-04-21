@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"pages/chtml"
+	"github.com/dpotapov/go-pages/chtml"
 
 	"golang.org/x/net/html"
 )

@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"sync"
 
-	"pages"
-	"pages/chtml"
+	"github.com/dpotapov/go-pages"
+	"github.com/dpotapov/go-pages/chtml"
 )
 
 func LoggerMiddleware(next http.Handler, logger *slog.Logger) http.Handler {

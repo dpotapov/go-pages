@@ -3,7 +3,7 @@ package pages
 import (
 	"sync"
 
-	"pages/chtml"
+	"github.com/dpotapov/go-pages/chtml"
 )
 
 // Scope wraps chtml.ScopeMap with modification propagation callback and closing behavior.
