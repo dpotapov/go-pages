@@ -3,7 +3,7 @@ module github.com/dpotapov/go-pages
 go 1.22
 
 require (
-	github.com/beevik/etree v1.3.0
+	github.com/beevik/etree v1.3.1-0.20240428200951-cda5fc441f5d
 	github.com/expr-lang/expr v1.16.2
 	github.com/google/go-cmp v0.6.0
 	github.com/gorilla/websocket v1.5.1
