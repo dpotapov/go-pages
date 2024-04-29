@@ -2,6 +2,7 @@ package chtml
 
 import (
 	"context"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
@@ -224,6 +225,7 @@ func parse(r io.Reader, imp Importer) (*chtmlComponent, error) {
 
 	// Disable strict mode for XML decoder, see https://pkg.go.dev/encoding/xml#Decoder
 	tmpDoc.ReadSettings.Permissive = true
+	tmpDoc.ReadSettings.AutoClose = xml.HTMLAutoClose // auto-close common HTML elements
 
 	_, err := tmpDoc.ReadFrom(r)
 	if err != nil {
