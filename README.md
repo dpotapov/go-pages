@@ -109,6 +109,9 @@ with `c:` namespace:
   component. In the second case, the `<c:arg>` definition declares possible inputs for the component
   (serves as a documentation and type checking) and default values.
 
+- `c:var` attribute is valid only for the `<c:NAME>` import element. It defines a variable name
+  where the component result will be stored. The variable can be referenced in the parent component.
+
 - `c:if`, `c:else-if`, `c:else` attribute for conditional rendering.
 
 - `c:for` attribute for iterating over a slice or a map.

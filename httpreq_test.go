@@ -1,7 +1,6 @@
 package pages
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"reflect"
@@ -66,26 +65,27 @@ func TestHttpRequestComponent_Execute(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s := chtml.NewScopeMap(nil)
 			s.SetVars(tt.vars)
-			if err := comp.Execute(context.Background(), s); err != nil {
-				t.Errorf("Execute() error = %v", err)
+			rr, err := comp.Render(s)
+			if err != nil {
+				t.Errorf("Render() error = %v", err)
 				return
 			}
 			if tt.wantVars != nil {
-				if got, ok := s.Vars()["p"].(*httpRequestPoller); ok {
+				if got, ok := rr.Data.(*httpRequestPoller); ok {
 					if got.Code != tt.wantVars.Code {
-						t.Errorf("Execute() got.Code = %v, want %v", got.Code, tt.wantVars.Code)
+						t.Errorf("Render() got.Code = %v, want %v", got.Code, tt.wantVars.Code)
 					}
 					if got.Body != tt.wantVars.Body {
-						t.Errorf("Execute() got.Body = %v, want %v", got.Body, tt.wantVars.Body)
+						t.Errorf("Render() got.Body = %v, want %v", got.Body, tt.wantVars.Body)
 					}
 					if !reflect.DeepEqual(got.Json, tt.wantVars.Json) {
-						t.Errorf("Execute() got.Json = %v, want %v", got.Json, tt.wantVars.Json)
+						t.Errorf("Render() got.Json = %v, want %v", got.Json, tt.wantVars.Json)
 					}
 					if got.Error != tt.wantVars.Error {
-						t.Errorf("Execute() got.Error = %v, want %v", got.Error, tt.wantVars.Error)
+						t.Errorf("Render() got.Error = %v, want %v", got.Error, tt.wantVars.Error)
 					}
 				} else {
-					t.Errorf("Execute() got = nil, want %v", tt.wantVars)
+					t.Errorf("Render() got = nil, want %v", tt.wantVars)
 				}
 			}
 		})
@@ -105,7 +105,7 @@ func TestHttpRequestComponent_WithInterval(t *testing.T) {
 	defer s.close()
 
 	s.setOnChangeCallback(func() {
-		p := s.Vars()["p"].(*httpRequestPoller)
+		p := s.Vars()["$poller"].(*httpRequestPoller)
 		t.Logf("poller updated: %v", p.Body)
 		if len(testData) == 0 {
 			p.polling = false
@@ -138,8 +138,8 @@ func TestHttpRequestComponent_WithInterval(t *testing.T) {
 		Router: mux,
 	}
 
-	if err := comp.Execute(context.Background(), s); err != nil {
-		t.Errorf("Execute() error = %v", err)
+	if _, err := comp.Render(s); err != nil {
+		t.Errorf("Render() error = %v", err)
 		return
 	}
 

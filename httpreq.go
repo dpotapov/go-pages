@@ -2,7 +2,6 @@ package pages
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,12 +19,12 @@ import (
 // returned data in the scope.
 //
 // Usage example:
-//   <c:http-request url="/api/data" method="POST" var="data" interval="15s">
+//   <c:http-request c:var="data" url="/api/data" method="POST" interval="15s">
 //     { "input1": "value1", "input2": "value2" }
 //   </c:http-request>
 //
 // In this example, the component will make a POST request to /api/data every 15 seconds and store
-// the response in the scope under the key "data". If the response data has changed, the component
+// the response in the variable "data". If the response data has changed, the component
 // will re-render the page.
 // By default, the interval is 0, which means the component will only make the request once.
 // The interval can be set to a duration string, such as "15s" or "1m".
@@ -42,7 +41,6 @@ func (r *HttpRequestComponent) args(s chtml.Scope) (*httpRequestArgs, error) {
 	p := &httpRequestArgs{
 		Method:   "GET",
 		URL:      "",
-		Var:      "",
 		Interval: 0,
 	}
 	vars := s.Vars()
@@ -51,9 +49,6 @@ func (r *HttpRequestComponent) args(s chtml.Scope) (*httpRequestArgs, error) {
 	}
 	if v, ok := vars["url"].(string); ok {
 		p.URL = v
-	}
-	if v, ok := vars["var"].(string); ok {
-		p.Var = v
 	}
 	if v, ok := vars["interval"].(string); ok {
 		d, err := time.ParseDuration(v)
@@ -78,21 +73,21 @@ func (r *HttpRequestComponent) args(s chtml.Scope) (*httpRequestArgs, error) {
 	return p, nil
 }
 
-func (r *HttpRequestComponent) Execute(ctx context.Context, s chtml.Scope) error {
+func (r *HttpRequestComponent) Render(s chtml.Scope) (*chtml.RenderResult, error) {
 	if r.Router == nil {
-		return fmt.Errorf("http router not set")
+		return nil, fmt.Errorf("http router not set")
 	}
 
 	args, err := r.args(s)
 	if err != nil {
-		return fmt.Errorf("get arg: %w", err)
+		return nil, fmt.Errorf("get arg: %w", err)
 	}
 
-	poller, ok := s.Vars()[args.Var].(*httpRequestPoller)
+	poller, ok := s.Vars()["$poller"].(*httpRequestPoller)
 	if !ok {
 		poller = newHttpRequestPoller(r.Router, s.Closed())
 		poller.onChange = s.Touch
-		s.Vars()[args.Var] = poller
+		s.Vars()["$poller"] = poller
 	}
 
 	// start polling if the interval is set and the poller is not already polling
@@ -106,22 +101,23 @@ func (r *HttpRequestComponent) Execute(ctx context.Context, s chtml.Scope) error
 		poller.execute(args)
 	}
 
-	return nil
+	return &chtml.RenderResult{
+		Data: poller,
+	}, nil
 }
 
 type httpRequestArgs struct {
 	Method   string
 	URL      string
-	Var      string
 	Interval time.Duration
 	Body     io.Reader
 }
 
 type httpRequestPoller struct {
-	Code  int
-	Body  string
-	Json  any
-	Error string
+	Code  int    `expr:"code"`
+	Body  string `expr:"body"`
+	Json  any    `expr:"json"`
+	Error string `expr:"error"`
 
 	// router is the HTTP router used to make requests
 	router http.Handler

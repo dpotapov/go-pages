@@ -30,9 +30,6 @@ const chtmlExt = ".chtml"
 const (
 	// specialRequestArg is the name of the HTTP request object passed to the root-level component.
 	specialRequestArg = "$req"
-
-	// specialResponseArg is the name of the HTTP reply object to carry between components.
-	specialResponseArg = "$rep"
 )
 
 // defaultSearchPath is the default list of directories to search for components when importing.
@@ -199,7 +196,7 @@ func (h *Handler) servePage(w http.ResponseWriter, r *http.Request, fsPath strin
 				// update scope vars with args
 				scope.setVars(args)
 
-				if err := comp.Execute(r.Context(), scope); err != nil {
+				if _, err := comp.Render(scope); err != nil {
 					return fmt.Errorf("render component: %w", err)
 				}
 
@@ -219,18 +216,25 @@ func (h *Handler) servePage(w http.ResponseWriter, r *http.Request, fsPath strin
 			}
 		}
 	} else {
-		if err := comp.Execute(r.Context(), scope); err != nil {
-			return fmt.Errorf("execute component: %w", err)
+		rr, err := comp.Render(scope)
+		if err != nil {
+			return fmt.Errorf("render component: %w", err)
 		}
 
-		rep := scope.Vars()[specialResponseArg]
-		if rep != nil {
-			// TODO: handle things like custom status codes, headers, redirects, etc.
-			h.logger.Warn("Response object is not supported yet", "response", rep)
+		if len(rr.Header) > 0 {
+			for k, vv := range rr.Header {
+				for _, v := range vv {
+					w.Header().Add(k, v)
+				}
+			}
 		}
 
-		if htmlDoc, ok := scope.Vars()["$html"].(*html.Node); ok {
-			if err := html.Render(w, htmlDoc); err != nil {
+		if rr.StatusCode != 0 {
+			w.WriteHeader(rr.StatusCode)
+		}
+
+		if rr.HTML != nil {
+			if err := html.Render(w, rr.HTML); err != nil {
 				return fmt.Errorf("render HTML: %w", err)
 			}
 		}

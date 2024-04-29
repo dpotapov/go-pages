@@ -4,9 +4,6 @@ package chtml
 // The CHTML component creates a new scope for each loop iteration, conditional branch, and
 // component import with Spawn method.
 type Scope interface {
-	// Root returns the scope associated with the root component.
-	Root() Scope
-
 	// Parent returns the parent scope of the current scope or nil if it's the root scope.
 	Parent() Scope
 
@@ -28,7 +25,6 @@ type Scope interface {
 // scope to the child scope.
 type ScopeMap struct {
 	parent Scope
-	root   Scope
 	vars   map[string]any
 }
 
@@ -36,22 +32,15 @@ var _ Scope = (*ScopeMap)(nil)
 
 func NewScopeMap(parent Scope) *ScopeMap {
 	vars := make(map[string]any)
-	var root Scope
 	if parent != nil {
 		for k, v := range parent.Vars() {
 			vars[k] = v
 		}
-		root = parent.Root()
 	}
 	return &ScopeMap{
 		parent: parent,
-		root:   root,
 		vars:   vars,
 	}
-}
-
-func (s *ScopeMap) Root() Scope {
-	return s.root
 }
 
 // Parent returns the parent scope of the current scope or nil if it's the root scope.

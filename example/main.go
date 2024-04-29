@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log/slog"
 	"net/http"
 	"os"
@@ -36,7 +35,7 @@ func (t *todos) subscription(s chtml.Scope) chan struct{} {
 	return sub
 }
 
-func (t *todos) Execute(ctx context.Context, s chtml.Scope) error {
+func (t *todos) Render(s chtml.Scope) (*chtml.RenderResult, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	changed := false
@@ -79,7 +78,7 @@ func (t *todos) Execute(ctx context.Context, s chtml.Scope) error {
 		}
 	}()
 
-	return nil
+	return nil, nil
 }
 
 func main() {
