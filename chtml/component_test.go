@@ -1,7 +1,6 @@
 package chtml
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -194,31 +193,28 @@ func TestComponent_ParseAndRender(t *testing.T) {
 				vars[k] = v
 			}
 
-			if err := comp.Execute(context.Background(), s); err != nil {
+			rr, err := comp.Render(s)
+			if err != nil {
 				if tt.wantErr == nil {
-					t.Errorf("Execute() error = %v", err)
+					t.Errorf("Render() error = %v", err)
 					return
 				} else {
 					if err.Error() != tt.wantErr.Error() {
-						t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
+						t.Errorf("Render() error = %v, wantErr %v", err, tt.wantErr)
 					}
 					return
 				}
 			}
-			out, ok := s.Vars()["$html"]
-			if !ok {
-				t.Errorf("Execute() no output")
-				return
-			}
+
 			var b strings.Builder
-			if err := html.Render(&b, out.(*html.Node)); err != nil {
+			if err := html.Render(&b, rr.HTML); err != nil {
 				t.Errorf("Render() error = %v", err)
 				return
 			}
 			got := b.String()
 			want := tt.output
 			if got != want {
-				t.Errorf("Execute() got = %v, want %v", got, want)
+				t.Errorf("Render() got = %v, want %v", got, want)
 			}
 		})
 	}

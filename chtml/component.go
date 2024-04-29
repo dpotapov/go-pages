@@ -1,12 +1,12 @@
 package chtml
 
 import (
-	"context"
 	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
 	"reflect"
 	"strings"
 
@@ -18,7 +18,14 @@ import (
 )
 
 type Component interface {
-	Execute(ctx context.Context, s Scope) error
+	Render(s Scope) (*RenderResult, error)
+}
+
+type RenderResult struct {
+	Header     http.Header
+	HTML       *html.Node
+	StatusCode int
+	Data       any
 }
 
 // ErrComponentNotFound is returned by Importer implementations when a component is not found.
@@ -49,6 +56,7 @@ type nodeMeta struct {
 	text             *vm.Program
 	loopVar, loopIdx string
 	imprt            Component
+	imprtVar         string
 	attrs            []nodeAttr
 	nextCond         *etree.Element
 }
@@ -78,6 +86,12 @@ func (pc *parseContext) clone() *parseContext {
 // evalScope wraps the Scope with extra information for the rendering stage.
 type evalScope struct {
 	Scope
+
+	// header stores the HTTP headers to be returned by the component.
+	header http.Header
+
+	// statusCode records the status code to be returned by the component.
+	statusCode int
 
 	// hidden stores nodes that have been marked as hidden and should not be rendered.
 	hidden map[etree.Token]struct{}
@@ -375,7 +389,16 @@ func (c *chtmlComponent) parseElement(el *etree.Element, pc *parseContext) error
 		if err != nil {
 			return fmt.Errorf("import %s: %w", compName, err)
 		}
-		c.meta[el] = &nodeMeta{imprt: comp}
+
+		imprtVar := el.SelectAttrValue("c:var", "")
+		if imprtVar == "" {
+			imprtVar = strings.ReplaceAll(strings.ToLower(compName), "-", "_")
+		}
+
+		c.meta[el] = &nodeMeta{
+			imprt:    comp,
+			imprtVar: imprtVar,
+		}
 	}
 	if err := c.parseAttrs(el, pc); err != nil {
 		return err
@@ -535,9 +558,9 @@ func (c *chtmlComponent) parseAttrs(el *etree.Element, pc *parseContext) error {
 	return nil
 }
 
-// Execute builds a new HTML document by evaluating the expressions in the component's tree and
+// Render builds a new HTML document by evaluating the expressions in the component's tree and
 // stores the result in the scope's "_" variable.
-func (c *chtmlComponent) Execute(ctx context.Context, s Scope) error {
+func (c *chtmlComponent) Render(s Scope) (*RenderResult, error) {
 	newDoc := &html.Node{
 		Type: html.DocumentNode,
 	}
@@ -563,19 +586,22 @@ func (c *chtmlComponent) Execute(ctx context.Context, s Scope) error {
 	}
 
 	for _, child := range c.doc.Root().Child {
-		if err := c.eval(ctx, newDoc, child, es); err != nil {
-			return err
+		if err := c.eval(newDoc, child, es); err != nil {
+			return nil, err
 		}
 	}
 
-	s.Vars()["$html"] = newDoc
-
-	return nil
+	return &RenderResult{
+		Header:     es.header,
+		StatusCode: es.statusCode,
+		HTML:       newDoc,
+		Data:       nil, // the CHMTL component does not return any data
+	}, nil
 }
 
 // evalIf evaluates the conditional expression (c:if, c:else-if, c:else) for the given node and
 // marks it as hidden if the condition is false.
-func (c *chtmlComponent) evalIf(ctx context.Context, dst *html.Node, src *etree.Element, es *evalScope) error {
+func (c *chtmlComponent) evalIf(dst *html.Node, src *etree.Element, es *evalScope) error {
 	render := true
 	nm, ok := c.meta[src]
 	if !ok {
@@ -635,7 +661,7 @@ func (c *chtmlComponent) evalAttrs(dst *html.Node, src *etree.Element, es *evalS
 
 // evalFor evaluates the loop expression (c:for) for the given node and appends the result to the
 // destination node.
-func (c *chtmlComponent) evalFor(ctx context.Context, dst *html.Node, src *etree.Element, es *evalScope) error {
+func (c *chtmlComponent) evalFor(dst *html.Node, src *etree.Element, es *evalScope) error {
 	nm := c.meta[src]
 	if nm == nil || nm.loop == nil {
 		return nil
@@ -659,7 +685,7 @@ func (c *chtmlComponent) evalFor(ctx context.Context, dst *html.Node, src *etree
 			nm.loopVar: el.Interface(),
 			nm.loopIdx: i,
 		}, src, i)
-		if err := c.eval(ctx, dst, src, subScope); err != nil {
+		if err := c.eval(dst, src, subScope); err != nil {
 			return err
 		}
 	}
@@ -671,7 +697,7 @@ func (c *chtmlComponent) evalFor(ctx context.Context, dst *html.Node, src *etree
 }
 
 // evalImport renders the imported component (<c:NAME>) and appends the result to the destination.
-func (c *chtmlComponent) evalImport(ctx context.Context, dst *html.Node, src *etree.Element, es *evalScope) error {
+func (c *chtmlComponent) evalImport(dst *html.Node, src *etree.Element, es *evalScope) error {
 	nm := c.meta[src]
 
 	if nm == nil || nm.imprt == nil {
@@ -739,17 +765,38 @@ func (c *chtmlComponent) evalImport(ctx context.Context, dst *html.Node, src *et
 		}
 	}
 
-	if err := nm.imprt.Execute(ctx, cs); err != nil {
+	rr, err := nm.imprt.Render(cs)
+	if err != nil {
 		return err
 	}
 
-	v := cs.Vars()["$html"]
-	if doc, ok := v.(*html.Node); ok {
-		*dst = *doc // replace <c:NAME> with the imported document
+	if rr.HTML != nil {
+		*dst = *rr.HTML
 	} else {
-		// if the imported component does not return HTML, replace it with an empty node
+		// if the imported component does not return HTML, replace the output node with a stub
 		dst.Type = html.RawNode
 		dst.Data = ""
+	}
+
+	if rr.Data != nil && nm.imprtVar != "" {
+		es.Vars()[nm.imprtVar] = rr.Data
+	}
+
+	// propagate the HTTP headers and status code
+
+	if len(rr.Header) > 0 {
+		if es.header == nil {
+			es.header = make(http.Header)
+		}
+		for k, vv := range rr.Header {
+			for _, v := range vv {
+				es.header.Add(k, v)
+			}
+		}
+	}
+
+	if rr.StatusCode != 0 && es.statusCode == 0 {
+		es.statusCode = rr.StatusCode
 	}
 
 	return nil
@@ -800,18 +847,18 @@ func (c *chtmlComponent) evalText(dst *html.Node, src *etree.CharData, es *evalS
 // 3. attributes
 // 4. child nodes
 // 5. imports (<c:NAME>)
-func (c *chtmlComponent) evalElement(ctx context.Context, dst *html.Node, src *etree.Element, es *evalScope) error {
+func (c *chtmlComponent) evalElement(dst *html.Node, src *etree.Element, es *evalScope) error {
 	if _, ok := es.hidden[src]; ok {
 		return nil
 	}
-	if err := c.evalIf(ctx, dst, src, es); err != nil {
+	if err := c.evalIf(dst, src, es); err != nil {
 		return err
 	}
 	if _, ok := es.hidden[src]; ok {
 		return nil
 	}
 
-	if err := c.evalFor(ctx, dst, src, es); err != nil {
+	if err := c.evalFor(dst, src, es); err != nil {
 		return err
 	}
 	if _, ok := es.hidden[src]; ok {
@@ -828,12 +875,12 @@ func (c *chtmlComponent) evalElement(ctx context.Context, dst *html.Node, src *e
 	}
 
 	for _, child := range src.Child {
-		if err := c.eval(ctx, clone, child, es); err != nil {
+		if err := c.eval(clone, child, es); err != nil {
 			return err
 		}
 	}
 
-	if err := c.evalImport(ctx, clone, src, es); err != nil {
+	if err := c.evalImport(clone, src, es); err != nil {
 		return err
 	}
 
@@ -841,10 +888,10 @@ func (c *chtmlComponent) evalElement(ctx context.Context, dst *html.Node, src *e
 	return nil
 }
 
-func (c *chtmlComponent) eval(ctx context.Context, dst *html.Node, src etree.Token, es *evalScope) error {
+func (c *chtmlComponent) eval(dst *html.Node, src etree.Token, es *evalScope) error {
 	switch n := src.(type) {
 	case *etree.Element:
-		return c.evalElement(ctx, dst, n, es)
+		return c.evalElement(dst, n, es)
 	case *etree.CharData:
 		return c.evalText(dst, n, es)
 	}
