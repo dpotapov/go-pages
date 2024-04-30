@@ -61,9 +61,44 @@ func (r *HttpRequestComponent) args(s chtml.Scope) (*httpRequestArgs, error) {
 		p.Interval = v
 	}
 	if v, ok := vars["_"].(*html.Node); ok {
-		// collect all text nodes into a buffer:
 		var buf bytes.Buffer
 		for child := v.FirstChild; child != nil; child = child.NextSibling {
+			// parse basic-auth credentials:
+			if child.Type == html.ElementNode && child.Data == "basic-auth" {
+				// get username and password from the attributes:
+				for _, attr := range child.Attr {
+					switch attr.Key {
+					case "username", "user":
+						p.BasicUser = attr.Val
+					case "password", "pass":
+						p.BasicPassword = attr.Val
+					}
+				}
+			}
+
+			// parse <header name="...">...</header>:
+			if child.Type == html.ElementNode && child.Data == "header" {
+				if p.Header == nil {
+					p.Header = make(http.Header)
+				}
+				var key string
+				for _, attr := range child.Attr {
+					if attr.Key == "name" {
+						key = attr.Val
+					}
+				}
+				if key != "" {
+					var buf bytes.Buffer
+					for c := child.FirstChild; c != nil; c = c.NextSibling {
+						if c.Type == html.TextNode {
+							buf.WriteString(c.Data)
+						}
+					}
+					p.Header.Add(key, buf.String())
+				}
+			}
+
+			// collect all text nodes into a buffer:
 			if child.Type == html.TextNode {
 				buf.WriteString(child.Data)
 			}
@@ -107,10 +142,12 @@ func (r *HttpRequestComponent) Render(s chtml.Scope) (*chtml.RenderResult, error
 }
 
 type httpRequestArgs struct {
-	Method   string
-	URL      string
-	Interval time.Duration
-	Body     io.Reader
+	Method                   string
+	URL                      string
+	Interval                 time.Duration
+	BasicUser, BasicPassword string // BasicAuth credentials
+	Header                   http.Header
+	Body                     io.Reader
 }
 
 type httpRequestPoller struct {
@@ -214,6 +251,14 @@ func (p *httpRequestPoller) execute(args *httpRequestArgs) {
 	if err != nil {
 		updVars(nil, fmt.Errorf("create request: %w", err))
 		return
+	}
+
+	if args.BasicUser != "" || args.BasicPassword != "" {
+		req.SetBasicAuth(args.BasicUser, args.BasicPassword)
+	}
+
+	if len(args.Header) > 0 {
+		req.Header = args.Header
 	}
 
 	rr := httptest.NewRecorder()
