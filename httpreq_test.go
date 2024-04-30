@@ -10,7 +10,7 @@ import (
 	"github.com/dpotapov/go-pages/chtml"
 )
 
-func TestHttpRequestComponent_Execute(t *testing.T) {
+func TestHttpRequestComponent_Render(t *testing.T) {
 	type wantVars struct {
 		Code  int
 		Body  string
@@ -21,7 +21,7 @@ func TestHttpRequestComponent_Execute(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/data", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"data": "hello"}`))
+		_, _ = w.Write([]byte(`{"data": "hello"}`))
 	})
 	comp := &HttpRequestComponent{
 		Router: mux,
