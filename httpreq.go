@@ -19,9 +19,10 @@ import (
 // returned data in the scope.
 //
 // Usage example:
-//   <c:http-request c:var="data" url="/api/data" method="POST" interval="15s">
-//     { "input1": "value1", "input2": "value2" }
-//   </c:http-request>
+//
+//	<c:http-request c:var="data" url="/api/data" method="POST" interval="15s">
+//	  { "input1": "value1", "input2": "value2" }
+//	</c:http-request>
 //
 // In this example, the component will make a POST request to /api/data every 15 seconds and store
 // the response in the variable "data". If the response data has changed, the component
@@ -60,44 +61,30 @@ func (r *HttpRequestComponent) args(s chtml.Scope) (*httpRequestArgs, error) {
 	if v, ok := vars["interval"].(time.Duration); ok {
 		p.Interval = v
 	}
+	switch v := vars["basic-auth-username"].(type) {
+	case string:
+		p.BasicUser = v
+	case []string:
+		if len(v) > 0 {
+			p.BasicUser = v[0]
+		}
+	}
+	switch v := vars["basic-auth-password"].(type) {
+	case string:
+		p.BasicPassword = v
+	case []string:
+		if len(v) > 0 {
+			p.BasicPassword = v[0]
+		}
+	}
+	switch v := vars["cookies"].(type) {
+	case []*http.Cookie:
+		p.Cookies = v
+		// TODO: support other types
+	}
 	if v, ok := vars["_"].(*html.Node); ok {
 		var buf bytes.Buffer
 		for child := v.FirstChild; child != nil; child = child.NextSibling {
-			// parse basic-auth credentials:
-			if child.Type == html.ElementNode && child.Data == "basic-auth" {
-				// get username and password from the attributes:
-				for _, attr := range child.Attr {
-					switch attr.Key {
-					case "username", "user":
-						p.BasicUser = attr.Val
-					case "password", "pass":
-						p.BasicPassword = attr.Val
-					}
-				}
-			}
-
-			// parse <header name="...">...</header>:
-			if child.Type == html.ElementNode && child.Data == "header" {
-				if p.Header == nil {
-					p.Header = make(http.Header)
-				}
-				var key string
-				for _, attr := range child.Attr {
-					if attr.Key == "name" {
-						key = attr.Val
-					}
-				}
-				if key != "" {
-					var buf bytes.Buffer
-					for c := child.FirstChild; c != nil; c = c.NextSibling {
-						if c.Type == html.TextNode {
-							buf.WriteString(c.Data)
-						}
-					}
-					p.Header.Add(key, buf.String())
-				}
-			}
-
 			// collect all text nodes into a buffer:
 			if child.Type == html.TextNode {
 				buf.WriteString(child.Data)
@@ -141,12 +128,17 @@ func (r *HttpRequestComponent) Render(s chtml.Scope) (*chtml.RenderResult, error
 	}, nil
 }
 
+func (r *HttpRequestComponent) ResultSchema() any {
+	return httpRequestPoller{}
+}
+
 type httpRequestArgs struct {
 	Method                   string
 	URL                      string
 	Interval                 time.Duration
 	BasicUser, BasicPassword string // BasicAuth credentials
 	Header                   http.Header
+	Cookies                  []*http.Cookie
 	Body                     io.Reader
 }
 
@@ -252,6 +244,7 @@ func (p *httpRequestPoller) execute(args *httpRequestArgs) {
 		updVars(nil, fmt.Errorf("create request: %w", err))
 		return
 	}
+	req.RequestURI = args.URL
 
 	if args.BasicUser != "" || args.BasicPassword != "" {
 		req.SetBasicAuth(args.BasicUser, args.BasicPassword)
@@ -259,6 +252,10 @@ func (p *httpRequestPoller) execute(args *httpRequestArgs) {
 
 	if len(args.Header) > 0 {
 		req.Header = args.Header
+	}
+
+	for _, cookie := range args.Cookies {
+		req.AddCookie(cookie)
 	}
 
 	rr := httptest.NewRecorder()
