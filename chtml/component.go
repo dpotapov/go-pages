@@ -19,6 +19,13 @@ import (
 
 type Component interface {
 	Render(s Scope) (*RenderResult, error)
+
+	// InputSchema returns an example of the data object that the component expects as input.
+	// InputSchema() map[string]any
+
+	// ResultSchema returns an example of the data object that the component will return when
+	// rendered. It is used for type checking and providing default values.
+	ResultSchema() any
 }
 
 type RenderResult struct {
@@ -30,6 +37,9 @@ type RenderResult struct {
 
 // ErrComponentNotFound is returned by Importer implementations when a component is not found.
 var ErrComponentNotFound = errors.New("component not found")
+
+// ErrImportNotAllowed is returned when an Importer is not set for the component.
+var ErrImportNotAllowed = errors.New("imports are not allowed")
 
 // Importer defines an interface for importing components, providing a method to
 // retrieve a component provider by name. The component provider is a function that
@@ -56,31 +66,18 @@ type nodeMeta struct {
 	text             *vm.Program
 	loopVar, loopIdx string
 	imprt            Component
-	imprtVar         string
-	attrs            []nodeAttr
+	imprtVar         string // scope's variable name where the component's returned data will be stored
 	nextCond         *etree.Element
-}
 
-// nodeAttr stores prepared expression for HTML node attribute. If prog property is not nil, it
-// means that the attribute value is an expression. Otherwise, it's a static string value.
-type nodeAttr struct {
-	key, val string
-	prog     *vm.Program
-}
+	// attrs stores HTML node attributes with parsed values. Following value types are supported:
+	// - string: static value
+	// - *vm.Program: expression
+	// - []etree.Token: raw XML nodes
+	// All other types will be formatted as strings.
+	attrs map[string]any
 
-// parseContext stores data helping to parse a component.
-type parseContext struct {
-	args map[string]any
-}
-
-func (pc *parseContext) clone() *parseContext {
-	args := make(map[string]any, len(pc.args))
-	for k, v := range pc.args {
-		args[k] = v
-	}
-	return &parseContext{
-		args: args,
-	}
+	// attrsKeys stores the keys of the attributes in the order they were parsed
+	attrsKeys []string
 }
 
 // evalScope wraps the Scope with extra information for the rendering stage.
@@ -197,18 +194,25 @@ type chtmlComponent struct {
 	// component is not loaded from a file.
 	fname string
 
-	// args is populated with default values for arguments during parsing stage
-	args map[string]any
-
 	// doc is the root node of the parsed CHTML document
 	doc *etree.Document
 
 	// vm is being used to evaluate expressions in parsing stage
 	vm vm.VM
 
+	// args is a map of variables that are passed to the component during rendering.
+	// The map is populated with default values during parsing stage.
+	args map[string]any
+
+	// shadowed stores the original values of variables that were shadowed during parsing.
+	shadowed map[string][]any
+
 	// meta stores extra information about HTML nodes, such as prepared expressions
-	// for conditionals, loops, etc.
+	// for conditionals, loops, etc. This is being populated during parsing stage.
 	meta map[etree.Token]*nodeMeta
+
+	// err stores the first error that occurred during parsing.
+	err error
 
 	// importer resolves component imports.
 	importer Importer
@@ -217,79 +221,21 @@ type chtmlComponent struct {
 // Parse parses the CHTML component from the given reader into a suitable representation for
 // rendering.
 func Parse(r io.Reader, imp Importer) (Component, error) {
-	return parse(r, imp)
-}
-
-func parse(r io.Reader, imp Importer) (*chtmlComponent, error) {
-	// Since the CHTML file may not have a single root per XML spec, create an artificial one:
-	root := etree.NewElement("c:root")
-	root.CreateAttr("xmlns:c", "chtml")
-
 	c := &chtmlComponent{
-		args: map[string]any{
-			"_": nil, // always provide a default argument
-		},
-		doc:      etree.NewDocumentWithRoot(root),
-		meta:     make(map[etree.Token]*nodeMeta),
 		importer: imp,
 	}
 
-	// Parse the document into an etree:
-	tmpDoc := etree.NewDocument()
+	c.parse(r)
 
-	// Disable strict mode for XML decoder, see https://pkg.go.dev/encoding/xml#Decoder
-	tmpDoc.ReadSettings.Permissive = true
-	tmpDoc.ReadSettings.AutoClose = xml.HTMLAutoClose // auto-close common HTML elements
-
-	_, err := tmpDoc.ReadFrom(r)
-	if err != nil {
-		return nil, err
-	}
-
-	pc := &parseContext{args: c.args}
-
-	// iterate over child nodes in the root element
-	for _, child := range append([]etree.Token{}, tmpDoc.Child...) {
-		switch n := child.(type) {
-		case *etree.Element:
-			// parse & remove c:arg elements on the root level
-			if n.FullTag() == "c:arg" {
-				if err := c.parseArgs(n, pc.args); err != nil {
-					return nil, fmt.Errorf("parse args: %w", err)
-				}
-				tmpDoc.RemoveChildAt(n.Index())
-			} else {
-				// parse remaining elements recursively for imports, conditionals, loops, etc.
-				if err := c.parseElement(n, pc); err != nil {
-					return nil, err
-				}
-			}
-
-		case *etree.CharData:
-			// do not render whitespace text nodes at the root level
-			if !n.IsWhitespace() {
-				if err := c.parseText(n, pc); err != nil {
-					return nil, err // TODO: provide trace
-				}
-			} else {
-				tmpDoc.RemoveChildAt(n.Index())
-			}
-		default:
-			// remove any non-element and non-text nodes (comments, directives, etc.)
-			tmpDoc.RemoveChildAt(n.Index())
-		}
-	}
-
-	for i := len(tmpDoc.Child); i > 0; i-- {
-		root.AddChild(tmpDoc.Child[0])
-	}
-
-	return c, nil
+	return c, c.err
 }
 
 // ParseFile parses the CHTML component from the given file. Unlike Parse, it may also watch
 // for changes in the file and trigger a re-parse when necessary.
 func ParseFile(fsys fs.FS, fname string, imp Importer) (Component, error) {
+	if strings.HasPrefix(fname, "/") {
+		fname = fname[1:]
+	}
 	f, err := fsys.Open(fname)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -299,146 +245,218 @@ func ParseFile(fsys fs.FS, fname string, imp Importer) (Component, error) {
 	}
 	defer func() { _ = f.Close() }()
 
-	c, err := parse(f, imp)
-	if err != nil {
-		return nil, err
+	c := &chtmlComponent{
+		importer: imp,
+		fsys:     fsys,
+		fname:    fname,
 	}
 
-	c.fsys = fsys
-	c.fname = fname
+	c.parse(f)
 
-	return c, nil
+	return c, c.err
 }
 
-// parseArgs parses the <c:arg> element recursively and builds a map of values for the
-// component's arguments.
-func (c *chtmlComponent) parseArgs(el *etree.Element, args map[string]any) error {
-	name := el.SelectAttrValue("name", "")
+// parse walks the document tree and populates the component's meta map with extra
+// information about the nodes.
+// On a root level of a document, it looks for <c:arg> elements that define the component's input
+// arguments.
+func (c *chtmlComponent) parse(r io.Reader) {
+	c.doc = etree.NewDocument()
 
-	if name == "" {
-		return errors.New("missing name attribute in <c:arg> element")
+	// Disable strict mode for XML decoder, see https://pkg.go.dev/encoding/xml#Decoder
+	c.doc.ReadSettings.Permissive = true
+	c.doc.ReadSettings.AutoClose = xml.HTMLAutoClose // auto-close common HTML elements
+
+	c.meta = make(map[etree.Token]*nodeMeta)
+
+	// create implicit argument
+	c.meta[&c.doc.Element] = &nodeMeta{attrs: map[string]any{"_": nil}}
+	c.args = c.meta[&c.doc.Element].attrs
+
+	c.shadowed = make(map[string][]any)
+
+	if _, err := c.doc.ReadFrom(r); err != nil {
+		c.error(fmt.Errorf("read XML document: %w", err))
+		return
 	}
 
-	args[name] = nil
+	c.cleanWhitespace(&c.doc.Element)
 
-	for _, child := range el.Child {
-		switch el := child.(type) {
-		case *etree.Element:
-			if el.FullTag() == "c:arg" {
-				if args[name] == nil {
-					args[name] = map[string]any{}
-				}
-				if _, ok := args[name].(map[string]any); !ok {
-					return fmt.Errorf("argument %q is already defined", name)
-				}
-				nestedArgs := args[name].(map[string]any)
-				if err := c.parseArgs(el, nestedArgs); err != nil {
-					return err // TODO: provide trace
-				}
-				args[name] = nestedArgs
-			} else {
-				if args[name] == nil {
-					args[name] = &html.Node{
-						Type: html.DocumentNode,
-					}
-				}
-				if _, ok := args[name].(*html.Node); !ok {
-					return fmt.Errorf("argument %q is already defined", name)
-				}
-				return fmt.Errorf("html args are not implemented")
-			}
-		case *etree.CharData:
-			if el.IsWhitespace() {
-				continue
-			}
-			// either text or html
-			prog, err := Interpol(el.Data, args)
-			if err != nil {
-				return fmt.Errorf("parse arg expression: %w", err) // TODO: provide trace
-			}
-			if prog != nil {
-				res, err := c.vm.Run(prog, env(args))
-				if err != nil {
-					return fmt.Errorf("run arg expression: %w", err) // TODO: provide trace
-				}
-				args[name] = res
-			} else {
-				args[name] = el.Data
-			}
+	for _, child := range c.doc.Element.Child {
+		if n, ok := child.(*etree.Element); ok && n.FullTag() == "c:arg" {
+			c.parseArg(n)
+		} else {
+			c.parseToken(child)
 		}
 	}
-
-	return nil
 }
 
-// parseElement recursively parses the given node and its children, storing extra information about
+// cleanWhitespace removes any whitespace text nodes in children of the given node.
+func (c *chtmlComponent) cleanWhitespace(el *etree.Element) {
+	for i := 0; i < len(el.Child); i++ {
+		if n, ok := el.Child[i].(*etree.CharData); ok && n.IsWhitespace() {
+			el.RemoveChildAt(i)
+			i--
+		}
+	}
+}
+
+// parseToken recursively parses the given node and its children, storing extra information about
 // the node in the component's meta map.
 //
 // Parsing rules:
 // - whitespace text nodes are skipped
-// - <c:NAME> is a component import
-// - node attributes are parsed with parseAttrs()
 // - text nodes are parsed as expressions if they contain ${...} syntax
-func (c *chtmlComponent) parseElement(el *etree.Element, pc *parseContext) error {
-	if el.Space == "c" { // TODO: add extra check for namespace URI
-		if c.importer == nil {
-			return errors.New("imports are not allowed")
+// - <c:NAME> is a component import
+// - other HTML tags are parsed for attributes and child nodes
+func (c *chtmlComponent) parseToken(t etree.Token) {
+	switch n := t.(type) {
+	case *etree.Element:
+		if n.Space == "c" {
+			c.parseImport(n)
+		} else {
+			c.parseHTML(n)
 		}
-		compName := el.Tag
-		comp, err := c.importer.Import(compName)
-		if err != nil {
-			return fmt.Errorf("import %s: %w", compName, err)
-		}
-
-		imprtVar := el.SelectAttrValue("c:var", "")
-		if imprtVar == "" {
-			imprtVar = strings.ReplaceAll(strings.ToLower(compName), "-", "_")
-		}
-
-		c.meta[el] = &nodeMeta{
-			imprt:    comp,
-			imprtVar: imprtVar,
+	case *etree.CharData:
+		if !n.IsWhitespace() {
+			c.parseText(n)
 		}
 	}
-	if err := c.parseAttrs(el, pc); err != nil {
-		return err
-	}
-	nm := c.meta[el]
-	if nm != nil && nm.loop != nil {
-		pc = pc.clone()
-		pc.args[nm.loopVar] = new(any)
-		if nm.loopIdx != "" {
-			pc.args[nm.loopIdx] = 0
-		}
-	}
-
-	for _, child := range el.Child {
-		switch n := child.(type) {
-		case *etree.Element:
-			if err := c.parseElement(n, pc); err != nil {
-				return err // TODO: provide trace
-			}
-		case *etree.CharData:
-			if err := c.parseText(n, pc); err != nil {
-				return err // TODO: provide trace
-			}
-		default:
-			// remove any non-element and non-text nodes
-			el.RemoveChildAt(n.Index())
-		}
-	}
-	return nil
 }
 
-func (c *chtmlComponent) parseText(n *etree.CharData, pc *parseContext) error {
-	p, err := Interpol(n.Data, pc.args)
+// parseArg parses the <c:arg> element and stores its children in the parent's node metadata.
+func (c *chtmlComponent) parseArg(el *etree.Element) {
+	name := el.SelectAttrValue("name", "")
+
+	if name == "" {
+		c.error(fmt.Errorf("missing name attribute in %s", el.FullTag()))
+		return
+	}
+
+	if len(el.Attr) > 1 {
+		c.error(fmt.Errorf("unexpected attributes in %s", el.FullTag()))
+		return
+	}
+
+	parent := el.Parent()
+	nm := c.meta[parent]
+	if nm == nil {
+		nm = &nodeMeta{}
+		c.meta[parent] = nm
+	}
+	if nm.attrs == nil {
+		nm.attrs = make(map[string]any)
+	}
+
+	if _, ok := nm.attrs[name]; ok {
+		c.error(fmt.Errorf("duplicate argument %q in %s", name, parent.FullTag()))
+		return
+	}
+
+	if len(el.Child) == 0 {
+		nm.attrs[name] = new(any)
+	} else {
+		nm.attrs[name] = el.Child // TODO: remove whitespace text nodes?
+	}
+
+	nm.attrsKeys = append(nm.attrsKeys, name)
+
+	for _, t := range el.Child {
+		c.parseToken(t)
+	}
+}
+
+// parseImport parses the <c:NAME> element
+func (c *chtmlComponent) parseImport(el *etree.Element) {
+	compName := el.Tag
+
+	if compName == "arg" {
+		c.error(fmt.Errorf("c:arg element is not allowed in this context"))
+		return
+	}
+
+	if c.importer == nil {
+		c.error(ErrImportNotAllowed)
+		return
+	}
+
+	comp, err := c.importer.Import(compName)
 	if err != nil {
-		return err
+		c.error(fmt.Errorf("import %s: %w", compName, err))
+		return
+	}
+
+	imprtVar := el.SelectAttrValue("c:var", "")
+	if imprtVar != "" {
+		if _, ok := c.args[imprtVar]; ok {
+			c.error(fmt.Errorf("variable %q is already defined", imprtVar))
+			return
+		}
+
+		c.args[imprtVar] = comp.ResultSchema()
+
+		c.push(imprtVar, comp.ResultSchema())
+		defer c.pop(imprtVar)
+	}
+
+	nm := &nodeMeta{
+		imprt:    comp,
+		imprtVar: imprtVar,
+	}
+	c.meta[el] = nm
+
+	c.parseAttrs(el)
+
+	var defaultArg []etree.Token
+
+	c.cleanWhitespace(el)
+
+	for _, child := range el.Child {
+		if n, ok := child.(*etree.Element); ok && n.FullTag() == "c:arg" {
+			c.parseArg(n)
+		} else {
+			c.parseToken(child)
+			defaultArg = append(defaultArg, child)
+		}
+	}
+
+	if len(defaultArg) > 0 {
+		if nm.attrs == nil {
+			nm.attrs = make(map[string]any)
+		}
+		nm.attrs["_"] = defaultArg
+		nm.attrsKeys = append(nm.attrsKeys, "_")
+	}
+
+	// TODO: check inputs for the component (attrs and <c:arg> values)
+}
+
+func (c *chtmlComponent) parseHTML(el *etree.Element) {
+	c.parseAttrs(el)
+
+	for _, child := range el.Child {
+		c.parseToken(child)
+	}
+
+	if c.meta[el] != nil {
+		if c.meta[el].loopVar != "" {
+			c.pop(c.meta[el].loopVar)
+		}
+		if c.meta[el].loopIdx != "" {
+			c.pop(c.meta[el].loopIdx)
+		}
+	}
+}
+
+func (c *chtmlComponent) parseText(n *etree.CharData) {
+	p, err := Interpol(n.Data, c.args)
+	if err != nil {
+		c.error(err)
+		return
 	}
 	if p != nil {
 		c.meta[n] = &nodeMeta{text: p}
 	}
-	return nil
 }
 
 func (c *chtmlComponent) findPrevCond(n *etree.Element) *etree.Element {
@@ -463,108 +481,122 @@ func (c *chtmlComponent) findPrevCond(n *etree.Element) *etree.Element {
 // - c:else attribute is parsed as a conditional expression with "true" value
 // - c:for attribute is parsed as a loop expression
 // - other attributes are interpolated if they contain ${...} syntax
-func (c *chtmlComponent) parseAttrs(el *etree.Element, pc *parseContext) error {
+func (c *chtmlComponent) parseAttrs(el *etree.Element) {
 	specialAttrs := map[string]string{}
 	hasAttr := func(key string) bool {
 		_, ok := specialAttrs[key]
 		return ok
 	}
 
+	nm := c.meta[el]
+
 	if len(el.Attr) > 0 {
-		if c.meta[el] == nil {
-			c.meta[el] = &nodeMeta{}
+		if nm == nil {
+			nm = &nodeMeta{}
+			c.meta[el] = nm
 		}
-		if c.meta[el].attrs == nil {
-			c.meta[el].attrs = make([]nodeAttr, 0, len(el.Attr))
+		if nm.attrs == nil {
+			nm.attrs = make(map[string]any)
+			nm.attrsKeys = make([]string, 0, len(el.Attr))
 		}
 	}
 
 	for _, attr := range el.Attr {
-		switch attr.FullKey() {
+		fk := attr.FullKey()
+
+		switch fk {
 		case "c:if", "c:else-if", "c:else", "c:for":
-			if _, ok := specialAttrs[attr.FullKey()]; ok {
-				return fmt.Errorf("cannot use %s twice on the same element", attr.FullKey())
+			if _, ok := specialAttrs[fk]; ok {
+				c.error(fmt.Errorf("cannot use %s twice on the same element", fk))
+				return
 			}
-			specialAttrs[attr.FullKey()] = attr.Value
+			specialAttrs[fk] = attr.Value
 		default:
-			na := nodeAttr{key: attr.FullKey()}
-			p, err := Interpol(attr.Value, pc.args)
+			p, err := Interpol(attr.Value, c.args)
 			if err != nil {
-				return err
+				c.error(fmt.Errorf("parse attribute %s: %w", fk, err))
+				return
 			}
 			if p != nil {
-				na.prog = p
+				nm.attrs[fk] = p
 			} else {
-				na.val = attr.Value
+				nm.attrs[fk] = attr.Value
 			}
-			c.meta[el].attrs = append(c.meta[el].attrs, na)
+			nm.attrsKeys = append(nm.attrsKeys, fk)
 		}
 	}
 	if hasAttr("c:if") && hasAttr("c:else-if") {
-		return errors.New("cannot use c:if with c:else-if on the same element")
+		c.error(errors.New("cannot use c:if with c:else-if on the same element"))
 	}
 	if hasAttr("c:if") && hasAttr("c:else") {
-		return errors.New("cannot use c:if with c:else on the same element")
+		c.error(errors.New("cannot use c:if with c:else on the same element"))
 	}
 	if hasAttr("c:else-if") && hasAttr("c:else") {
-		return errors.New("cannot use c:else-if with c:else on the same element")
+		c.error(errors.New("cannot use c:else-if with c:else on the same element"))
 	}
 	if specialAttrs["c:else"] != "" && specialAttrs["c:else"] != "else" {
-		return errors.New("unexpected value for c:else")
+		c.error(errors.New("unexpected value for c:else"))
 	}
 
 	if _, ok := specialAttrs["c:if"]; ok {
 		prog, err := expr.Compile(specialAttrs["c:if"], expr.Optimize(true), expr.AsBool())
 		if err != nil {
-			return err // TODO: provide trace
+			c.error(fmt.Errorf("parse c:if: %w", err))
+			return
 		}
-		c.meta[el].cond = prog
+		nm.cond = prog
 	} else if _, ok := specialAttrs["c:else-if"]; ok {
 		prog, err := expr.Compile(specialAttrs["c:else-if"], expr.Optimize(true), expr.AsBool())
 		if err != nil {
-			return err // TODO: provide trace
+			c.error(fmt.Errorf("parse c:else-if: %w", err))
+			return
 		}
-		c.meta[el].cond = prog
+		nm.cond = prog
 		if prevCond := c.findPrevCond(el); prevCond != nil {
 			c.meta[prevCond].nextCond = el
 		} else {
-			return errors.New("c:else-if must be used after c:if")
+			c.error(errors.New("c:else-if must be used after c:if"))
+			return
 		}
 	} else if _, ok := specialAttrs["c:else"]; ok {
 		prog, err := expr.Compile("true")
 		if err != nil {
-			return err // TODO: provide trace
+			c.error(fmt.Errorf("parse c:else: %w", err))
+			return
 		}
-		c.meta[el].cond = prog
+		nm.cond = prog
 		if prevCond := c.findPrevCond(el); prevCond != nil {
 			c.meta[prevCond].nextCond = el
 		} else {
-			return errors.New("c:else must be used after c:if or c:else-if")
+			c.error(errors.New("c:else must be used after c:if or c:else-if"))
+			return
 		}
 	}
 	if _, ok := specialAttrs["c:for"]; ok {
 		v, k, ex, err := parseLoopExpr(specialAttrs["c:for"])
 		if err != nil {
-			return err
+			c.error(fmt.Errorf("parse c:for: %w", err))
+			return
 		}
 		prog, err := expr.Compile(ex, expr.Optimize(true))
 		if err != nil {
-			return err // TODO: provide trace
+			c.error(fmt.Errorf("parse c:for: %w", err))
+			return
 		}
-		c.meta[el].loop = prog
-		c.meta[el].loopVar = v
-		c.meta[el].loopIdx = k
+		nm.loop = prog
+		nm.loopVar = v
+		nm.loopIdx = k
+
+		c.push(v, new(any))
+		if k != "" {
+			c.push(k, 0)
+		}
 	}
-	return nil
 }
 
 // Render builds a new HTML document by evaluating the expressions in the component's tree and
 // stores the result in the scope's "_" variable.
 func (c *chtmlComponent) Render(s Scope) (*RenderResult, error) {
-	newDoc := &html.Node{
-		Type: html.DocumentNode,
-	}
-
 	// create an evalScope if the given scope is not an evalScope
 	var es *evalScope
 	if evalScope, ok := s.(*evalScope); ok {
@@ -581,11 +613,27 @@ func (c *chtmlComponent) Render(s Scope) (*RenderResult, error) {
 	vars := es.Vars()
 	for k, v := range c.args {
 		if _, ok := vars[k]; !ok {
+
+			// if the argument is raw XML, evaluate into HTML:
+			if tokens, ok := v.([]etree.Token); ok {
+				n := &html.Node{Type: html.DocumentNode}
+				for _, t := range tokens {
+					if err := c.eval(n, t, es); err != nil {
+						return nil, fmt.Errorf("eval arg %s: %w", k, err)
+					}
+				}
+				v = n
+			}
+
 			vars[k] = v
 		}
 	}
 
-	for _, child := range c.doc.Root().Child {
+	newDoc := &html.Node{
+		Type: html.DocumentNode,
+	}
+
+	for _, child := range c.doc.Element.Child {
 		if err := c.eval(newDoc, child, es); err != nil {
 			return nil, err
 		}
@@ -597,6 +645,10 @@ func (c *chtmlComponent) Render(s Scope) (*RenderResult, error) {
 		HTML:       newDoc,
 		Data:       nil, // the CHMTL component does not return any data
 	}, nil
+}
+
+func (c *chtmlComponent) ResultSchema() any {
+	return nil
 }
 
 // evalIf evaluates the conditional expression (c:if, c:else-if, c:else) for the given node and
@@ -631,26 +683,33 @@ func (c *chtmlComponent) evalIf(dst *html.Node, src *etree.Element, es *evalScop
 
 // evalAttrs loops over the attributes of the source node and evaluates the expressions for them.
 // If the attribute has no associated expression, it is copied as is.
+// If the given element is an import, skip the evaluation and return immediately.
 func (c *chtmlComponent) evalAttrs(dst *html.Node, src *etree.Element, es *evalScope) error {
 	nm := c.meta[src]
 	if nm == nil || nm.attrs == nil {
 		return nil
 	}
-	attrs := make([]html.Attribute, len(nm.attrs))
-	for i, attr := range nm.attrs {
-		if attr.prog != nil {
-			res, err := c.vm.Run(attr.prog, env(es.Vars()))
+	attrs := make([]html.Attribute, 0, len(nm.attrs))
+	for k, v := range nm.attrs {
+		var sv string
+
+		switch attr := v.(type) {
+		case string:
+			sv = attr
+		case *vm.Program:
+			res, err := c.vm.Run(attr, env(es.Vars()))
 			if err != nil {
 				return err // TODO: provide trace
 			}
-			s, ok := res.(string)
-			if res != nil && !ok {
-				return errors.New("attribute expression must return string")
-			}
-			attrs[i] = html.Attribute{Key: attr.key, Val: s}
-		} else {
-			attrs[i] = html.Attribute{Key: attr.key, Val: attr.val}
+			sv = fmt.Sprint(res)
+		case []etree.Token:
+			continue // skip raw XML nodes
+		case *html.Node:
+			continue // skip HTML nodes
+		default:
+			sv = fmt.Sprint(v)
 		}
+		attrs = append(attrs, html.Attribute{Key: k, Val: sv})
 	}
 	dst.Attr = nil
 	if len(attrs) > 0 {
@@ -704,66 +763,50 @@ func (c *chtmlComponent) evalImport(dst *html.Node, src *etree.Element, es *eval
 		return nil
 	}
 
-	// build list of arguments for the child component
-	args := make(map[string]any)
-	for _, attr := range nm.attrs {
-		if attr.prog != nil {
-			res, err := c.vm.Run(attr.prog, env(es.Vars()))
+	vars := es.Vars()
+
+	for k, v := range nm.attrs {
+		// eval expressions in the scope
+		switch val := v.(type) {
+		case *vm.Program:
+			res, err := c.vm.Run(val, env(vars))
 			if err != nil {
-				return err // TODO: provide trace
-			}
-			args[attr.key] = res
-		} else {
-			args[attr.key] = attr.val
-		}
-	}
-
-	nonameArg := "_"
-
-	// add extra arguments based on child <c:arg> elements
-	// It is assumed that the dst tree has already been evaluated, thus the values there are
-	// ready to become arguments for the imported component.
-	for child := dst.FirstChild; child != nil; child = child.NextSibling {
-		if child.Type == html.ElementNode && child.Data == "c:arg" {
-			if err := c.parseArgs(src, args); err != nil {
-				return err // TODO: provide trace
-			}
-		} else {
-			// skip TextNodes with whitespace
-			if child.Type == html.TextNode && strings.TrimSpace(child.Data) == "" {
-				continue
-			}
-
-			var sb strings.Builder
-			if err := html.Render(&sb, child); err != nil {
 				return err
 			}
-			if _, ok := args[nonameArg]; !ok {
-				args[nonameArg] = &html.Node{
-					Type: html.DocumentNode,
+			vars[k] = res
+		case []etree.Token:
+			n := &html.Node{Type: html.DocumentNode}
+			for _, t := range val {
+				if err := c.eval(n, t, es); err != nil {
+					return fmt.Errorf("eval attr %s: %w", k, err)
 				}
 			}
-			if doc, ok := args[nonameArg].(*html.Node); !ok {
-				return fmt.Errorf("import: argument %q is already defined", nonameArg)
-			} else {
-				doc.AppendChild(&html.Node{
-					Type: html.RawNode,
-					Data: sb.String(),
-				})
+			vars[k] = n
+		}
+
+		// if the variable is an HTML node with a single text child, use it as the value
+		if n, ok := vars[k].(*html.Node); ok {
+			if n.FirstChild != nil && n.FirstChild == n.LastChild && n.FirstChild.Type == html.TextNode {
+				vars[k] = n.FirstChild.Data
 			}
 		}
 	}
 
 	// retrieve the scope for the imported component or create a new one
-	cs := es.spawn(args, src, 0)
+	cs := es.spawn(nil, src, 0)
 
-	// make the scope isolated (keep only vars matching the component's arguments)
-	vars := cs.Vars()
-	for k, v := range args {
-		if _, ok := vars[k]; !ok {
-			vars[k] = v
+	// make the scope isolated (keep only vars matching the component's arguments).
+	// using closure here just for grouping the code.
+	func() {
+		vars := cs.Vars()
+
+		// remove all vars that do not belong to the component
+		for k := range vars {
+			if _, ok := nm.attrs[k]; !ok {
+				delete(vars, k)
+			}
 		}
-	}
+	}()
 
 	rr, err := nm.imprt.Render(cs)
 	if err != nil {
@@ -771,11 +814,7 @@ func (c *chtmlComponent) evalImport(dst *html.Node, src *etree.Element, es *eval
 	}
 
 	if rr.HTML != nil {
-		*dst = *rr.HTML
-	} else {
-		// if the imported component does not return HTML, replace the output node with a stub
-		dst.Type = html.RawNode
-		dst.Data = ""
+		dst.AppendChild(rr.HTML)
 	}
 
 	if rr.Data != nil && nm.imprtVar != "" {
@@ -804,15 +843,19 @@ func (c *chtmlComponent) evalImport(dst *html.Node, src *etree.Element, es *eval
 
 // evalText evaluates the interpolated expression for the given text node and stores the result in
 // the destination node.
-// If the text node is not an expression, no action is taken.
+// If the text node is not an expression, the value is copied as is.
 func (c *chtmlComponent) evalText(dst *html.Node, src *etree.CharData, es *evalScope) error {
 	nm := c.meta[src]
 	if nm == nil || nm.text == nil {
+		dst.AppendChild(&html.Node{
+			Type: html.TextNode,
+			Data: src.Data,
+		})
 		return nil
 	}
 	res, err := c.vm.Run(nm.text, env(es.Vars()))
 	if err != nil {
-		return err
+		return fmt.Errorf("eval text %s: %w", src.Parent().GetPath(), err)
 	}
 	switch v := res.(type) {
 	case string:
@@ -838,15 +881,16 @@ func (c *chtmlComponent) evalText(dst *html.Node, src *etree.CharData, es *evalS
 	return nil
 }
 
-// evalElement evaluates all expressions in conditionals, loops, child nodes, imports for the source node
-// tree and clones relevant nodes to the destination tree.
+// evalElement evaluates all expressions in conditionals, loops, child nodes, imports for the
+// source node tree and clones relevant nodes to the destination tree.
 //
 // The evaluation process is performed in the following order:
 // 1. conditionals (c:if, c:else-if, c:else)
 // 2. loops (c:for)
-// 3. attributes
-// 4. child nodes
-// 5. imports (<c:NAME>)
+// 3. import arguments (<c:arg>)
+// 4. attributes
+// 5. child nodes and child <c:arg> elements
+// 6. imports (<c:NAME>)
 func (c *chtmlComponent) evalElement(dst *html.Node, src *etree.Element, es *evalScope) error {
 	if _, ok := es.hidden[src]; ok {
 		return nil
@@ -865,26 +909,37 @@ func (c *chtmlComponent) evalElement(dst *html.Node, src *etree.Element, es *eva
 		return nil
 	}
 
-	clone := &html.Node{
-		Type:     html.ElementNode,
-		DataAtom: atom.Lookup([]byte(src.FullTag())),
-		Data:     src.FullTag(),
-	}
-	if err := c.evalAttrs(clone, src, es); err != nil {
-		return err
+	if src.FullTag() == "c:arg" { // TODO: find a better way to not render <c:arg> elements
+		return nil
 	}
 
-	for _, child := range src.Child {
-		if err := c.eval(clone, child, es); err != nil {
+	nm := c.meta[src]
+	if nm == nil || nm.imprt == nil {
+		// if the element is not an import, clone it to the destination tree as HTML
+		clone := &html.Node{
+			Type:     html.ElementNode,
+			DataAtom: atom.Lookup([]byte(src.FullTag())),
+			Data:     src.FullTag(),
+		}
+
+		// eval attributes into values for the cloned node
+		if err := c.evalAttrs(clone, src, es); err != nil {
 			return err
+		}
+
+		for _, child := range src.Child {
+			if err := c.eval(clone, child, es); err != nil {
+				return err
+			}
+		}
+
+		dst.AppendChild(clone)
+	} else if nm.imprt != nil {
+		if err := c.evalImport(dst, src, es); err != nil {
+			return fmt.Errorf("eval import %s: %w", src.GetPath(), err)
 		}
 	}
 
-	if err := c.evalImport(clone, src, es); err != nil {
-		return err
-	}
-
-	dst.AppendChild(clone)
 	return nil
 }
 
@@ -896,6 +951,35 @@ func (c *chtmlComponent) eval(dst *html.Node, src etree.Token, es *evalScope) er
 		return c.evalText(dst, n, es)
 	}
 	return nil
+}
+
+// error captures the first error that occurred during parsing.
+func (c *chtmlComponent) error(err error) {
+	if c.err == nil {
+		c.err = err
+	}
+}
+
+// push adds a variable (argument) to the parsing context. If the current scope already has
+// a variable with the same name, it is shadowed and restored when the variable is popped.
+func (c *chtmlComponent) push(name string, v any) {
+	if t, ok := c.args[name]; ok {
+		c.shadowed[name] = append(c.shadowed[name], t)
+	}
+	c.args[name] = v
+}
+
+// pop removes a variable from the parsing context, restoring the previous value if it was shadowed.
+func (c *chtmlComponent) pop(name string) any {
+	v := c.args[name]
+	if len(c.shadowed[name]) > 0 {
+		p := c.shadowed[name][len(c.shadowed[name])-1]
+		c.shadowed[name] = c.shadowed[name][:len(c.shadowed[name])-1]
+		c.args[name] = p
+	} else {
+		delete(c.args, name)
+	}
+	return v
 }
 
 func cloneNode(n *html.Node) *html.Node {

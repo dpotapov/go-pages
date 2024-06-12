@@ -1,8 +1,7 @@
 <c:arg name="todo" />
 <c:arg name="todo_done_id" />
-<c:arg name="todos" />
 
-<c:todos-store add="${todo}" del="${todo_done_id}" />
+<c:todos-store add="${todo}" del="${todo_done_id}" c:var="todos" />
 
 <div id="todo-list">
   <ol c:if="len(todos) > 0">
