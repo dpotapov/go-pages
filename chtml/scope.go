@@ -21,7 +21,7 @@ type Scope interface {
 }
 
 // ScopeMap is a simple implementation of the Scope interface based on map[string]any type and
-// suitable to work with expr-lang's env. This implementation copies the variables from the parent
+// suitable to work with expr-lang's args. This implementation copies the variables from the parent
 // scope to the child scope.
 type ScopeMap struct {
 	parent Scope

@@ -53,8 +53,6 @@ func (t *todos) Render(s chtml.Scope) (*chtml.RenderResult, error) {
 		}
 	}
 
-	s.Parent().Vars()["todos"] = t.todos
-
 	sub := t.subscription(s)
 
 	if changed {
@@ -78,7 +76,13 @@ func (t *todos) Render(s chtml.Scope) (*chtml.RenderResult, error) {
 		}
 	}()
 
-	return nil, nil
+	return &chtml.RenderResult{
+		Data: t.todos,
+	}, nil
+}
+
+func (t *todos) ResultSchema() any {
+	return []string{}
 }
 
 func main() {

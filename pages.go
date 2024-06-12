@@ -196,12 +196,13 @@ func (h *Handler) servePage(w http.ResponseWriter, r *http.Request, fsPath strin
 				// update scope vars with args
 				scope.setVars(args)
 
-				if _, err := comp.Render(scope); err != nil {
+				rr, err := comp.Render(scope)
+				if err != nil {
 					return fmt.Errorf("render component: %w", err)
 				}
 
-				if htmlDoc, ok := scope.Vars()["$html"].(*html.Node); ok {
-					if err := html.Render(w, htmlDoc); err != nil {
+				if rr.HTML != nil {
+					if err := html.Render(w, rr.HTML); err != nil {
 						return fmt.Errorf("render HTML: %w", err)
 					}
 				}
@@ -523,6 +524,7 @@ type RequestArg struct {
 	RemoteAddr string              `expr:"remote_addr"`
 
 	Headers map[string][]string `expr:"headers"`
+	Cookies []*http.Cookie      `expr:"cookies"`
 
 	// Body is available only when the content type is either application/json or
 	// application/x-www-form-urlencoded.
@@ -544,6 +546,7 @@ func NewRequestArg(r *http.Request) *RequestArg {
 		Query:      r.URL.Query(),
 		RemoteAddr: r.RemoteAddr,
 		Headers:    r.Header,
+		Cookies:    r.Cookies(),
 		Body:       nil,
 		RawBody:    r.Body,
 	}

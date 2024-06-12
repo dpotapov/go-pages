@@ -2,6 +2,7 @@ package chtml
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -19,7 +20,8 @@ func TestParse(t *testing.T) {
 			<li><a href="foo">Foo</a></li>
 			<li><a href="/bar/baz">BarBaz</a></li>
 		</ul>`
-	comp, err := Parse(strings.NewReader(s), nil)
+	r := strings.NewReader(s)
+	comp, err := Parse(r, nil)
 	if err != nil {
 		t.Errorf("Parse() error = %v", err)
 		return
@@ -29,14 +31,13 @@ func TestParse(t *testing.T) {
 	// Check args:
 	require.Equal(t, 2, len(c.args))
 	require.Equal(t, nil, c.args["_"])
-	require.Equal(t, "http://foo.bar", c.args["link1"])
+	require.IsType(t, []etree.Token{}, c.args["link1"])
 
 	// Check links:
-	require.NotNil(t, c.doc)
-	require.NotNil(t, c.doc.Root())
-	require.Equal(t, 2, len(c.doc.Root().Child))
-	require.Equal(t, "p", c.doc.Root().Child[0].(*etree.Element).Tag)
-	require.Equal(t, "ul", c.doc.Root().Child[1].(*etree.Element).Tag)
+	require.Len(t, c.doc.Element.ChildElements(), 3)
+	ul := c.doc.Element.SelectElement("ul")
+	require.NotNil(t, ul)
+	require.Len(t, ul.ChildElements(), 2)
 }
 
 func Test_parseLoopExpr(t *testing.T) {
@@ -154,10 +155,12 @@ func TestComponent_ParseAndRender(t *testing.T) {
 				<c:simple-page title="${page_title}">
 					${page_content}
 				</c:simple-page>`,
-			output:  `<h1>Default Title</h1><div>Default Content</div>`,
+			output: `<h1>Default Title</h1><div>
+					Default Content
+				</div>`,
 			wantErr: nil,
 		},
-		/*{
+		{
 			name: "htmlTitleAndContent",
 			template: `
 				<c:arg name="page_title">
@@ -169,15 +172,19 @@ func TestComponent_ParseAndRender(t *testing.T) {
 				<c:simple-page title="${page_title}">
 					<p>${page_content}</p>
 				</c:simple-page>`,
-			output:  `<h1>Default Title</h1><div>Default Content</div>`,
-			wantErr: errors.New("attribute expression must return string"),
+			output: `<h1>
+					<i>Default Title</i>
+				</h1><div><p>
+					<strong>Default Content</strong>
+				</p></div>`,
+			wantErr: nil,
 		},
 		{
 			name:     "doubleHtmlArgEval",
 			template: `<c:arg name="content"><ul><li>Item</li></ul></c:arg>${content}<p>${content}</p>`,
 			output:   `<ul><li>Item</li></ul><p><ul><li>Item</li></ul></p>`,
 			wantErr:  nil,
-		},*/
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -213,8 +220,8 @@ func TestComponent_ParseAndRender(t *testing.T) {
 			}
 			got := b.String()
 			want := tt.output
-			if got != want {
-				t.Errorf("Render() got = %v, want %v", got, want)
+			if diff := cmp.Diff(got, want); diff != "" {
+				t.Errorf("Render() diff (-got +want):\n%s", diff)
 			}
 		})
 	}
@@ -242,53 +249,41 @@ func TestComponent_parseArgs(t *testing.T) {
 		{
 			name:     "emptyArg",
 			nodes:    `<c:arg name="foo" />`,
-			wantArgs: map[string]any{"_": nil, "foo": nil},
+			wantArgs: map[string]any{"_": nil, "foo": new(any)},
 			wantErr:  false,
 		},
 		{
 			name:     "stringArg",
 			nodes:    `<c:arg name="foo">bar</c:arg>`,
-			wantArgs: map[string]any{"_": nil, "foo": "bar"},
+			wantArgs: map[string]any{"_": nil, "foo": []etree.Token{etree.NewText("bar")}},
 			wantErr:  false,
 		},
 		{
 			name:     "stringArgInterpol",
 			nodes:    `<c:arg name="foo">${"bar"}</c:arg>`,
-			wantArgs: map[string]any{"_": nil, "foo": "bar"},
+			wantArgs: map[string]any{"_": nil, "foo": []etree.Token{etree.NewText("${\"bar\"}")}},
 			wantErr:  false,
 		},
 		{
-			name:     "intArg",
-			nodes:    `<c:arg name="foo">${123}</c:arg>`,
-			wantArgs: map[string]any{"_": nil, "foo": 123},
-			wantErr:  false,
-		},
-		{
-			name:     "floatArg",
-			nodes:    `<c:arg name="foo">${1.23}</c:arg>`,
-			wantArgs: map[string]any{"_": nil, "foo": 1.23},
-			wantErr:  false,
-		},
-		{
-			name:     "boolArg",
-			nodes:    `<c:arg name="foo">${true}</c:arg>`,
-			wantArgs: map[string]any{"_": nil, "foo": true},
-			wantErr:  false,
-		},
-		/*{
-				name: "htmlArg",
-				nodes: `
+			name: "htmlArg",
+			nodes: `
 					<c:arg name="foo">
 						<p>bar</p>
 						<pre>baz</pre>
 					</c:arg>
 		    	`,
-				wantArgs: map[string]any{
-					"_":   nil,
-					"foo": wantHTML(t, `<p>bar</p><pre>baz</pre>`),
+			wantArgs: map[string]any{
+				"_": nil,
+				"foo": []etree.Token{
+					etree.NewText("\n\t\t\t\t\t"),
+					etree.NewElement("p"),
+					etree.NewText("\n\t\t\t\t\t"),
+					etree.NewElement("pre"),
+					etree.NewText("\n\t\t\t\t\t"),
 				},
-				wantErr: false,
-			},*/
+			},
+			wantErr: false,
+		},
 		{
 			name: "nestedArg",
 			nodes: `
@@ -298,13 +293,10 @@ func TestComponent_parseArgs(t *testing.T) {
 				</c:arg>
 			`,
 			wantArgs: map[string]any{
-				"_": nil,
-				"foo": map[string]any{
-					"bar": "baz",
-					"baz": 123,
-				},
+				"_":   nil,
+				"foo": []etree.Token{},
 			},
-			wantErr: false,
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -317,7 +309,30 @@ func TestComponent_parseArgs(t *testing.T) {
 				return
 			}
 
-			if diff := cmp.Diff(c.(*chtmlComponent).args, tt.wantArgs); diff != "" {
+			opts := cmp.Options{
+				cmp.FilterPath(func(p cmp.Path) bool {
+					if len(p) > 1 {
+						prev := p.Index(-2)
+
+						// Ignore non-Data properties for text nodes.
+						if prev.Type() == reflect.TypeOf(etree.CharData{}) {
+							return p.Last().String() != "Data"
+						}
+
+						// Ignore all properties for elements except Space and Tag.
+						if prev.Type() == reflect.TypeOf(etree.Element{}) {
+							switch p.Last().String() {
+							case "Space", "Tag":
+								return false
+							}
+							return true
+						}
+					}
+					return false
+				}, cmp.Ignore()),
+			}
+
+			if diff := cmp.Diff(c.(*chtmlComponent).args, tt.wantArgs, opts); diff != "" {
 				t.Errorf("Parse() diff (-got +want):\n%s", diff)
 			}
 		})
