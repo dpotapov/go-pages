@@ -30,7 +30,7 @@ func newComponentError(compName string, t etree.Token, err error) *ComponentErro
 }
 
 func (e *ComponentError) Error() string {
-	return e.path + ": " + e.err.Error()
+	return e.name + ": " + e.path + ": " + e.err.Error()
 }
 
 func (e *ComponentError) Unwrap() error {
