@@ -67,6 +67,13 @@ type Handler struct {
 	// OnError is a callback that is called when an error occurs while serving a page.
 	OnError func(*http.Request, error)
 
+	// OnErrorComponent is a name of a component that is rendered when an error occurs while
+	// rendering a page.
+	// This component is not invoked on general request processing errors where the OnError
+	// callback can be used.
+	// If not set, a standard "Internal Server Error" will be sent back to the client.
+	OnErrorComponent string
+
 	// Logger configures logging for internal events.
 	Logger *slog.Logger
 
@@ -75,6 +82,9 @@ type Handler struct {
 
 	// logger is a private logger instance that is used to log internal events.
 	logger *slog.Logger
+
+	// errComp is an imported error component instance if OnErrorComponent is set.
+	errComp chtml.Component
 }
 
 // ServeHTTP implements the http.Handler interface.
@@ -85,6 +95,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 		if h.Logger != nil {
 			h.logger = h.Logger
+		}
+
+		// initialize the error component:
+		if h.OnErrorComponent != "" {
+			imp := h.importer(".")
+			ec, err := imp.Import(h.OnErrorComponent)
+			if err != nil {
+				h.logger.Error("Import error component", "error", err)
+			}
+			h.errComp = ec
 		}
 	})
 
@@ -133,10 +153,9 @@ func (h *Handler) handleRequest(w http.ResponseWriter, r *http.Request) error {
 func (h *Handler) servePage(w http.ResponseWriter, r *http.Request, fsPath string, args map[string]any) error {
 	imp := h.importer(path.Dir(fsPath))
 
-	comp, err := imp.Import(path.Base(strings.TrimSuffix(fsPath, chtmlExt)))
-	if err != nil {
-		return fmt.Errorf("get component %s: %w", fsPath, err)
-	}
+	compName := path.Base(strings.TrimSuffix(fsPath, chtmlExt))
+
+	comp := NewErrorHandlerComponent(compName, imp, h.errComp)
 
 	scope := newScope(args)
 	defer scope.close()
@@ -219,7 +238,10 @@ func (h *Handler) servePage(w http.ResponseWriter, r *http.Request, fsPath strin
 	} else {
 		rr, err := comp.Render(scope)
 		if err != nil {
-			return fmt.Errorf("render component: %w", err)
+			rr.StatusCode = http.StatusInternalServerError
+			h.logger.Error("Render component", "error", err)
+			// w.WriteHeader(http.StatusInternalServerError)
+			// return fmt.Errorf("render component: %w", err)
 		}
 
 		if len(rr.Header) > 0 {
@@ -429,7 +451,7 @@ func (h *Handler) importer(dir string) chtml.ImporterFunc {
 			}
 
 			comp, err := chtml.ParseFile(h.FileSystem, p, h.importer(path.Dir(p)))
-			if errors.Is(err, chtml.ErrComponentNotFound) {
+			if err == chtml.ErrComponentNotFound {
 				continue
 			}
 

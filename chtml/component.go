@@ -101,6 +101,9 @@ type evalScope struct {
 
 	// closed is a channel that is closed when the scope is not going to be rendered.
 	closed chan struct{}
+
+	// errs accumulates errors during rendering
+	errs []error
 }
 
 func newEvalScope(s Scope) *evalScope {
@@ -183,6 +186,10 @@ func (es *evalScope) closeChild(src etree.Token, n int) {
 			scopes[i] = nil
 		}
 	}
+}
+
+func (es *evalScope) error(t etree.Token, err error) {
+	es.errs = append(es.errs, newComponentError("tbd", t, err))
 }
 
 // chtmlComponent is an instance of a CHTML component, ready to be rendered.
@@ -276,7 +283,7 @@ func (c *chtmlComponent) parse(r io.Reader) {
 	c.shadowed = make(map[string][]any)
 
 	if _, err := c.doc.ReadFrom(r); err != nil {
-		c.error(fmt.Errorf("read XML document: %w", err))
+		c.error(&c.doc.Element, fmt.Errorf("read XML document: %w", err))
 		return
 	}
 
@@ -329,12 +336,12 @@ func (c *chtmlComponent) parseArg(el *etree.Element) {
 	name := el.SelectAttrValue("name", "")
 
 	if name == "" {
-		c.error(fmt.Errorf("missing name attribute in %s", el.FullTag()))
+		c.error(el, fmt.Errorf("missing name attribute in %s", el.FullTag()))
 		return
 	}
 
 	if len(el.Attr) > 1 {
-		c.error(fmt.Errorf("unexpected attributes in %s", el.FullTag()))
+		c.error(el, fmt.Errorf("unexpected attributes in %s", el.FullTag()))
 		return
 	}
 
@@ -349,7 +356,7 @@ func (c *chtmlComponent) parseArg(el *etree.Element) {
 	}
 
 	if _, ok := nm.attrs[name]; ok {
-		c.error(fmt.Errorf("duplicate argument %q in %s", name, parent.FullTag()))
+		c.error(el, fmt.Errorf("duplicate argument %q in %s", name, parent.FullTag()))
 		return
 	}
 
@@ -371,25 +378,25 @@ func (c *chtmlComponent) parseImport(el *etree.Element) {
 	compName := el.Tag
 
 	if compName == "arg" {
-		c.error(fmt.Errorf("c:arg element is not allowed in this context"))
+		c.error(el, fmt.Errorf("c:arg element is not allowed in this context"))
 		return
 	}
 
 	if c.importer == nil {
-		c.error(ErrImportNotAllowed)
+		c.error(el, ErrImportNotAllowed)
 		return
 	}
 
 	comp, err := c.importer.Import(compName)
 	if err != nil {
-		c.error(fmt.Errorf("import %s: %w", compName, err))
+		c.error(el, fmt.Errorf("import %s: %w", compName, err))
 		return
 	}
 
 	imprtVar := el.SelectAttrValue("c:var", "")
 	if imprtVar != "" {
 		if _, ok := c.args[imprtVar]; ok {
-			c.error(fmt.Errorf("variable %q is already defined", imprtVar))
+			c.error(el, fmt.Errorf("variable %q is already defined", imprtVar))
 			return
 		}
 
@@ -451,7 +458,7 @@ func (c *chtmlComponent) parseHTML(el *etree.Element) {
 func (c *chtmlComponent) parseText(n *etree.CharData) {
 	p, err := Interpol(n.Data, c.args)
 	if err != nil {
-		c.error(err)
+		c.error(n, err)
 		return
 	}
 	if p != nil {
@@ -507,14 +514,14 @@ func (c *chtmlComponent) parseAttrs(el *etree.Element) {
 		switch fk {
 		case "c:if", "c:else-if", "c:else", "c:for":
 			if _, ok := specialAttrs[fk]; ok {
-				c.error(fmt.Errorf("cannot use %s twice on the same element", fk))
+				c.error(el, fmt.Errorf("cannot use %s twice on the same element", fk))
 				return
 			}
 			specialAttrs[fk] = attr.Value
 		default:
 			p, err := Interpol(attr.Value, c.args)
 			if err != nil {
-				c.error(fmt.Errorf("parse attribute %s: %w", fk, err))
+				c.error(el, fmt.Errorf("parse attribute %s: %w", fk, err))
 				return
 			}
 			if p != nil {
@@ -526,61 +533,61 @@ func (c *chtmlComponent) parseAttrs(el *etree.Element) {
 		}
 	}
 	if hasAttr("c:if") && hasAttr("c:else-if") {
-		c.error(errors.New("cannot use c:if with c:else-if on the same element"))
+		c.error(el, errors.New("cannot use c:if with c:else-if on the same element"))
 	}
 	if hasAttr("c:if") && hasAttr("c:else") {
-		c.error(errors.New("cannot use c:if with c:else on the same element"))
+		c.error(el, errors.New("cannot use c:if with c:else on the same element"))
 	}
 	if hasAttr("c:else-if") && hasAttr("c:else") {
-		c.error(errors.New("cannot use c:else-if with c:else on the same element"))
+		c.error(el, errors.New("cannot use c:else-if with c:else on the same element"))
 	}
 	if specialAttrs["c:else"] != "" && specialAttrs["c:else"] != "else" {
-		c.error(errors.New("unexpected value for c:else"))
+		c.error(el, errors.New("unexpected value for c:else"))
 	}
 
 	if _, ok := specialAttrs["c:if"]; ok {
 		prog, err := expr.Compile(specialAttrs["c:if"], expr.Optimize(true), expr.AsBool())
 		if err != nil {
-			c.error(fmt.Errorf("parse c:if: %w", err))
+			c.error(el, fmt.Errorf("parse c:if: %w", err))
 			return
 		}
 		nm.cond = prog
 	} else if _, ok := specialAttrs["c:else-if"]; ok {
 		prog, err := expr.Compile(specialAttrs["c:else-if"], expr.Optimize(true), expr.AsBool())
 		if err != nil {
-			c.error(fmt.Errorf("parse c:else-if: %w", err))
+			c.error(el, fmt.Errorf("parse c:else-if: %w", err))
 			return
 		}
 		nm.cond = prog
 		if prevCond := c.findPrevCond(el); prevCond != nil {
 			c.meta[prevCond].nextCond = el
 		} else {
-			c.error(errors.New("c:else-if must be used after c:if"))
+			c.error(el, errors.New("c:else-if must be used after c:if"))
 			return
 		}
 	} else if _, ok := specialAttrs["c:else"]; ok {
 		prog, err := expr.Compile("true")
 		if err != nil {
-			c.error(fmt.Errorf("parse c:else: %w", err))
+			c.error(el, fmt.Errorf("parse c:else: %w", err))
 			return
 		}
 		nm.cond = prog
 		if prevCond := c.findPrevCond(el); prevCond != nil {
 			c.meta[prevCond].nextCond = el
 		} else {
-			c.error(errors.New("c:else must be used after c:if or c:else-if"))
+			c.error(el, errors.New("c:else must be used after c:if or c:else-if"))
 			return
 		}
 	}
 	if _, ok := specialAttrs["c:for"]; ok {
 		v, k, ex, err := parseLoopExpr(specialAttrs["c:for"])
 		if err != nil {
-			c.error(fmt.Errorf("parse c:for: %w", err))
+			c.error(el, fmt.Errorf("parse c:for: %w", err))
 			return
 		}
 		prog, err := expr.Compile(ex, expr.Optimize(true))
 		if err != nil {
-			c.error(fmt.Errorf("parse c:for: %w", err))
+			c.error(el, fmt.Errorf("parse c:for: %w", err))
 			return
 		}
 		nm.loop = prog
@@ -618,9 +625,7 @@ func (c *chtmlComponent) Render(s Scope) (*RenderResult, error) {
 			if tokens, ok := v.([]etree.Token); ok {
 				n := &html.Node{Type: html.DocumentNode}
 				for _, t := range tokens {
-					if err := c.eval(n, t, es); err != nil {
-						return nil, fmt.Errorf("eval arg %s: %w", k, err)
-					}
+					c.eval(n, t, es)
 				}
 				v = n
 			}
@@ -634,9 +639,7 @@ func (c *chtmlComponent) Render(s Scope) (*RenderResult, error) {
 	}
 
 	for _, child := range c.doc.Element.Child {
-		if err := c.eval(newDoc, child, es); err != nil {
-			return nil, err
-		}
+		c.eval(newDoc, child, es)
 	}
 
 	return &RenderResult{
@@ -644,7 +647,7 @@ func (c *chtmlComponent) Render(s Scope) (*RenderResult, error) {
 		StatusCode: es.statusCode,
 		HTML:       newDoc,
 		Data:       nil, // the CHMTL component does not return any data
-	}, nil
+	}, errors.Join(es.errs...)
 }
 
 func (c *chtmlComponent) ResultSchema() any {
@@ -653,23 +656,26 @@ func (c *chtmlComponent) ResultSchema() any {
 
 // evalIf evaluates the conditional expression (c:if, c:else-if, c:else) for the given node and
 // marks it as hidden if the condition is false.
-func (c *chtmlComponent) evalIf(dst *html.Node, src *etree.Element, es *evalScope) error {
+func (c *chtmlComponent) evalIf(dst *html.Node, src *etree.Element, es *evalScope) {
 	render := true
+	condErr := false // tells not to render all conditional nodes if an error occurred
 	nm, ok := c.meta[src]
 	if !ok {
-		return nil
+		return
 	}
 	if nm.cond != nil {
 		res, err := c.vm.Run(nm.cond, env(es.Vars()))
-		if err != nil {
-			return err
+		if _, ok := res.(bool); err == nil && !ok {
+			err = errors.New("expression must return boolean")
 		}
-		render, ok = res.(bool)
-		if !ok {
-			return errors.New("c:if expression must return boolean")
+		if err != nil {
+			es.error(src, fmt.Errorf("eval c:if: %w", err))
+			condErr = true
+		} else {
+			render = res.(bool)
 		}
 	}
-	if render {
+	if render || condErr {
 		// mark next conditional as not rendered
 		for next := nm.nextCond; next != nil; next = c.meta[next].nextCond {
 			es.hidden[next] = struct{}{}
@@ -678,7 +684,7 @@ func (c *chtmlComponent) evalIf(dst *html.Node, src *etree.Element, es *evalScop
 		es.hidden[src] = struct{}{}
 		es.closeChild(src, 0) // TODO: close only child scopes or itself?
 	}
-	return nil
+	// TODO: if condErr put some comment in the HTML output
 }
 
 // evalAttrs loops over the attributes of the source node and evaluates the expressions for them.
@@ -720,23 +726,25 @@ func (c *chtmlComponent) evalAttrs(dst *html.Node, src *etree.Element, es *evalS
 
 // evalFor evaluates the loop expression (c:for) for the given node and appends the result to the
 // destination node.
-func (c *chtmlComponent) evalFor(dst *html.Node, src *etree.Element, es *evalScope) error {
+func (c *chtmlComponent) evalFor(dst *html.Node, src *etree.Element, es *evalScope) {
 	nm := c.meta[src]
 	if nm == nil || nm.loop == nil {
-		return nil
+		return
 	}
 	if _, ok := es.expandedLoops[src]; ok {
-		return nil
+		return
 	}
 	es.expandedLoops[src] = struct{}{}
 
 	res, err := c.vm.Run(nm.loop, env(es.Vars()))
 	if err != nil {
-		return err // TODO: provide trace
+		es.error(src, fmt.Errorf("eval c:for: %w", err))
+		return
 	}
 	v := reflect.ValueOf(res)
 	if v.Kind() != reflect.Slice {
-		return errors.New("c:for expression must return slice")
+		es.error(src, fmt.Errorf("c:for expression must return slice"))
+		return
 	}
 	for i := 0; i < v.Len(); i++ {
 		el := v.Index(i)
@@ -744,15 +752,12 @@ func (c *chtmlComponent) evalFor(dst *html.Node, src *etree.Element, es *evalSco
 			nm.loopVar: el.Interface(),
 			nm.loopIdx: i,
 		}, src, i)
-		if err := c.eval(dst, src, subScope); err != nil {
-			return err
-		}
+		c.eval(dst, src, subScope)
 	}
 
 	es.closeChild(src, v.Len()) // close remaining scopes
 
 	es.hidden[src] = struct{}{}
-	return nil
 }
 
 // evalImport renders the imported component (<c:NAME>) and appends the result to the destination.
@@ -777,9 +782,7 @@ func (c *chtmlComponent) evalImport(dst *html.Node, src *etree.Element, es *eval
 		case []etree.Token:
 			n := &html.Node{Type: html.DocumentNode}
 			for _, t := range val {
-				if err := c.eval(n, t, es); err != nil {
-					return fmt.Errorf("eval attr %s: %w", k, err)
-				}
+				c.eval(n, t, es)
 			}
 			vars[k] = n
 		}
@@ -844,18 +847,23 @@ func (c *chtmlComponent) evalImport(dst *html.Node, src *etree.Element, es *eval
 // evalText evaluates the interpolated expression for the given text node and stores the result in
 // the destination node.
 // If the text node is not an expression, the value is copied as is.
-func (c *chtmlComponent) evalText(dst *html.Node, src *etree.CharData, es *evalScope) error {
+func (c *chtmlComponent) evalText(dst *html.Node, src *etree.CharData, es *evalScope) {
 	nm := c.meta[src]
 	if nm == nil || nm.text == nil {
 		dst.AppendChild(&html.Node{
 			Type: html.TextNode,
 			Data: src.Data,
 		})
-		return nil
+		return
 	}
 	res, err := c.vm.Run(nm.text, env(es.Vars()))
 	if err != nil {
-		return fmt.Errorf("eval text %s: %w", src.Parent().GetPath(), err)
+		dst.AppendChild(&html.Node{
+			Type: html.CommentNode,
+			Data: err.Error(),
+		})
+		es.error(src, fmt.Errorf("eval text: %w", err))
+		return
 	}
 	switch v := res.(type) {
 	case string:
@@ -878,7 +886,6 @@ func (c *chtmlComponent) evalText(dst *html.Node, src *etree.CharData, es *evalS
 			})
 		}
 	}
-	return nil
 }
 
 // evalElement evaluates all expressions in conditionals, loops, child nodes, imports for the
@@ -891,26 +898,25 @@ func (c *chtmlComponent) evalText(dst *html.Node, src *etree.CharData, es *evalS
 // 4. attributes
 // 5. child nodes and child <c:arg> elements
 // 6. imports (<c:NAME>)
-func (c *chtmlComponent) evalElement(dst *html.Node, src *etree.Element, es *evalScope) error {
+func (c *chtmlComponent) evalElement(dst *html.Node, src *etree.Element, es *evalScope) {
 	if _, ok := es.hidden[src]; ok {
-		return nil
-	}
-	if err := c.evalIf(dst, src, es); err != nil {
-		return err
-	}
-	if _, ok := es.hidden[src]; ok {
-		return nil
+		return
 	}
 
-	if err := c.evalFor(dst, src, es); err != nil {
-		return err
-	}
+	c.evalIf(dst, src, es)
+
 	if _, ok := es.hidden[src]; ok {
-		return nil
+		return
+	}
+
+	c.evalFor(dst, src, es)
+
+	if _, ok := es.hidden[src]; ok {
+		return
 	}
 
 	if src.FullTag() == "c:arg" { // TODO: find a better way to not render <c:arg> elements
-		return nil
+		return
 	}
 
 	nm := c.meta[src]
@@ -924,39 +930,35 @@ func (c *chtmlComponent) evalElement(dst *html.Node, src *etree.Element, es *eva
 
 		// eval attributes into values for the cloned node
 		if err := c.evalAttrs(clone, src, es); err != nil {
-			return err
+			es.error(src, fmt.Errorf("eval attributes: %w", err))
+			return
 		}
 
 		for _, child := range src.Child {
-			if err := c.eval(clone, child, es); err != nil {
-				return err
-			}
+			c.eval(clone, child, es)
 		}
 
 		dst.AppendChild(clone)
 	} else if nm.imprt != nil {
 		if err := c.evalImport(dst, src, es); err != nil {
-			return fmt.Errorf("eval import %s: %w", src.GetPath(), err)
+			es.error(src, fmt.Errorf("eval import: %w", err))
 		}
 	}
-
-	return nil
 }
 
-func (c *chtmlComponent) eval(dst *html.Node, src etree.Token, es *evalScope) error {
+func (c *chtmlComponent) eval(dst *html.Node, src etree.Token, es *evalScope) {
 	switch n := src.(type) {
 	case *etree.Element:
-		return c.evalElement(dst, n, es)
+		c.evalElement(dst, n, es)
 	case *etree.CharData:
-		return c.evalText(dst, n, es)
+		c.evalText(dst, n, es)
 	}
-	return nil
 }
 
 // error captures the first error that occurred during parsing.
-func (c *chtmlComponent) error(err error) {
+func (c *chtmlComponent) error(t etree.Token, err error) {
 	if c.err == nil {
-		c.err = err
+		c.err = newComponentError(c.fname, t, err)
 	}
 }
 
