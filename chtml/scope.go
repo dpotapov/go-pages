@@ -4,9 +4,6 @@ package chtml
 // The CHTML component creates a new scope for each loop iteration, conditional branch, and
 // component import with Spawn method.
 type Scope interface {
-	// Parent returns the parent scope of the current scope or nil if it's the root scope.
-	Parent() Scope
-
 	// Spawn creates a new child scope with extra variables added to it.
 	Spawn(vars map[string]any) Scope
 
@@ -24,8 +21,7 @@ type Scope interface {
 // suitable to work with expr-lang's args. This implementation copies the variables from the parent
 // scope to the child scope.
 type ScopeMap struct {
-	parent Scope
-	vars   map[string]any
+	vars map[string]any
 }
 
 var _ Scope = (*ScopeMap)(nil)
@@ -38,14 +34,8 @@ func NewScopeMap(parent Scope) *ScopeMap {
 		}
 	}
 	return &ScopeMap{
-		parent: parent,
-		vars:   vars,
+		vars: vars,
 	}
-}
-
-// Parent returns the parent scope of the current scope or nil if it's the root scope.
-func (s *ScopeMap) Parent() Scope {
-	return s.parent
 }
 
 // Spawn creates a new child scope of the current scope with its own set of arguments.
