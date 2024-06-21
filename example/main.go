@@ -45,7 +45,7 @@ func (t *todos) Render(s chtml.Scope) (*chtml.RenderResult, error) {
 		changed = true
 	}
 
-	if todoDoneID, ok := s.Vars()["todo_done_id"].(string); ok && todoDoneID != "" {
+	if todoDoneID, ok := s.Vars()["del"].(string); ok && todoDoneID != "" {
 		i, err := strconv.ParseInt(todoDoneID, 10, 64)
 		if err == nil && i >= 0 && i < int64(len(t.todos)) {
 			t.todos = append(t.todos[:i], t.todos[i+1:]...)
