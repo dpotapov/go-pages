@@ -27,11 +27,6 @@ import (
 // in the file system.
 const chtmlExt = ".chtml"
 
-const (
-	// specialRequestArg is the name of the HTTP request object passed to the root-level component.
-	specialRequestArg = "$req"
-)
-
 // defaultSearchPath is the default list of directories to search for components when importing.
 var defaultSearchPath = []string{".", ".lib", "/", "/.lib"}
 
@@ -140,10 +135,6 @@ func (h *Handler) handleRequest(w http.ResponseWriter, r *http.Request) error {
 			args[k] = v
 		}
 
-		if _, ok := args[specialRequestArg]; !ok {
-			args[specialRequestArg] = NewRequestArg(r)
-		}
-
 		return h.servePage(w, r, fsPath, args)
 	}
 
@@ -157,7 +148,7 @@ func (h *Handler) servePage(w http.ResponseWriter, r *http.Request, fsPath strin
 
 	comp := NewErrorHandlerComponent(compName, imp, h.errComp)
 
-	scope := newScope(args)
+	scope := newScope(args, r)
 	defer scope.close()
 
 	if websocket.IsWebSocketUpgrade(r) {
