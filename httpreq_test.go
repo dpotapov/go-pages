@@ -101,7 +101,7 @@ func TestHttpRequestComponent_WithInterval(t *testing.T) {
 		"url":      "/api/data",
 		"var":      "p",
 		"interval": "1s",
-	})
+	}, nil)
 	defer s.close()
 
 	s.setOnChangeCallback(func() {

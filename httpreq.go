@@ -20,9 +20,11 @@ import (
 //
 // Usage example:
 //
-//	<c:http-request c:var="data" url="/api/data" method="POST" interval="15s">
-//	  { "input1": "value1", "input2": "value2" }
-//	</c:http-request>
+//	 <c:arg name="data">
+//		  <c:http-request url="/api/data" method="POST" interval="15s">
+//		    { "input1": "value1", "input2": "value2" }
+//		  </c:http-request>
+//	 </c:arg>
 //
 // In this example, the component will make a POST request to /api/data every 15 seconds and store
 // the response in the variable "data". If the response data has changed, the component

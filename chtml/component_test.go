@@ -28,10 +28,10 @@ func TestParse(t *testing.T) {
 	}
 	c := comp.(*chtmlComponent)
 
-	// Check args:
-	require.Equal(t, 2, len(c.args))
-	require.Equal(t, nil, c.args["_"])
-	require.IsType(t, []etree.Token{}, c.args["link1"])
+	// Check inpSchema:
+	require.Equal(t, 2, len(c.inpSchema))
+	require.Equal(t, nil, c.inpSchema["_"])
+	require.Equal(t, "http://foo.bar", c.inpSchema["link1"])
 
 	// Check links:
 	require.Len(t, c.doc.Element.ChildElements(), 3)
@@ -82,6 +82,8 @@ func importFunc(name string) (Component, error) {
 		s = `Hello, ${_}!`
 	case "simple-page":
 		s = `<c:arg name="title">NoTitle</c:arg><h1>${title}</h1><div>${_}</div>`
+	case "data-provider":
+		return &dataProviderComponent{}, nil
 	default:
 		return nil, fmt.Errorf("unknown component %q", name)
 	}
@@ -155,9 +157,7 @@ func TestComponent_ParseAndRender(t *testing.T) {
 				<c:simple-page title="${page_title}">
 					${page_content}
 				</c:simple-page>`,
-			output: `<h1>Default Title</h1><div>
-					Default Content
-				</div>`,
+			output:  `<h1>Default Title</h1><div>Default Content</div>`,
 			wantErr: nil,
 		},
 		{
@@ -183,6 +183,12 @@ func TestComponent_ParseAndRender(t *testing.T) {
 			name:     "doubleHtmlArgEval",
 			template: `<c:arg name="content"><ul><li>Item</li></ul></c:arg>${content}<p>${content}</p>`,
 			output:   `<ul><li>Item</li></ul><p><ul><li>Item</li></ul></p>`,
+			wantErr:  nil,
+		},
+		{
+			name:     "compWithinArg",
+			template: `<c:arg name="data"><c:data-provider key1="newVal" /></c:arg>${data.key1}`,
+			output:   "newVal",
 			wantErr:  nil,
 		},
 	}
@@ -229,40 +235,74 @@ func TestComponent_ParseAndRender(t *testing.T) {
 
 func TestComponent_parseArgs(t *testing.T) {
 	tests := []struct {
-		name     string
-		nodes    string
-		wantArgs map[string]any
-		wantErr  bool
+		name       string
+		nodes      string
+		wantSchema map[string]any
+		wantErr    bool
 	}{
 		{
-			name:     "empty",
-			nodes:    ``,
-			wantArgs: map[string]any{"_": nil},
-			wantErr:  false,
+			name:       "empty",
+			nodes:      ``,
+			wantSchema: map[string]any{"_": nil},
+			wantErr:    false,
 		},
 		{
-			name:     "noArgName",
-			nodes:    `<c:arg></c:arg>`,
-			wantArgs: map[string]any{"_": nil},
-			wantErr:  true,
+			name:       "noArgName",
+			nodes:      `<c:arg></c:arg>`,
+			wantSchema: map[string]any{"_": nil},
+			wantErr:    true,
 		},
 		{
-			name:     "emptyArg",
-			nodes:    `<c:arg name="foo" />`,
-			wantArgs: map[string]any{"_": nil, "foo": new(any)},
-			wantErr:  false,
+			name:       "emptyArg",
+			nodes:      `<c:arg name="foo" />`,
+			wantSchema: map[string]any{"_": nil, "foo": new(any)},
+			wantErr:    false,
 		},
 		{
-			name:     "stringArg",
-			nodes:    `<c:arg name="foo">bar</c:arg>`,
-			wantArgs: map[string]any{"_": nil, "foo": []etree.Token{etree.NewText("bar")}},
-			wantErr:  false,
+			name:       "stringArg",
+			nodes:      `<c:arg name="foo">bar</c:arg>`,
+			wantSchema: map[string]any{"_": nil, "foo": "bar"},
+			wantErr:    false,
 		},
 		{
-			name:     "stringArgInterpol",
-			nodes:    `<c:arg name="foo">${"bar"}</c:arg>`,
-			wantArgs: map[string]any{"_": nil, "foo": []etree.Token{etree.NewText("${\"bar\"}")}},
-			wantErr:  false,
+			name:       "stringArgInterpol",
+			nodes:      `<c:arg name="foo">${"bar"}</c:arg>`,
+			wantSchema: map[string]any{"_": nil, "foo": "bar"},
+			wantErr:    false,
+		},
+		{
+			name: "stringWhitespaceArgInterpol",
+			nodes: `<c:arg name="foo">
+					${"bar"}
+					</c:arg>`,
+			wantSchema: map[string]any{"_": nil, "foo": "bar"},
+			wantErr:    false,
+		},
+		{
+			name:       "boolArgInterpol",
+			nodes:      `<c:arg name="foo">${true}</c:arg>`,
+			wantSchema: map[string]any{"_": nil, "foo": true},
+			wantErr:    false,
+		},
+		{
+			name:       "intArgInterpol",
+			nodes:      `<c:arg name="foo">${123}</c:arg>`,
+			wantSchema: map[string]any{"_": nil, "foo": 123},
+			wantErr:    false,
+		},
+		{
+			name: "intWhitespaceArgInterpol",
+			nodes: `<c:arg name="foo">
+					${123}
+				</c:arg>`,
+			wantSchema: map[string]any{"_": nil, "foo": 123},
+			wantErr:    false,
+		},
+		{
+			name:       "listArgInterpol",
+			nodes:      `<c:arg name="foo">${ [1,2,3] }</c:arg>`,
+			wantSchema: map[string]any{"_": nil, "foo": []any{1, 2, 3}},
+			wantErr:    false,
 		},
 		{
 			name: "htmlArg",
@@ -272,15 +312,9 @@ func TestComponent_parseArgs(t *testing.T) {
 						<pre>baz</pre>
 					</c:arg>
 		    	`,
-			wantArgs: map[string]any{
-				"_": nil,
-				"foo": []etree.Token{
-					etree.NewText("\n\t\t\t\t\t"),
-					etree.NewElement("p"),
-					etree.NewText("\n\t\t\t\t\t"),
-					etree.NewElement("pre"),
-					etree.NewText("\n\t\t\t\t\t"),
-				},
+			wantSchema: map[string]any{
+				"_":   nil,
+				"foo": nil,
 			},
 			wantErr: false,
 		},
@@ -292,16 +326,24 @@ func TestComponent_parseArgs(t *testing.T) {
 					<c:arg name="baz">${123}</c:arg>
 				</c:arg>
 			`,
-			wantArgs: map[string]any{
+			wantSchema: map[string]any{
 				"_":   nil,
 				"foo": []etree.Token{},
 			},
 			wantErr: true,
 		},
+		{
+			name: "importArg",
+			nodes: `<c:arg name="foo">
+						<c:data-provider />
+					</c:arg>`,
+			wantSchema: map[string]any{"_": nil, "foo": map[string]string{"key1": ""}},
+			wantErr:    false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c, err := Parse(strings.NewReader(tt.nodes), nil)
+			c, err := Parse(strings.NewReader(tt.nodes), ImporterFunc(importFunc))
 			if err != nil {
 				if !tt.wantErr {
 					t.Errorf("Parse() error = %v", err)
@@ -332,9 +374,28 @@ func TestComponent_parseArgs(t *testing.T) {
 				}, cmp.Ignore()),
 			}
 
-			if diff := cmp.Diff(c.(*chtmlComponent).args, tt.wantArgs, opts); diff != "" {
+			if diff := cmp.Diff(c.(*chtmlComponent).inpSchema, tt.wantSchema, opts); diff != "" {
 				t.Errorf("Parse() diff (-got +want):\n%s", diff)
 			}
 		})
 	}
+}
+
+type dataProviderComponent struct{}
+
+var _ Component = (*dataProviderComponent)(nil)
+
+func (d *dataProviderComponent) Render(s Scope) (*RenderResult, error) {
+	vars := s.Vars()
+	rr := &RenderResult{
+		Data: map[string]any{"key1": "value1"},
+	}
+	if _, ok := vars["key1"]; ok {
+		rr.Data.(map[string]any)["key1"] = vars["key1"]
+	}
+	return rr, nil
+}
+
+func (d *dataProviderComponent) ResultSchema() any {
+	return map[string]string{"key1": ""}
 }
