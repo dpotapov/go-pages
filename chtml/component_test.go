@@ -21,21 +21,21 @@ func TestParse(t *testing.T) {
 			<li><a href="/bar/baz">BarBaz</a></li>
 		</ul>`
 	r := strings.NewReader(s)
-	comp, err := Parse(r, nil)
+	imp, err := Parse(r, nil)
 	if err != nil {
 		t.Errorf("Parse() error = %v", err)
 		return
 	}
-	c := comp.(*chtmlComponent)
+	parser := imp.(*chtmlParser)
 
 	// Check inpSchema:
-	require.Equal(t, 2, len(c.inpSchema))
-	require.Equal(t, nil, c.inpSchema["_"])
-	require.Equal(t, "http://foo.bar", c.inpSchema["link1"])
+	require.Equal(t, 2, len(parser.inpSchema))
+	require.Equal(t, new(any), parser.inpSchema["_"])
+	require.Equal(t, "http://foo.bar", parser.inpSchema["link1"])
 
 	// Check links:
-	require.Len(t, c.doc.Element.ChildElements(), 3)
-	ul := c.doc.Element.SelectElement("ul")
+	require.Len(t, parser.doc.Element.ChildElements(), 3)
+	ul := parser.doc.Element.SelectElement("ul")
 	require.NotNil(t, ul)
 	require.Len(t, ul.ChildElements(), 2)
 }
@@ -83,19 +83,20 @@ func importFunc(name string) (Component, error) {
 	case "simple-page":
 		s = `<c:arg name="title">NoTitle</c:arg><h1>${title}</h1><div>${_}</div>`
 	case "data-provider":
-		return &dataProviderComponent{}, nil
+		return dataProviderComponent(), nil
 	default:
 		return nil, fmt.Errorf("unknown component %q", name)
 	}
-	return Parse(strings.NewReader(s), ImporterFunc(importFunc))
+
+	parser, err := Parse(strings.NewReader(s), ImporterFunc(importFunc))
+	if err != nil {
+		return nil, err
+	}
+
+	return parser.Import("")
 }
 
 func TestComponent_ParseAndRender(t *testing.T) {
-	env := map[string]any{
-		"foo":     "bar",
-		"words":   []string{"foo", "bar", "baz"},
-		"numbers": []int{1, 2, 3},
-	}
 	tests := []struct {
 		name     string
 		template string
@@ -130,9 +131,9 @@ func TestComponent_ParseAndRender(t *testing.T) {
 		{"forEmpty", `<p c:for="x in []">Hello, ${x}!</p>`, ``, nil},
 		{"forOne", `<p c:for="x in ['foo']">${x}</p>`, `<p>foo</p>`, nil},
 		{"forTwo", `<p c:for="x in ['foo', 'bar']">${x}</p>`, `<p>foo</p><p>bar</p>`, nil},
-		{"forWords", `<c:arg name="words" /><ul><li c:for="w in words">${w}</li></ul>`,
+		{"forWords", `<c:arg name="words">${['foo', 'bar', 'baz']}</c:arg><ul><li c:for="w in words">${w}</li></ul>`,
 			`<ul><li>foo</li><li>bar</li><li>baz</li></ul>`, nil},
-		{"forNumbers", `<c:arg name="numbers" /><p c:for="i in numbers">${i}</p>`, `<p>1</p><p>2</p><p>3</p>`, nil},
+		{"forNumbers", `<c:arg name="numbers">${[1,2,3]}</c:arg><p c:for="i in numbers">${i}</p>`, `<p>1</p><p>2</p><p>3</p>`, nil},
 
 		{"forIfFalse", `<p c:for="x in ['foo']" c:if="false">${x}</p>`, ``, nil},
 		{"forIfTrue", `<p c:for="x in ['foo']" c:if="true">${x}</p>`, `<p>foo</p>`, nil},
@@ -157,7 +158,9 @@ func TestComponent_ParseAndRender(t *testing.T) {
 				<c:simple-page title="${page_title}">
 					${page_content}
 				</c:simple-page>`,
-			output:  `<h1>Default Title</h1><div>Default Content</div>`,
+			output: `<h1>Default Title</h1><div>
+					Default Content
+				</div>`,
 			wantErr: nil,
 		},
 		{
@@ -194,16 +197,18 @@ func TestComponent_ParseAndRender(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			comp, err := Parse(strings.NewReader(tt.template), ImporterFunc(importFunc))
+			parser, err := Parse(strings.NewReader(tt.template), ImporterFunc(importFunc))
 			if err != nil {
 				t.Errorf("Parse() error = %v", err)
 				return
 			}
 
-			s := NewScopeMap(nil)
-			vars := s.Vars()
-			for k, v := range env {
-				vars[k] = v
+			s := NewScope(env(nil))
+
+			comp, err := parser.Import("")
+			if err != nil {
+				t.Errorf("Import() error = %v", err)
+				return
 			}
 
 			rr, err := comp.Render(s)
@@ -220,10 +225,13 @@ func TestComponent_ParseAndRender(t *testing.T) {
 			}
 
 			var b strings.Builder
-			if err := html.Render(&b, rr.HTML); err != nil {
-				t.Errorf("Render() error = %v", err)
-				return
+			if ht := AnyToHtml(rr); ht != nil {
+				if err := html.Render(&b, ht); err != nil {
+					t.Errorf("Render() error = %v", err)
+					return
+				}
 			}
+
 			got := b.String()
 			want := tt.output
 			if diff := cmp.Diff(got, want); diff != "" {
@@ -243,31 +251,31 @@ func TestComponent_parseArgs(t *testing.T) {
 		{
 			name:       "empty",
 			nodes:      ``,
-			wantSchema: map[string]any{"_": nil},
+			wantSchema: map[string]any{"_": new(any)},
 			wantErr:    false,
 		},
 		{
 			name:       "noArgName",
 			nodes:      `<c:arg></c:arg>`,
-			wantSchema: map[string]any{"_": nil},
+			wantSchema: map[string]any{"_": new(any)},
 			wantErr:    true,
 		},
 		{
 			name:       "emptyArg",
 			nodes:      `<c:arg name="foo" />`,
-			wantSchema: map[string]any{"_": nil, "foo": new(any)},
+			wantSchema: map[string]any{"_": new(any), "foo": new(any)},
 			wantErr:    false,
 		},
 		{
 			name:       "stringArg",
 			nodes:      `<c:arg name="foo">bar</c:arg>`,
-			wantSchema: map[string]any{"_": nil, "foo": "bar"},
+			wantSchema: map[string]any{"_": new(any), "foo": "bar"},
 			wantErr:    false,
 		},
 		{
 			name:       "stringArgInterpol",
 			nodes:      `<c:arg name="foo">${"bar"}</c:arg>`,
-			wantSchema: map[string]any{"_": nil, "foo": "bar"},
+			wantSchema: map[string]any{"_": new(any), "foo": "bar"},
 			wantErr:    false,
 		},
 		{
@@ -275,19 +283,19 @@ func TestComponent_parseArgs(t *testing.T) {
 			nodes: `<c:arg name="foo">
 					${"bar"}
 					</c:arg>`,
-			wantSchema: map[string]any{"_": nil, "foo": "bar"},
+			wantSchema: map[string]any{"_": new(any), "foo": "\n\t\t\t\t\tbar\n\t\t\t\t\t"},
 			wantErr:    false,
 		},
 		{
 			name:       "boolArgInterpol",
 			nodes:      `<c:arg name="foo">${true}</c:arg>`,
-			wantSchema: map[string]any{"_": nil, "foo": true},
+			wantSchema: map[string]any{"_": new(any), "foo": true},
 			wantErr:    false,
 		},
 		{
 			name:       "intArgInterpol",
 			nodes:      `<c:arg name="foo">${123}</c:arg>`,
-			wantSchema: map[string]any{"_": nil, "foo": 123},
+			wantSchema: map[string]any{"_": new(any), "foo": 123},
 			wantErr:    false,
 		},
 		{
@@ -295,13 +303,13 @@ func TestComponent_parseArgs(t *testing.T) {
 			nodes: `<c:arg name="foo">
 					${123}
 				</c:arg>`,
-			wantSchema: map[string]any{"_": nil, "foo": 123},
+			wantSchema: map[string]any{"_": new(any), "foo": 123},
 			wantErr:    false,
 		},
 		{
 			name:       "listArgInterpol",
 			nodes:      `<c:arg name="foo">${ [1,2,3] }</c:arg>`,
-			wantSchema: map[string]any{"_": nil, "foo": []any{1, 2, 3}},
+			wantSchema: map[string]any{"_": new(any), "foo": []any{1, 2, 3}},
 			wantErr:    false,
 		},
 		{
@@ -313,8 +321,8 @@ func TestComponent_parseArgs(t *testing.T) {
 					</c:arg>
 		    	`,
 			wantSchema: map[string]any{
-				"_":   nil,
-				"foo": nil,
+				"_":   new(any),
+				"foo": &html.Node{},
 			},
 			wantErr: false,
 		},
@@ -327,7 +335,7 @@ func TestComponent_parseArgs(t *testing.T) {
 				</c:arg>
 			`,
 			wantSchema: map[string]any{
-				"_":   nil,
+				"_":   new(any),
 				"foo": []etree.Token{},
 			},
 			wantErr: true,
@@ -337,13 +345,13 @@ func TestComponent_parseArgs(t *testing.T) {
 			nodes: `<c:arg name="foo">
 						<c:data-provider />
 					</c:arg>`,
-			wantSchema: map[string]any{"_": nil, "foo": map[string]string{"key1": ""}},
+			wantSchema: map[string]any{"_": new(any), "foo": map[string]any{"key1": "value1"}},
 			wantErr:    false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c, err := Parse(strings.NewReader(tt.nodes), ImporterFunc(importFunc))
+			p, err := Parse(strings.NewReader(tt.nodes), ImporterFunc(importFunc))
 			if err != nil {
 				if !tt.wantErr {
 					t.Errorf("Parse() error = %v", err)
@@ -374,28 +382,96 @@ func TestComponent_parseArgs(t *testing.T) {
 				}, cmp.Ignore()),
 			}
 
-			if diff := cmp.Diff(c.(*chtmlComponent).inpSchema, tt.wantSchema, opts); diff != "" {
+			if diff := cmp.Diff(p.(*chtmlParser).inpSchema, tt.wantSchema, opts); diff != "" {
 				t.Errorf("Parse() diff (-got +want):\n%s", diff)
 			}
 		})
 	}
 }
 
-type dataProviderComponent struct{}
-
-var _ Component = (*dataProviderComponent)(nil)
-
-func (d *dataProviderComponent) Render(s Scope) (*RenderResult, error) {
-	vars := s.Vars()
-	rr := &RenderResult{
-		Data: map[string]any{"key1": "value1"},
-	}
-	if _, ok := vars["key1"]; ok {
-		rr.Data.(map[string]any)["key1"] = vars["key1"]
-	}
-	return rr, nil
+type componentLifecycleEvent struct {
+	imported bool
+	rendered bool
+	disposed bool
 }
 
-func (d *dataProviderComponent) ResultSchema() any {
-	return map[string]string{"key1": ""}
+type testComponent struct {
+	events *[]componentLifecycleEvent
+}
+
+func (c *testComponent) Render(s Scope) (any, error) {
+	*c.events = append(*c.events, componentLifecycleEvent{rendered: true})
+	return nil, nil
+}
+
+func (c *testComponent) Dispose() {
+	*c.events = append(*c.events, componentLifecycleEvent{disposed: true})
+}
+
+func TestComponentReuse(t *testing.T) {
+	var events []componentLifecycleEvent
+
+	importFunc := func(name string) (Component, error) {
+		switch name {
+		case "test":
+			events = append(events, componentLifecycleEvent{imported: true})
+			return &testComponent{&events}, nil
+		default:
+			return nil, fmt.Errorf("unknown component %q", name)
+		}
+	}
+
+	parser, err := Parse(strings.NewReader("<c:test />"), ImporterFunc(importFunc))
+	require.NoError(t, err)
+
+	require.Equal(t, 3, len(events))
+	require.True(t, events[0].imported)
+	require.True(t, events[1].rendered)
+	require.True(t, events[2].disposed)
+
+	s := NewScope(nil)
+	comp, err := parser.Import("")
+	require.NoError(t, err)
+
+	events = nil
+
+	_, err = comp.Render(s)
+	require.NoError(t, err)
+
+	require.Equal(t, 2, len(events))
+	require.True(t, events[0].imported)
+	require.True(t, events[1].rendered)
+
+	// Reuse the component first time
+	events = nil
+	_, err = comp.Render(s)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(events))
+	require.True(t, events[0].rendered) // no import event
+
+	// Reuse the component second time
+	events = nil
+	_, err = comp.Render(s)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(events))
+	require.True(t, events[0].rendered) // no import event
+
+	// Dispose the component
+	events = nil
+	if d, ok := comp.(Disposable); ok {
+		d.Dispose()
+	}
+	require.Equal(t, 1, len(events))
+	require.True(t, events[0].disposed)
+}
+
+var dataProviderComponent = func() Component {
+	return ComponentFunc(func(s Scope) (any, error) {
+		vars := s.Vars()
+		rr := map[string]any{"key1": "value1"} // default value
+		if _, ok := vars["key1"]; ok {
+			rr["key1"] = vars["key1"]
+		}
+		return rr, nil
+	})
 }

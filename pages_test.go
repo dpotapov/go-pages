@@ -22,10 +22,10 @@ func TestPages_Handler(t *testing.T) {
 		{"GET /js/", 404, "Not Found\n"},
 		{"GET /js/asset.js", 200, "console.log(1)\n"},
 		{"GET /posts", 404, "Not Found\n"},
-		{"GET /posts/123/", 200, "view-post"},
-		{"GET /posts/123/edit", 200, "edit-post"},
+		{"GET /posts/123/", 200, "view-post\n"},
+		{"GET /posts/123/edit", 200, "edit-post\n"},
 		{"GET /posts/123/asset.txt", 200, "post-content\n"},
-		{"GET /posts/new", 200, "new-post"},
+		{"GET /posts/new", 200, "new-post\n"},
 	}
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("%d_%s", i, tt.url), func(t *testing.T) {

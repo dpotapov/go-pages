@@ -130,26 +130,26 @@ func (h *Handler) handleRequest(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	if strings.HasSuffix(fsPath, chtmlExt) {
-		args := map[string]any{}
-		for k, v := range params {
-			args[k] = v
-		}
-
-		return h.servePage(w, r, fsPath, args)
+		return h.servePage(w, r, fsPath, params)
 	}
 
 	return h.serveFile(w, r, fsPath)
 }
 
-func (h *Handler) servePage(w http.ResponseWriter, r *http.Request, fsPath string, args map[string]any) error {
+func (h *Handler) servePage(
+	w http.ResponseWriter,
+	r *http.Request,
+	fsPath string,
+	route map[string]string,
+) error {
 	imp := h.importer(path.Dir(fsPath))
 
 	compName := path.Base(strings.TrimSuffix(fsPath, chtmlExt))
 
 	comp := NewErrorHandlerComponent(compName, imp, h.errComp)
+	defer comp.Dispose()
 
-	scope := newScope(args, r)
-	defer scope.close()
+	mainScope := newScope(nil, r, route)
 
 	if websocket.IsWebSocketUpgrade(r) {
 		ws, err := wsUpgrader.Upgrade(w, r, nil)
@@ -164,19 +164,13 @@ func (h *Handler) servePage(w http.ResponseWriter, r *http.Request, fsPath strin
 		// Stop either when the websocket connection is closed or when the component will never be
 		// changed.
 
-		rc := make(chan struct{}) // renderer event channel
-		done := make(chan error)  // channel to communicate the completion of the rendering loop
-
-		scope.setOnChangeCallback(func() {
-			select {
-			case rc <- struct{}{}:
-			default:
-			}
-		})
+		done := make(chan error)           // channel to communicate the completion of the rendering loop
+		varsC := make(chan map[string]any) // channel to receive new variables from the websocket
 
 		go func() {
 			for {
-				if err := ws.ReadJSON(&args); err != nil {
+				var newVars map[string]any
+				if err := ws.ReadJSON(&newVars); err != nil {
 					if websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
 						err = nil
 					} else {
@@ -186,71 +180,94 @@ func (h *Handler) servePage(w http.ResponseWriter, r *http.Request, fsPath strin
 					return
 				}
 
-				// Trigger render on WebSocket message receipt
-				select {
-				case rc <- struct{}{}:
-				default: // If rc is already pending, don't block
+				// apply route
+				for k, v := range route {
+					newVars[k] = v
 				}
+
+				// Trigger render on WebSocket message receipt
+				varsC <- newVars
 			}
 		}()
 
+		vars := make(map[string]any, len(route))
+		for k, v := range route {
+			vars[k] = v
+		}
+		// scope := newScope(vars, r)
+		// print address of chan:
+
+		s := mainScope.Spawn(vars).(*scope) // create a new isolated scope for rendering
+
 		for {
 			select {
-			case <-rc:
+			case wsvars := <-varsC:
+				// apply vars from the websocket:
+				for k, v := range vars {
+					wsvars[k] = v
+				}
+				s = mainScope.Spawn(wsvars).(*scope)
+				s.Touch()
+			case <-mainScope.Touched():
 				// render the component
 				w, err := ws.NextWriter(websocket.TextMessage)
 				if err != nil {
 					return fmt.Errorf("get websocket writer: %w", err)
 				}
 
-				// update scope vars with args
-				scope.setVars(args)
-
-				rr, err := comp.Render(scope)
-				if err != nil {
-					return fmt.Errorf("render component: %w", err)
-				}
-
-				if rr.HTML != nil {
-					if err := html.Render(w, rr.HTML); err != nil {
-						return fmt.Errorf("render HTML: %w", err)
-					}
+				if err := h.render(w, comp, s); err != nil {
+					return err
 				}
 
 				if err := w.Close(); err != nil {
 					return fmt.Errorf("close websocket writer: %w", err)
 				}
 
-				args = nil // clear args
-			case err := <-done:
+				s = mainScope.Spawn(vars).(*scope) // reset the scope
+			case err = <-done:
 				return err
 			}
 		}
 	} else {
-		rr, err := comp.Render(scope)
-		if err != nil {
-			rr.StatusCode = http.StatusInternalServerError
-			h.logger.Error("Render component", "error", err)
-			// w.WriteHeader(http.StatusInternalServerError)
-			// return fmt.Errorf("render component: %w", err)
-		}
+		return h.render(w, comp, mainScope)
+	}
+}
 
-		if len(rr.Header) > 0 {
-			for k, vv := range rr.Header {
+func (h *Handler) render(w io.Writer, comp chtml.Component, scope *scope) error {
+	rr, err := comp.Render(scope)
+	if err != nil {
+		scope.globals.statusCode = http.StatusInternalServerError
+		h.logger.Error("Render component", "error", err)
+		// w.WriteHeader(http.StatusInternalServerError)
+		// return fmt.Errorf("render component: %w", err)
+	}
+
+	if rw, ok := w.(http.ResponseWriter); ok {
+		if len(scope.globals.header) > 0 {
+			for k, vv := range scope.globals.header {
 				for _, v := range vv {
-					w.Header().Add(k, v)
+					rw.Header().Add(k, v)
 				}
 			}
 		}
 
-		if rr.StatusCode != 0 {
-			w.WriteHeader(rr.StatusCode)
+		if scope.globals.statusCode != 0 {
+			rw.WriteHeader(scope.globals.statusCode)
 		}
+	}
 
-		if rr.HTML != nil {
-			if err := html.Render(w, rr.HTML); err != nil {
-				return fmt.Errorf("render HTML: %w", err)
-			}
+	// TODO: check the Accept header and return the appropriate content type
+	if doc, ok := rr.(*html.Node); ok {
+		if err := html.Render(w, doc); err != nil {
+			return fmt.Errorf("render HTML: %w", err)
+		}
+	} else if s, ok := rr.(string); ok {
+		if _, err := io.WriteString(w, s); err != nil {
+			return fmt.Errorf("write string: %w", err)
+		}
+	} else {
+		if err := json.NewEncoder(w).Encode(rr); err != nil {
+			return fmt.Errorf("render JSON: %w", err)
 		}
 	}
 
@@ -419,6 +436,8 @@ func (h *Handler) importer(dir string) chtml.ImporterFunc {
 		searchPath = defaultSearchPath
 	}
 
+	parsed := map[string]chtml.Importer{}
+
 	return func(name string) (chtml.Component, error) {
 		if h.CustomImporter != nil {
 			prov, err := h.CustomImporter.Import(name)
@@ -441,12 +460,17 @@ func (h *Handler) importer(dir string) chtml.ImporterFunc {
 				p = path.Join(dir, sp, p)
 			}
 
-			comp, err := chtml.ParseFile(h.FileSystem, p, h.importer(path.Dir(p)))
-			if err == chtml.ErrComponentNotFound {
-				continue
+			imp, ok := parsed[p]
+			if !ok {
+				var err error
+				imp, err = chtml.ParseFile(h.FileSystem, p, h.importer(path.Dir(p)))
+				if err == chtml.ErrComponentNotFound {
+					continue
+				}
+				parsed[p] = imp
 			}
 
-			return comp, err
+			return imp.Import("")
 		}
 
 		return nil, chtml.ErrComponentNotFound
