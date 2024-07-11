@@ -10,7 +10,7 @@ import (
 	"github.com/dpotapov/go-pages/chtml"
 )
 
-func TestHttpRequestComponent_Render(t *testing.T) {
+func TestHttpCallComponent_Render(t *testing.T) {
 	type wantVars struct {
 		Code  int
 		Body  string
@@ -23,9 +23,6 @@ func TestHttpRequestComponent_Render(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data": "hello"}`))
 	})
-	comp := &HttpRequestComponent{
-		Router: mux,
-	}
 	tests := []struct {
 		name     string
 		vars     map[string]any
@@ -33,24 +30,18 @@ func TestHttpRequestComponent_Render(t *testing.T) {
 	}{
 		{
 			name:     "noArgs",
-			vars:     nil,
+			vars:     map[string]any{},
 			wantVars: nil,
 		},
 		{
-			name: "noURL",
-			vars: map[string]any{
-				"var": "p",
-			},
-			wantVars: &wantVars{
-				Code: 301, // by default, the router redirects to the root
-				Body: "<a href=\"/\">Moved Permanently</a>.\n\n",
-			},
+			name:     "noURL",
+			vars:     map[string]any{},
+			wantVars: &wantVars{},
 		},
 		{
 			name: "getData",
 			vars: map[string]any{
 				"url": "/api/data",
-				"var": "p",
 			},
 			wantVars: &wantVars{
 				Code: 200,
@@ -63,15 +54,18 @@ func TestHttpRequestComponent_Render(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := chtml.NewScopeMap(nil)
-			s.SetVars(tt.vars)
+			s := chtml.NewScope(tt.vars)
+
+			comp := NewHttpCallComponent(mux)
+			defer comp.Dispose()
+
 			rr, err := comp.Render(s)
 			if err != nil {
 				t.Errorf("Render() error = %v", err)
 				return
 			}
 			if tt.wantVars != nil {
-				if got, ok := rr.Data.(*httpRequestPoller); ok {
+				if got, ok := rr.(*HttpCallResponse); ok {
 					if got.Code != tt.wantVars.Code {
 						t.Errorf("Render() got.Code = %v, want %v", got.Code, tt.wantVars.Code)
 					}
@@ -92,26 +86,30 @@ func TestHttpRequestComponent_Render(t *testing.T) {
 	}
 }
 
-func TestHttpRequestComponent_WithInterval(t *testing.T) {
+func TestHttpCallComponent_WithInterval(t *testing.T) {
 	var wg sync.WaitGroup
 	testData := []string{"monday", "tuesday", "wednesday"}
-	wg.Add(1)
+	wg.Add(2)
 
 	s := newScope(map[string]any{
 		"url":      "/api/data",
-		"var":      "p",
 		"interval": "1s",
-	}, nil)
-	defer s.close()
+	}, nil, nil)
 
-	s.setOnChangeCallback(func() {
-		p := s.Vars()["$poller"].(*httpRequestPoller)
-		t.Logf("poller updated: %v", p.Body)
-		if len(testData) == 0 {
-			p.polling = false
-			wg.Done()
+	done := make(chan struct{})
+	defer close(done)
+
+	go func() {
+		for {
+			select {
+			case <-s.Touched():
+				t.Logf("scope touched")
+				wg.Done()
+			case <-done:
+				return
+			}
 		}
-	})
+	}()
 
 	mux := http.NewServeMux()
 
@@ -134,9 +132,8 @@ func TestHttpRequestComponent_WithInterval(t *testing.T) {
 		}
 	})
 
-	comp := &HttpRequestComponent{
-		Router: mux,
-	}
+	comp := NewHttpCallComponent(mux)
+	defer comp.Dispose()
 
 	if _, err := comp.Render(s); err != nil {
 		t.Errorf("Render() error = %v", err)

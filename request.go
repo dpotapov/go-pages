@@ -4,16 +4,10 @@ import "github.com/dpotapov/go-pages/chtml"
 
 type RequestComponent struct{}
 
-var _ chtml.Component = &RequestComponent{}
-
-func (r *RequestComponent) Render(s chtml.Scope) (*chtml.RenderResult, error) {
-	rr := &chtml.RenderResult{}
+func (rc RequestComponent) Render(s chtml.Scope) (any, error) {
+	rr := &RequestArg{}
 	if v, ok := s.(*scope); ok {
-		rr.Data = NewRequestArg(v.req)
+		rr = NewRequestArg(v.globals.req)
 	}
 	return rr, nil
-}
-
-func (r *RequestComponent) ResultSchema() any {
-	return RequestArg{}
 }

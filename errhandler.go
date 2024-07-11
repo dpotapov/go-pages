@@ -22,7 +22,7 @@ type errorHandlerComponent struct {
 
 var _ chtml.Component = &errorHandlerComponent{}
 
-func NewErrorHandlerComponent(name string, imp chtml.Importer, fallback chtml.Component) chtml.Component {
+func NewErrorHandlerComponent(name string, imp chtml.Importer, fallback chtml.Component) *errorHandlerComponent {
 	comp, err := imp.Import(name)
 
 	return &errorHandlerComponent{
@@ -32,7 +32,7 @@ func NewErrorHandlerComponent(name string, imp chtml.Importer, fallback chtml.Co
 	}
 }
 
-func (eh *errorHandlerComponent) Render(s chtml.Scope) (*chtml.RenderResult, error) {
+func (eh *errorHandlerComponent) Render(s chtml.Scope) (any, error) {
 	errs := []error{eh.importErr}
 
 	if eh.importErr == nil {
@@ -54,11 +54,18 @@ func (eh *errorHandlerComponent) Render(s chtml.Scope) (*chtml.RenderResult, err
 		}
 	}
 
-	s.Vars()["errors"] = eh.compErrs
+	ss := s.Spawn(map[string]any{
+		"errors": eh.compErrs,
+	})
 
-	return eh.fallback.Render(s)
+	return eh.fallback.Render(ss)
 }
 
-func (eh *errorHandlerComponent) ResultSchema() any {
-	return nil
+func (eh *errorHandlerComponent) Dispose() {
+	if d, ok := eh.comp.(chtml.Disposable); ok {
+		d.Dispose()
+	}
+	if d, ok := eh.fallback.(chtml.Disposable); ok {
+		d.Dispose()
+	}
 }

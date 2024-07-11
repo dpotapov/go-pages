@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"strconv"
 	"sync"
 
 	"github.com/dpotapov/go-pages"
@@ -19,70 +18,112 @@ func LoggerMiddleware(next http.Handler, logger *slog.Logger) http.Handler {
 }
 
 type todos struct {
-	todos         []string
-	subscriptions map[chtml.Scope]chan struct{}
-	mu            sync.Mutex
+	db  *todoDB
+	sub chan struct{}
 }
 
 var _ chtml.Component = (*todos)(nil)
+var _ chtml.Disposable = (*todos)(nil)
 
-func (t *todos) subscription(s chtml.Scope) chan struct{} {
-	if sub, ok := t.subscriptions[s]; ok {
-		return sub
+type todosArgs struct {
+	Add string
+	Del int
+}
+
+func (t *todos) Render(s chtml.Scope) (any, error) {
+	var args todosArgs
+	if err := chtml.UnmarshalScope(s, &args); err != nil {
+		return nil, err
 	}
-	sub := make(chan struct{})
-	t.subscriptions[s] = sub
+
+	t.db.Add(args.Add)
+	t.db.Del(args.Del)
+
+	if t.sub == nil {
+		t.sub = t.db.Subscribe()
+		go func() {
+			for range t.sub {
+				s.Touch()
+			}
+		}()
+	}
+
+	todos := t.db.Todos()
+
+	return todos, nil
+}
+
+func (t *todos) Dispose() {
+	if t.sub != nil {
+		t.db.Unsubscribe(t.sub)
+	}
+}
+
+type todoDB struct {
+	todos       []string
+	subscribers map[chan struct{}]struct{}
+	mu          sync.Mutex
+}
+
+func newTodoDB() *todoDB {
+	return &todoDB{
+		subscribers: make(map[chan struct{}]struct{}),
+		todos:       []string{},
+	}
+}
+
+func (b *todoDB) Todos() []string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	todos := make([]string, len(b.todos))
+	copy(todos, b.todos)
+	return todos
+}
+
+func (b *todoDB) Add(todo string) {
+	if todo == "" {
+		return
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.todos = append(b.todos, todo)
+	b.notify()
+}
+
+func (b *todoDB) Del(index int) {
+	if index <= 0 {
+		return
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if index <= len(b.todos) {
+		b.todos = append(b.todos[:index-1], b.todos[index:]...)
+		b.notify()
+	}
+}
+
+func (b *todoDB) Subscribe() chan struct{} {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	sub := make(chan struct{}, 1)
+	b.subscribers[sub] = struct{}{}
 	return sub
 }
 
-func (t *todos) Render(s chtml.Scope) (*chtml.RenderResult, error) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	changed := false
-
-	if todo, ok := s.Vars()["add"].(string); ok && todo != "" {
-		t.todos = append(t.todos, todo)
-		changed = true
-	}
-
-	if todoDoneID, ok := s.Vars()["del"].(string); ok && todoDoneID != "" {
-		i, err := strconv.ParseInt(todoDoneID, 10, 64)
-		if err == nil && i >= 0 && i < int64(len(t.todos)) {
-			t.todos = append(t.todos[:i], t.todos[i+1:]...)
-			changed = true
-		}
-	}
-
-	sub := t.subscription(s)
-
-	if changed {
-		for _, s := range t.subscriptions {
-			if s != sub {
-				s <- struct{}{}
-			}
-		}
-	}
-
-	go func() {
-		// if the scope is closed, remove the subscription
-		defer delete(t.subscriptions, s)
-		for {
-			select {
-			case <-s.Closed():
-				return
-			case <-sub:
-				s.Touch()
-			}
-		}
-	}()
-
-	return &chtml.RenderResult{
-		Data: t.todos,
-	}, nil
+func (b *todoDB) Unsubscribe(sub chan struct{}) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	delete(b.subscribers, sub)
+	close(sub)
 }
 
-func (t *todos) ResultSchema() any {
-	return []string{}
+func (b *todoDB) notify() {
+	for sub := range b.subscribers {
+		select {
+		case sub <- struct{}{}:
+		default:
+		}
+	}
 }
 
 func main() {
@@ -90,14 +131,18 @@ func main() {
 		Level: slog.LevelDebug,
 	}))
 
+	db := newTodoDB()
+
 	ph := &pages.Handler{
-		FileSystem: os.DirFS("./pages"),
-		BuiltinComponents: map[string]chtml.Component{
-			"todos-store": &todos{
-				todos:         []string{},
-				subscriptions: make(map[chtml.Scope]chan struct{}),
-			},
-		},
+		FileSystem: os.DirFS("./example/pages"),
+		CustomImporter: chtml.ImporterFunc(func(name string) (chtml.Component, error) {
+			if name == "todos-store" {
+				return &todos{
+					db: db,
+				}, nil
+			}
+			return nil, chtml.ErrComponentNotFound
+		}),
 		OnError: nil,
 		Logger:  logger,
 	}
