@@ -1,5 +1,5 @@
-<c:arg name="todo" />
-<c:arg name="todo_done_id" />
+<c:arg name="todo">${""}</c:arg>
+<c:arg name="todo_done_id">${0}</c:arg>
 
 <c:arg name="todos">
   <c:todos-store add="${todo}" del="${todo_done_id}" />
@@ -9,11 +9,10 @@
   <ol c:if="len(todos) > 0">
     <li c:for="i, n in todos">${i}
       <form ws-send style="display: inline; margin-left: 15px">
-        <input name="todo_done_id" type="hidden" value="${string(n)}" />
+        <input name="todo_done_id" type="hidden" value="${string(n+1)}" />
         <input type="submit" value="Done" style="font-size: 0.7rem; border: none; background-color: aquamarine;"/>
       </form>
     </li>
   </ol>
   <p c:else>The list is empty.</p>
 </div>
-
