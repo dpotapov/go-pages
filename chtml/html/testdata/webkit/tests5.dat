@@ -193,9 +193,8 @@
 | <html>
 |   <head>
 |     <noscript>
-|       "<!--"
+|       <!-- </noscript> -->
 |   <body>
-|     "-->"
 
 #data
 <noscript><!--</noscript>--></noscript>

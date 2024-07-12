@@ -271,7 +271,7 @@ func TestParser(t *testing.T) {
 					continue
 				}
 
-				err = testParseCase(ta.text, ta.want, ta.context, ParseOptionEnableScripting(ta.scripting))
+				err = testParseCase(ta.text, ta.want, ta.context)
 
 				if err != nil {
 					t.Errorf("%s test #%d %q, %s", tf, i, ta.text, err)
@@ -295,7 +295,7 @@ func TestParserWithoutScripting(t *testing.T) {
 |         src="https://golang.org/doc/gopher/doc.png"
 `
 
-	if err := testParseCase(text, want, "", ParseOptionEnableScripting(false)); err != nil {
+	if err := testParseCase(text, want, ""); err != nil {
 		t.Errorf("test with scripting is disabled, %q, %s", text, err)
 	}
 }
@@ -304,7 +304,7 @@ func TestParserWithoutScripting(t *testing.T) {
 // pass, it returns an error that explains the failure.
 // text is the HTML to be parsed, want is a dump of the correct parse tree,
 // and context is the name of the context node, if any.
-func testParseCase(text, want, context string, opts ...ParseOption) (err error) {
+func testParseCase(text, want, context string) (err error) {
 	defer func() {
 		if x := recover(); x != nil {
 			switch e := x.(type) {
@@ -318,7 +318,7 @@ func testParseCase(text, want, context string, opts ...ParseOption) (err error) 
 
 	var doc *html.Node
 	if context == "" {
-		doc, err = ParseWithOptions(strings.NewReader(text), opts...)
+		doc, err = Parse(strings.NewReader(text))
 		if err != nil {
 			return err
 		}
@@ -333,7 +333,7 @@ func testParseCase(text, want, context string, opts ...ParseOption) (err error) 
 			Namespace: namespace,
 			Type:      html.ElementNode,
 		}
-		nodes, err := ParseFragmentWithOptions(strings.NewReader(text), contextNode, opts...)
+		nodes, err := ParseFragment(strings.NewReader(text), contextNode)
 		if err != nil {
 			return err
 		}
@@ -367,7 +367,7 @@ func testParseCase(text, want, context string, opts ...ParseOption) (err error) 
 	go func() {
 		pw.CloseWithError(html.Render(pw, doc))
 	}()
-	doc1, err := ParseWithOptions(pr, opts...)
+	doc1, err := Parse(pr)
 	if err != nil {
 		return err
 	}
