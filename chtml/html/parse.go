@@ -32,7 +32,7 @@ type parser struct {
 	// Element pointers (section 12.2.4.4).
 	head, form *html.Node
 	// Other parsing state flags (section 12.2.4.5).
-	scripting, framesetOK bool
+	framesetOK bool
 	// The stack of template insertion modes
 	templateStack insertionModeStack
 	// im is the current insertion mode.
@@ -643,13 +643,10 @@ func inHeadIM(p *parser) bool {
 			p.acknowledgeSelfClosingTag()
 			return true
 		case a.Noscript:
-			if p.scripting {
-				p.parseGenericRawTextElement()
-				return true
-			}
 			p.addElement()
 			p.im = inHeadNoscriptIM
-			// Don't let the tokenizer go into raw text mode when scripting is disabled.
+			// Don't let the tokenizer go into raw text mode when for <noscript> tag and parse
+			// its content as regular HTML.
 			p.tokenizer.NextIsNotRawText()
 			return true
 		case a.Script, a.Title:
@@ -1070,13 +1067,10 @@ func inBodyIM(p *parser) bool {
 		case a.Noembed:
 			p.parseGenericRawTextElement()
 		case a.Noscript:
-			if p.scripting {
-				p.parseGenericRawTextElement()
-				return true
-			}
 			p.reconstructActiveFormattingElements()
 			p.addElement()
-			// Don't let the tokenizer go into raw text mode when scripting is disabled.
+			// Don't let the tokenizer go into raw text mode when for <noscript> tag and parse
+			// its content as regular HTML.
 			p.tokenizer.NextIsNotRawText()
 		case a.Select:
 			p.reconstructActiveFormattingElements()
@@ -2342,45 +2336,13 @@ func (p *parser) parse() error {
 //
 // The input is assumed to be UTF-8 encoded.
 func Parse(r io.Reader) (*html.Node, error) {
-	return ParseWithOptions(r)
-}
-
-// ParseFragment parses a fragment of HTML and returns the nodes that were
-// found. If the fragment is the InnerHTML for an existing element, pass that
-// element in context.
-//
-// It has the same intricacies as Parse.
-func ParseFragment(r io.Reader, context *html.Node) ([]*html.Node, error) {
-	return ParseFragmentWithOptions(r, context)
-}
-
-// ParseOption configures a parser.
-type ParseOption func(p *parser)
-
-// ParseOptionEnableScripting configures the scripting flag.
-// https://html.spec.whatwg.org/multipage/webappapis.html#enabling-and-disabling-scripting
-//
-// By default, scripting is enabled.
-func ParseOptionEnableScripting(enable bool) ParseOption {
-	return func(p *parser) {
-		p.scripting = enable
-	}
-}
-
-// ParseWithOptions is like Parse, with options.
-func ParseWithOptions(r io.Reader, opts ...ParseOption) (*html.Node, error) {
 	p := &parser{
 		tokenizer: html.NewTokenizer(r),
 		doc: &html.Node{
 			Type: html.DocumentNode,
 		},
-		scripting:  true,
 		framesetOK: true,
 		im:         initialIM,
-	}
-
-	for _, f := range opts {
-		f(p)
 	}
 
 	if err := p.parse(); err != nil {
@@ -2389,8 +2351,12 @@ func ParseWithOptions(r io.Reader, opts ...ParseOption) (*html.Node, error) {
 	return p.doc, nil
 }
 
-// ParseFragmentWithOptions is like ParseFragment, with options.
-func ParseFragmentWithOptions(r io.Reader, context *html.Node, opts ...ParseOption) ([]*html.Node, error) {
+// ParseFragment parses a fragment of HTML and returns the nodes that were
+// found. If the fragment is the InnerHTML for an existing element, pass that
+// element in context.
+//
+// It has the same intricacies as Parse.
+func ParseFragment(r io.Reader, context *html.Node) ([]*html.Node, error) {
 	contextTag := ""
 	if context != nil {
 		if context.Type != html.ElementNode {
@@ -2408,18 +2374,13 @@ func ParseFragmentWithOptions(r io.Reader, context *html.Node, opts ...ParseOpti
 		doc: &html.Node{
 			Type: html.DocumentNode,
 		},
-		scripting: true,
-		fragment:  true,
-		context:   context,
+		fragment: true,
+		context:  context,
 	}
 	if context != nil && context.Namespace != "" {
 		p.tokenizer = html.NewTokenizer(r)
 	} else {
 		p.tokenizer = html.NewTokenizerFragment(r, contextTag)
-	}
-
-	for _, f := range opts {
-		f(p)
 	}
 
 	root := &html.Node{

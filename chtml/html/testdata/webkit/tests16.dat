@@ -1110,9 +1110,8 @@
 | <html>
 |   <head>
 |     <noscript>
-|       "<!--<noscript>"
+|       <!-- <noscript></noscript> -->
 |   <body>
-|     "-->"
 
 #data
 <!doctype html><noscript><!--<noscript></noscript>--></noscript>
@@ -1135,11 +1134,8 @@
 | <html>
 |   <head>
 |     <noscript>
-|       "<!--"
+|       <!-- </noscript>X<noscript> -->
 |   <body>
-|     "X"
-|     <noscript>
-|       "-->"
 
 #data
 <!doctype html><noscript><!--</noscript>X<noscript>--></noscript>
@@ -1162,9 +1158,9 @@
 | <html>
 |   <head>
 |     <noscript>
-|       "<iframe>"
 |   <body>
-|     "X"
+|     <iframe>
+|       "</noscript>X"
 
 #data
 <!doctype html><noscript><iframe></noscript>X
@@ -2383,9 +2379,8 @@
 | <html>
 |   <head>
 |     <noscript>
-|       "<!--<noscript>"
+|       <!-- <noscript></noscript> -->
 |   <body>
-|     "-->"
 
 #data
 <noscript><!--<noscript></noscript>--></noscript>
@@ -2408,11 +2403,8 @@
 | <html>
 |   <head>
 |     <noscript>
-|       "<!--"
+|       <!-- </noscript>X<noscript> -->
 |   <body>
-|     "X"
-|     <noscript>
-|       "-->"
 
 #data
 <noscript><!--</noscript>X<noscript>--></noscript>
@@ -2435,9 +2427,9 @@
 | <html>
 |   <head>
 |     <noscript>
-|       "<iframe>"
 |   <body>
-|     "X"
+|     <iframe>
+|       "</noscript>X"
 
 #data
 <noscript><iframe></noscript>X
