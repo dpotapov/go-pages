@@ -7,14 +7,11 @@
 (3,7): unexpected-end-tag
 (3,8): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <div>
-|       "
+| <div>
+|   "
 "
-|       <div>
-|       "
+|   <div>
+|   "
 x"
 
 #data
@@ -25,13 +22,10 @@ x"
 (2,7): unexpected-end-tag
 (2,8): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <div>
-|       "x"
-|       <div>
-|       "
+| <div>
+|   "x"
+|   <div>
+|   "
 x"
 
 #data
@@ -41,13 +35,10 @@ x"
 (1,25): unexpected-end-tag
 (1,26): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <div>
-|       "x"
-|       <div>
-|       "xx"
+| <div>
+|   "x"
+|   <div>
+|   "xx"
 
 #data
 <div>x<div></div>y</span>z
@@ -56,13 +47,10 @@ x"
 (1,25): unexpected-end-tag
 (1,26): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <div>
-|       "x"
-|       <div>
-|       "yz"
+| <div>
+|   "x"
+|   <div>
+|   "yz"
 
 #data
 <table><div>x<div></div>x</span>x
@@ -78,25 +66,19 @@ x"
 (1,33): foster-parenting-character
 (1,33): eof-in-table
 #document
-| <html>
-|   <head>
-|   <body>
-|     <div>
-|       "x"
-|       <div>
-|       "xx"
-|     <table>
+| <div>
+|   "x"
+|   <div>
+|   "xx"
+| <table>
 
 #data
 <table><li><li></table>
 #errors
 #document
-| <html>
-|   <head>
-|   <body>
-|     <li>
-|     <li>
-|     <table>
+| <li>
+| <li>
+| <table>
 
 #data
 x<table>x
@@ -105,11 +87,8 @@ x<table>x
 (1,9): foster-parenting-character
 (1,9): eof-in-table
 #document
-| <html>
-|   <head>
-|   <body>
-|     "xx"
-|     <table>
+| "xx"
+| <table>
 
 #data
 x<table><table>x
@@ -119,13 +98,10 @@ x<table><table>x
 (1,16): foster-parenting-character
 (1,16): eof-in-table
 #document
-| <html>
-|   <head>
-|   <body>
-|     "x"
-|     <table>
-|     "x"
-|     <table>
+| "x"
+| <table>
+| "x"
+| <table>
 
 #data
 <b>a<div></div><div></b>y
@@ -134,15 +110,12 @@ x<table><table>x
 (1,24): adoption-agency-1.3
 (1,25): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <b>
-|       "a"
-|       <div>
-|     <div>
-|       <b>
-|       "y"
+| <b>
+|   "a"
+|   <div>
+| <div>
+|   <b>
+|   "y"
 
 #data
 <a><div><p></a>
@@ -152,11 +125,8 @@ x<table><table>x
 (1,15): adoption-agency-1.3
 (1,15): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
+| <a>
+| <div>
+|   <a>
+|   <p>
 |     <a>
-|     <div>
-|       <a>
-|       <p>
-|         <a>

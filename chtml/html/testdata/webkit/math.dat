@@ -1,60 +1,53 @@
 #data
 <math><tr><td><mo><tr>
 #errors
-#document-fragment
-td
 #document
 | <math math>
 |   <math tr>
 |     <math td>
 |       <math mo>
+|         <tr>
 
 #data
 <math><tr><td><mo><tr>
 #errors
-#document-fragment
-tr
 #document
 | <math math>
 |   <math tr>
 |     <math td>
 |       <math mo>
+|         <tr>
 
 #data
 <math><thead><mo><tbody>
 #errors
-#document-fragment
-thead
 #document
 | <math math>
 |   <math thead>
 |     <math mo>
+|       <tbody>
 
 #data
 <math><tfoot><mo><tbody>
 #errors
-#document-fragment
-tfoot
 #document
 | <math math>
 |   <math tfoot>
 |     <math mo>
+|       <tbody>
 
 #data
 <math><tbody><mo><tfoot>
 #errors
-#document-fragment
-tbody
 #document
 | <math math>
 |   <math tbody>
 |     <math mo>
+|       <tfoot>
 
 #data
 <math><tbody><mo></table>
 #errors
-#document-fragment
-tbody
 #document
 | <math math>
 |   <math tbody>
@@ -63,8 +56,6 @@ tbody
 #data
 <math><thead><mo></table>
 #errors
-#document-fragment
-tbody
 #document
 | <math math>
 |   <math thead>
@@ -73,8 +64,6 @@ tbody
 #data
 <math><tfoot><mo></table>
 #errors
-#document-fragment
-tbody
 #document
 | <math math>
 |   <math tfoot>

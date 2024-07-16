@@ -4,57 +4,43 @@
 (1,14): expected-doctype-but-got-start-tag
 (1,14): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <foo>
-|       bar="qux/"
+| <foo>
+|   bar="qux/"
 
 #data
 <p id="status"><noscript><strong>A</strong></noscript><span>B</span></p>
 #errors
 (1,15): expected-doctype-but-got-start-tag
-#script-on
 #document
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|       id="status"
-|       <noscript>
-|         <strong>
-|           "A"
-|       <span>
-|         "B"
+| <p>
+|   id="status"
+|   <noscript>
+|     <strong>
+|       "A"
+|   <span>
+|     "B"
 
 #data
 <p id="status"><noscript><strong>A</strong></noscript><span>B</span></p>
 #errors
 (1,15): expected-doctype-but-got-start-tag
-#script-off
 #document
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|       id="status"
-|       <noscript>
-|         <strong>
-|           "A"
-|       <span>
-|         "B"
+| <p>
+|   id="status"
+|   <noscript>
+|     <strong>
+|       "A"
+|   <span>
+|     "B"
 
 #data
 <div><sarcasm><div></div></sarcasm></div>
 #errors
 (1,5): expected-doctype-but-got-start-tag
 #document
-| <html>
-|   <head>
-|   <body>
+| <div>
+|   <sarcasm>
 |     <div>
-|       <sarcasm>
-|         <div>
 
 #data
 <html><body><img src="" border="0" alt="><div>A</div></body></html>
@@ -65,7 +51,6 @@
 (1:68) eof-in-tag
 #document
 | <html>
-|   <head>
 |   <body>
 
 #data
@@ -76,14 +61,11 @@
 (1,20): foster-parenting-character
 (1,20): eof-in-table
 #document
-| <html>
-|   <head>
-|   <body>
-|     "A"
-|     <table>
-|       <tbody>
-|         <tr>
-|           <td>
+| "A"
+| <table>
+|   <tbody>
+|     <tr>
+|       <td>
 
 #data
 <table><td></thead>A
@@ -93,14 +75,11 @@
 (1,19): XXX-undefined-error
 (1,20): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <tr>
-|           <td>
-|             "A"
+| <table>
+|   <tbody>
+|     <tr>
+|       <td>
+|         "A"
 
 #data
 <table><td></tfoot>A
@@ -110,14 +89,11 @@
 (1,19): XXX-undefined-error
 (1,20): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <tr>
-|           <td>
-|             "A"
+| <table>
+|   <tbody>
+|     <tr>
+|       <td>
+|         "A"
 
 #data
 <table><thead><td></tbody>A
@@ -127,101 +103,78 @@
 (1,26): XXX-undefined-error
 (1,27): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <thead>
-|         <tr>
-|           <td>
-|             "A"
+| <table>
+|   <thead>
+|     <tr>
+|       <td>
+|         "A"
 
 #data
 <legend>test</legend>
 #errors
 #document
-| <html>
-|   <head>
-|   <body>
-|     <legend>
-|       "test"
+| <legend>
+|   "test"
 
 #data
 <table><input>
 #errors
 #document
-| <html>
-|   <head>
-|   <body>
-|     <input>
-|     <table>
+| <input>
+| <table>
 
 #data
 <b><em><foo><foo><aside></b>
 #errors
 #document
-| <html>
-|   <head>
-|   <body>
+| <b>
+|   <em>
+|     <foo>
+|       <foo>
+| <em>
+|   <aside>
 |     <b>
-|       <em>
-|         <foo>
-|           <foo>
-|     <em>
-|       <aside>
-|         <b>
 
 #data
 <b><em><foo><foo><aside></b></em>
 #errors
 #document
-| <html>
-|   <head>
-|   <body>
+| <b>
+|   <em>
+|     <foo>
+|       <foo>
+| <em>
+| <aside>
+|   <em>
 |     <b>
-|       <em>
-|         <foo>
-|           <foo>
-|     <em>
-|     <aside>
-|       <em>
-|         <b>
 
 #data
 <b><em><foo><foo><foo><aside></b>
 #errors
 #document
-| <html>
-|   <head>
-|   <body>
-|     <b>
-|       <em>
+| <b>
+|   <em>
+|     <foo>
+|       <foo>
 |         <foo>
-|           <foo>
-|             <foo>
-|     <aside>
-|       <b>
+| <aside>
+|   <b>
 
 #data
 <b><em><foo><foo><foo><aside></b></em>
 #errors
 #document
-| <html>
-|   <head>
-|   <body>
-|     <b>
-|       <em>
+| <b>
+|   <em>
+|     <foo>
+|       <foo>
 |         <foo>
-|           <foo>
-|             <foo>
-|     <aside>
-|       <b>
+| <aside>
+|   <b>
 
 #data
 <b><em><foo><foo><foo><foo><foo><foo><foo><foo><foo><foo><aside></b></em>
 #errors
-#document-fragment
-div
 #document
 | <b>
 |   <em>
@@ -241,8 +194,6 @@ div
 #data
 <b><em><foo><foob><foob><foob><foob><fooc><fooc><fooc><fooc><food><aside></b></em>
 #errors
-#document-fragment
-div
 #document
 | <b>
 |   <em>
@@ -262,43 +213,33 @@ div
 #data
 <option><XH<optgroup></optgroup>
 #errors
-#document-fragment
-select
 #document
 | <option>
+|   <xh<optgroup>
 
 #data
 <svg><foreignObject><div>foo</div><plaintext></foreignObject></svg><div>bar</div>
 #errors
 #document
-| <html>
-|   <head>
-|   <body>
-|     <svg svg>
-|       <svg foreignObject>
-|         <div>
-|           "foo"
-|         <plaintext>
-|           "</foreignObject></svg><div>bar</div>"
+| <svg svg>
+|   <svg foreignObject>
+|     <div>
+|       "foo"
+|     <plaintext>
+|       "</foreignObject></svg><div>bar</div>"
 
 #data
 <svg><foreignObject></foreignObject><title></svg>foo
 #errors
 #document
-| <html>
-|   <head>
-|   <body>
-|     <svg svg>
-|       <svg foreignObject>
-|       <svg title>
-|     "foo"
+| <svg svg>
+|   <svg foreignObject>
+|   <svg title>
+| "foo"
 
 #data
 </foreignObject><plaintext><div>foo</div>
 #errors
 #document
-| <html>
-|   <head>
-|   <body>
-|     <plaintext>
-|       "<div>foo</div>"
+| <plaintext>
+|   "<div>foo</div>"

@@ -3,10 +3,7 @@ FOO&gt;BAR
 #errors
 (1,3): expected-doctype-but-got-chars
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO>BAR"
+| "FOO>BAR"
 
 #data
 FOO&gtBAR
@@ -16,10 +13,7 @@ FOO&gtBAR
 #new-errors
 (1:7) missing-semicolon-after-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO>BAR"
+| "FOO>BAR"
 
 #data
 FOO&gt BAR
@@ -29,20 +23,14 @@ FOO&gt BAR
 #new-errors
 (1:7) missing-semicolon-after-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO> BAR"
+| "FOO> BAR"
 
 #data
 FOO&gt;;;BAR
 #errors
 (1,3): expected-doctype-but-got-chars
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO>;;BAR"
+| "FOO>;;BAR"
 
 #data
 I'm &notit; I tell you
@@ -52,20 +40,14 @@ I'm &notit; I tell you
 #new-errors
 (1:9) missing-semicolon-after-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "I'm ¬it; I tell you"
+| "I'm ¬it; I tell you"
 
 #data
 I'm &notin; I tell you
 #errors
 (1,4): expected-doctype-but-got-chars
 #document
-| <html>
-|   <head>
-|   <body>
-|     "I'm ∉ I tell you"
+| "I'm ∉ I tell you"
 
 #data
 &ammmp;
@@ -75,10 +57,7 @@ I'm &notin; I tell you
 #new-errors
 (1:7) unknown-named-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "&ammmp;"
+| "&ammmp;"
 
 #data
 &ammmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmp;
@@ -88,20 +67,14 @@ I'm &notin; I tell you
 #new-errors
 (1:950) unknown-named-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "&ammmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmp;"
+| "&ammmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmp;"
 
 #data
 FOO& BAR
 #errors
 (1,3): expected-doctype-but-got-chars
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO& BAR"
+| "FOO& BAR"
 
 #data
 FOO&<BAR>
@@ -109,51 +82,36 @@ FOO&<BAR>
 (1,3): expected-doctype-but-got-chars
 (1,9): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO&"
-|     <bar>
+| "FOO&"
+| <bar>
 
 #data
 FOO&&&&gt;BAR
 #errors
 (1,3): expected-doctype-but-got-chars
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO&&&>BAR"
+| "FOO&&&>BAR"
 
 #data
 FOO&#41;BAR
 #errors
 (1,3): expected-doctype-but-got-chars
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO)BAR"
+| "FOO)BAR"
 
 #data
 FOO&#x41;BAR
 #errors
 (1,3): expected-doctype-but-got-chars
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOABAR"
+| "FOOABAR"
 
 #data
 FOO&#X41;BAR
 #errors
 (1,3): expected-doctype-but-got-chars
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOABAR"
+| "FOOABAR"
 
 #data
 FOO&#BAR
@@ -163,10 +121,7 @@ FOO&#BAR
 #new-errors
 (1:6) absence-of-digits-in-numeric-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO&#BAR"
+| "FOO&#BAR"
 
 #data
 FOO&#ZOO
@@ -176,10 +131,7 @@ FOO&#ZOO
 #new-errors
 (1:6) absence-of-digits-in-numeric-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO&#ZOO"
+| "FOO&#ZOO"
 
 #data
 FOO&#xBAR
@@ -189,10 +141,7 @@ FOO&#xBAR
 #new-errors
 (1:9) missing-semicolon-after-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOºR"
+| "FOOºR"
 
 #data
 FOO&#xZOO
@@ -202,10 +151,7 @@ FOO&#xZOO
 #new-errors
 (1:7) absence-of-digits-in-numeric-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO&#xZOO"
+| "FOO&#xZOO"
 
 #data
 FOO&#XZOO
@@ -215,10 +161,7 @@ FOO&#XZOO
 #new-errors
 (1:7) absence-of-digits-in-numeric-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO&#XZOO"
+| "FOO&#XZOO"
 
 #data
 FOO&#41BAR
@@ -228,10 +171,7 @@ FOO&#41BAR
 #new-errors
 (1:8) missing-semicolon-after-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO)BAR"
+| "FOO)BAR"
 
 #data
 FOO&#x41BAR
@@ -241,10 +181,7 @@ FOO&#x41BAR
 #new-errors
 (1:11) missing-semicolon-after-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO䆺R"
+| "FOO䆺R"
 
 #data
 FOO&#x41ZOO
@@ -254,10 +191,7 @@ FOO&#x41ZOO
 #new-errors
 (1:9) missing-semicolon-after-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOAZOO"
+| "FOOAZOO"
 
 #data
 FOO&#x0000;ZOO
@@ -267,30 +201,21 @@ FOO&#x0000;ZOO
 #new-errors
 (1:12) null-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO�ZOO"
+| "FOO�ZOO"
 
 #data
 FOO&#x0078;ZOO
 #errors
 (1,3): expected-doctype-but-got-chars
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOxZOO"
+| "FOOxZOO"
 
 #data
 FOO&#x0079;ZOO
 #errors
 (1,3): expected-doctype-but-got-chars
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOyZOO"
+| "FOOyZOO"
 
 #data
 FOO&#x0080;ZOO
@@ -300,10 +225,7 @@ FOO&#x0080;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO€ZOO"
+| "FOO€ZOO"
 
 #data
 FOO&#x0081;ZOO
@@ -313,10 +235,7 @@ FOO&#x0081;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOZOO"
+| "FOOZOO"
 
 #data
 FOO&#x0082;ZOO
@@ -326,10 +245,7 @@ FOO&#x0082;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO‚ZOO"
+| "FOO‚ZOO"
 
 #data
 FOO&#x0083;ZOO
@@ -339,10 +255,7 @@ FOO&#x0083;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOƒZOO"
+| "FOOƒZOO"
 
 #data
 FOO&#x0084;ZOO
@@ -352,10 +265,7 @@ FOO&#x0084;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO„ZOO"
+| "FOO„ZOO"
 
 #data
 FOO&#x0085;ZOO
@@ -365,10 +275,7 @@ FOO&#x0085;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO…ZOO"
+| "FOO…ZOO"
 
 #data
 FOO&#x0086;ZOO
@@ -378,10 +285,7 @@ FOO&#x0086;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO†ZOO"
+| "FOO†ZOO"
 
 #data
 FOO&#x0087;ZOO
@@ -391,10 +295,7 @@ FOO&#x0087;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO‡ZOO"
+| "FOO‡ZOO"
 
 #data
 FOO&#x0088;ZOO
@@ -404,10 +305,7 @@ FOO&#x0088;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOˆZOO"
+| "FOOˆZOO"
 
 #data
 FOO&#x0089;ZOO
@@ -417,10 +315,7 @@ FOO&#x0089;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO‰ZOO"
+| "FOO‰ZOO"
 
 #data
 FOO&#x008A;ZOO
@@ -430,10 +325,7 @@ FOO&#x008A;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOŠZOO"
+| "FOOŠZOO"
 
 #data
 FOO&#x008B;ZOO
@@ -443,10 +335,7 @@ FOO&#x008B;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO‹ZOO"
+| "FOO‹ZOO"
 
 #data
 FOO&#x008C;ZOO
@@ -456,10 +345,7 @@ FOO&#x008C;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOŒZOO"
+| "FOOŒZOO"
 
 #data
 FOO&#x008D;ZOO
@@ -469,10 +355,7 @@ FOO&#x008D;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOZOO"
+| "FOOZOO"
 
 #data
 FOO&#x008E;ZOO
@@ -482,10 +365,7 @@ FOO&#x008E;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOŽZOO"
+| "FOOŽZOO"
 
 #data
 FOO&#x008F;ZOO
@@ -495,10 +375,7 @@ FOO&#x008F;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOZOO"
+| "FOOZOO"
 
 #data
 FOO&#x0090;ZOO
@@ -508,10 +385,7 @@ FOO&#x0090;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOZOO"
+| "FOOZOO"
 
 #data
 FOO&#x0091;ZOO
@@ -521,10 +395,7 @@ FOO&#x0091;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO‘ZOO"
+| "FOO‘ZOO"
 
 #data
 FOO&#x0092;ZOO
@@ -534,10 +405,7 @@ FOO&#x0092;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO’ZOO"
+| "FOO’ZOO"
 
 #data
 FOO&#x0093;ZOO
@@ -547,10 +415,7 @@ FOO&#x0093;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO“ZOO"
+| "FOO“ZOO"
 
 #data
 FOO&#x0094;ZOO
@@ -560,10 +425,7 @@ FOO&#x0094;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO”ZOO"
+| "FOO”ZOO"
 
 #data
 FOO&#x0095;ZOO
@@ -573,10 +435,7 @@ FOO&#x0095;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO•ZOO"
+| "FOO•ZOO"
 
 #data
 FOO&#x0096;ZOO
@@ -586,10 +445,7 @@ FOO&#x0096;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO–ZOO"
+| "FOO–ZOO"
 
 #data
 FOO&#x0097;ZOO
@@ -599,10 +455,7 @@ FOO&#x0097;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO—ZOO"
+| "FOO—ZOO"
 
 #data
 FOO&#x0098;ZOO
@@ -612,10 +465,7 @@ FOO&#x0098;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO˜ZOO"
+| "FOO˜ZOO"
 
 #data
 FOO&#x0099;ZOO
@@ -625,10 +475,7 @@ FOO&#x0099;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO™ZOO"
+| "FOO™ZOO"
 
 #data
 FOO&#x009A;ZOO
@@ -638,10 +485,7 @@ FOO&#x009A;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOšZOO"
+| "FOOšZOO"
 
 #data
 FOO&#x009B;ZOO
@@ -651,10 +495,7 @@ FOO&#x009B;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO›ZOO"
+| "FOO›ZOO"
 
 #data
 FOO&#x009C;ZOO
@@ -664,10 +505,7 @@ FOO&#x009C;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOœZOO"
+| "FOOœZOO"
 
 #data
 FOO&#x009D;ZOO
@@ -677,10 +515,7 @@ FOO&#x009D;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOZOO"
+| "FOOZOO"
 
 #data
 FOO&#x009E;ZOO
@@ -690,10 +525,7 @@ FOO&#x009E;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOžZOO"
+| "FOOžZOO"
 
 #data
 FOO&#x009F;ZOO
@@ -703,30 +535,21 @@ FOO&#x009F;ZOO
 #new-errors
 (1:12) control-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOŸZOO"
+| "FOOŸZOO"
 
 #data
 FOO&#x00A0;ZOO
 #errors
 (1,3): expected-doctype-but-got-chars
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO ZOO"
+| "FOO ZOO"
 
 #data
 FOO&#xD7FF;ZOO
 #errors
 (1,3): expected-doctype-but-got-chars
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO퟿ZOO"
+| "FOO퟿ZOO"
 
 #data
 FOO&#xD800;ZOO
@@ -736,10 +559,7 @@ FOO&#xD800;ZOO
 #new-errors
 (1:12) surrogate-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO�ZOO"
+| "FOO�ZOO"
 
 #data
 FOO&#xD801;ZOO
@@ -749,10 +569,7 @@ FOO&#xD801;ZOO
 #new-errors
 (1:12) surrogate-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO�ZOO"
+| "FOO�ZOO"
 
 #data
 FOO&#xDFFE;ZOO
@@ -762,10 +579,7 @@ FOO&#xDFFE;ZOO
 #new-errors
 (1:12) surrogate-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO�ZOO"
+| "FOO�ZOO"
 
 #data
 FOO&#xDFFF;ZOO
@@ -775,20 +589,14 @@ FOO&#xDFFF;ZOO
 #new-errors
 (1:12) surrogate-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO�ZOO"
+| "FOO�ZOO"
 
 #data
 FOO&#xE000;ZOO
 #errors
 (1,3): expected-doctype-but-got-chars
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOOZOO"
+| "FOOZOO"
 
 #data
 FOO&#x10FFFE;ZOO
@@ -798,20 +606,14 @@ FOO&#x10FFFE;ZOO
 #new-errors
 (1:14) noncharacter-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO􏿾ZOO"
+| "FOO􏿾ZOO"
 
 #data
 FOO&#x1087D4;ZOO
 #errors
 (1,3): expected-doctype-but-got-chars
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO􈟔ZOO"
+| "FOO􈟔ZOO"
 
 #data
 FOO&#x10FFFF;ZOO
@@ -821,10 +623,7 @@ FOO&#x10FFFF;ZOO
 #new-errors
 (1:14) noncharacter-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO􏿿ZOO"
+| "FOO􏿿ZOO"
 
 #data
 FOO&#x110000;ZOO
@@ -834,10 +633,7 @@ FOO&#x110000;ZOO
 #new-errors
 (1:14) character-reference-outside-unicode-range
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO�ZOO"
+| "FOO�ZOO"
 
 #data
 FOO&#xFFFFFF;ZOO
@@ -847,10 +643,7 @@ FOO&#xFFFFFF;ZOO
 #new-errors
 (1:14) character-reference-outside-unicode-range
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO�ZOO"
+| "FOO�ZOO"
 
 #data
 FOO&#11111111111
@@ -862,10 +655,7 @@ FOO&#11111111111
 (1:17) missing-semicolon-after-character-reference
 (1:17) character-reference-outside-unicode-range
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO�"
+| "FOO�"
 
 #data
 FOO&#1111111111
@@ -877,10 +667,7 @@ FOO&#1111111111
 (1:16) missing-semicolon-after-character-reference
 (1:16) character-reference-outside-unicode-range
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO�"
+| "FOO�"
 
 #data
 FOO&#111111111111
@@ -892,10 +679,7 @@ FOO&#111111111111
 (1:18) missing-semicolon-after-character-reference
 (1:18) character-reference-outside-unicode-range
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO�"
+| "FOO�"
 
 #data
 FOO&#11111111111ZOO
@@ -907,10 +691,7 @@ FOO&#11111111111ZOO
 (1:17) missing-semicolon-after-character-reference
 (1:17) character-reference-outside-unicode-range
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO�ZOO"
+| "FOO�ZOO"
 
 #data
 FOO&#1111111111ZOO
@@ -922,10 +703,7 @@ FOO&#1111111111ZOO
 (1:16) missing-semicolon-after-character-reference
 (1:16) character-reference-outside-unicode-range
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO�ZOO"
+| "FOO�ZOO"
 
 #data
 FOO&#111111111111ZOO
@@ -937,7 +715,4 @@ FOO&#111111111111ZOO
 (1:18) missing-semicolon-after-character-reference
 (1:18) character-reference-outside-unicode-range
 #document
-| <html>
-|   <head>
-|   <body>
-|     "FOO�ZOO"
+| "FOO�ZOO"

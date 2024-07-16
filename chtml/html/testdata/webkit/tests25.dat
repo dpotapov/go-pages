@@ -4,66 +4,54 @@
 (1,27): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <foo>
-|       "A"
+| <body>
+|   <foo>
+|     "A"
 
 #data
 <!DOCTYPE html><body><area>A
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <area>
-|     "A"
+| <body>
+|   <area>
+|   "A"
 
 #data
 <!DOCTYPE html><body><base>A
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <base>
-|     "A"
+| <body>
+|   <base>
+|   "A"
 
 #data
 <!DOCTYPE html><body><basefont>A
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <basefont>
-|     "A"
+| <body>
+|   <basefont>
+|   "A"
 
 #data
 <!DOCTYPE html><body><bgsound>A
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <bgsound>
-|     "A"
+| <body>
+|   <bgsound>
+|   "A"
 
 #data
 <!DOCTYPE html><body><br>A
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <br>
-|     "A"
+| <body>
+|   <br>
+|   "A"
 
 #data
 <!DOCTYPE html><body><col>A
@@ -71,9 +59,8 @@
 (1,26): unexpected-start-tag-ignored
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
+| <body>
+|   <col>
 |     "A"
 
 #data
@@ -82,22 +69,18 @@
 eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <command>
-|       "A"
+| <body>
+|   <command>
+|     "A"
 
 #data
 <!DOCTYPE html><body><embed>A
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <embed>
-|     "A"
+| <body>
+|   <embed>
+|   "A"
 
 #data
 <!DOCTYPE html><body><frame>A
@@ -105,9 +88,8 @@ eof
 (1,28): unexpected-start-tag-ignored
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
+| <body>
+|   <frame>
 |     "A"
 
 #data
@@ -115,44 +97,36 @@ eof
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <hr>
-|     "A"
+| <body>
+|   <hr>
+|   "A"
 
 #data
 <!DOCTYPE html><body><img>A
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <img>
-|     "A"
+| <body>
+|   <img>
+|   "A"
 
 #data
 <!DOCTYPE html><body><input>A
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <input>
-|     "A"
+| <body>
+|   <input>
+|   "A"
 
 #data
 <!DOCTYPE html><body><keygen>A
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <keygen>
-|     "A"
+| <body>
+|   <keygen>
+|   "A"
 
 #data
 <!DOCTYPE html><keygen>A</keygen>B
@@ -160,11 +134,8 @@ eof
 33: Stray end tag “keygen”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <keygen>
-|     "AB"
+| <keygen>
+| "AB"
 
 #data
 </keygen>A
@@ -172,10 +143,7 @@ eof
 9: End tag seen without seeing a doctype first. Expected “<!DOCTYPE html>”.
 9: Stray end tag “keygen”.
 #document
-| <html>
-|   <head>
-|   <body>
-|     "A"
+| "A"
 
 #data
 <!DOCTYPE html></keygen>A
@@ -183,10 +151,7 @@ eof
 24: Stray end tag “keygen”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     "A"
+| "A"
 
 #data
 <!DOCTYPE html><head></keygen>A
@@ -194,10 +159,8 @@ eof
 30: Stray end tag “keygen”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     "A"
+| <head>
+|   "A"
 
 #data
 <!DOCTYPE html><head></head></keygen>A
@@ -205,10 +168,8 @@ eof
 30: Stray end tag “keygen”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     "A"
+| <head>
+| "A"
 
 #data
 <!DOCTYPE html><body></keygen>A
@@ -216,73 +177,59 @@ eof
 30: Stray end tag “keygen”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     "A"
+| <body>
+|   "A"
 
 #data
 <!DOCTYPE html><body><link>A
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <link>
-|     "A"
+| <body>
+|   <link>
+|   "A"
 
 #data
 <!DOCTYPE html><body><meta>A
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <meta>
-|     "A"
+| <body>
+|   <meta>
+|   "A"
 
 #data
 <!DOCTYPE html><body><param>A
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <param>
-|     "A"
+| <body>
+|   <param>
+|   "A"
 
 #data
 <!DOCTYPE html><body><source>A
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <source>
-|     "A"
+| <body>
+|   <source>
+|   "A"
 
 #data
 <!DOCTYPE html><body><track>A
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <track>
-|     "A"
+| <body>
+|   <track>
+|   "A"
 
 #data
 <!DOCTYPE html><body><wbr>A
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <wbr>
-|     "A"
+| <body>
+|   <wbr>
+|   "A"

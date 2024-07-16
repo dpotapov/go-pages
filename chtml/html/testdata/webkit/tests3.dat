@@ -4,10 +4,8 @@
 (1,6): expected-doctype-but-got-start-tag
 (1,20): unexpected-start-tag-out-of-my-head
 #document
-| <html>
-|   <head>
-|     <style>
-|   <body>
+| <head>
+| <style>
 
 #data
 <head></head><script></script>
@@ -15,10 +13,8 @@
 (1,6): expected-doctype-but-got-start-tag
 (1,21): unexpected-start-tag-out-of-my-head
 #document
-| <html>
-|   <head>
-|     <script>
-|   <body>
+| <head>
+| <script>
 
 #data
 <head></head><!-- --><style></style><!-- --><script></script>
@@ -27,27 +23,23 @@
 (1,28): unexpected-start-tag-out-of-my-head
 (1,52): unexpected-start-tag-out-of-my-head
 #document
-| <html>
-|   <head>
-|     <style>
-|     <script>
-|   <!--   -->
-|   <!--   -->
-|   <body>
+| <head>
+| <!--   -->
+| <style>
+| <!--   -->
+| <script>
 
 #data
 <head></head><!-- -->x<style></style><!-- --><script></script>
 #errors
 (1,6): expected-doctype-but-got-start-tag
 #document
-| <html>
-|   <head>
-|   <!--   -->
-|   <body>
-|     "x"
-|     <style>
-|     <!--   -->
-|     <script>
+| <head>
+| <!--   -->
+| "x"
+| <style>
+| <!--   -->
+| <script>
 
 #data
 <!DOCTYPE html><html><head></head><body><pre>
@@ -149,11 +141,8 @@ y"
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <pre>
-|       "
+| <pre>
+|   "
 A"
 
 #data
@@ -163,9 +152,8 @@ A"
 #document
 | <!DOCTYPE html>
 | <html>
+|   <meta>
 |   <head>
-|     <meta>
-|   <body>
 
 #data
 <!DOCTYPE html><HTML><HEAD><head></HEAD></HTML>
@@ -175,7 +163,7 @@ A"
 | <!DOCTYPE html>
 | <html>
 |   <head>
-|   <body>
+|     <head>
 
 #data
 <textarea>foo<span>bar</span><i>baz
@@ -183,11 +171,8 @@ A"
 (1,10): expected-doctype-but-got-start-tag
 (1,35): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <textarea>
-|       "foo<span>bar</span><i>baz"
+| <textarea>
+|   "foo<span>bar</span><i>baz"
 
 #data
 <title>foo<span>bar</em><i>baz
@@ -195,11 +180,8 @@ A"
 (1,7): expected-doctype-but-got-start-tag
 (1,30): expected-named-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|     <title>
-|       "foo<span>bar</em><i>baz"
-|   <body>
+| <title>
+|   "foo<span>bar</em><i>baz"
 
 #data
 <!DOCTYPE html><textarea>
@@ -207,10 +189,7 @@ A"
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <textarea>
+| <textarea>
 
 #data
 <!DOCTYPE html><textarea>
@@ -218,11 +197,8 @@ foo</textarea>
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <textarea>
-|       "foo"
+| <textarea>
+|   "foo"
 
 #data
 <!DOCTYPE html><textarea>
@@ -231,11 +207,8 @@ foo</textarea>
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <textarea>
-|       "
+| <textarea>
+|   "
 foo"
 
 #data
@@ -261,12 +234,9 @@ foo"
 (1,33): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <nobr>
-|     <nobr>
-|     <nobr>
+| <nobr>
+| <nobr>
+| <nobr>
 
 #data
 <!doctype html><nobr><nobr></nobr><nobr>
@@ -275,12 +245,9 @@ foo"
 (1,40): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <nobr>
-|     <nobr>
-|     <nobr>
+| <nobr>
+| <nobr>
+| <nobr>
 
 #data
 <!doctype html><html><body><p><table></table></body></html>
@@ -288,7 +255,6 @@ foo"
 #document
 | <!DOCTYPE html>
 | <html>
-|   <head>
 |   <body>
 |     <p>
 |     <table>
@@ -298,8 +264,5 @@ foo"
 #errors
 (1,3): expected-doctype-but-got-start-tag
 #document
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|       <table>
+| <p>
+|   <table>

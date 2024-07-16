@@ -88,22 +88,6 @@ func (s *nodeStack) remove(n *html.Node) {
 	*s = (*s)[:j]
 }
 
-type insertionModeStack []insertionMode
-
-func (s *insertionModeStack) pop() (im insertionMode) {
-	i := len(*s)
-	im = (*s)[i-1]
-	*s = (*s)[:i-1]
-	return im
-}
-
-func (s *insertionModeStack) top() insertionMode {
-	if i := len(*s); i > 0 {
-		return (*s)[i-1]
-	}
-	return nil
-}
-
 // cloneNode returns a new node with the same type, data and attributes.
 // The clone has no parent, no siblings and no children.
 func cloneNode(n *html.Node) *html.Node {

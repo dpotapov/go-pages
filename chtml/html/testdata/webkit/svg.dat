@@ -1,60 +1,43 @@
 #data
 <svg><tr><td><title><tr>
 #errors
-#document-fragment
-td
 #document
 | <svg svg>
 |   <svg tr>
 |     <svg td>
 |       <svg title>
-
-#data
-<svg><tr><td><title><tr>
-#errors
-#document-fragment
-tr
-#document
-| <svg svg>
-|   <svg tr>
-|     <svg td>
-|       <svg title>
+|         <tr>
 
 #data
 <svg><thead><title><tbody>
 #errors
-#document-fragment
-thead
 #document
 | <svg svg>
 |   <svg thead>
 |     <svg title>
+|       <tbody>
 
 #data
 <svg><tfoot><title><tbody>
 #errors
-#document-fragment
-tfoot
 #document
 | <svg svg>
 |   <svg tfoot>
 |     <svg title>
+|       <tbody>
 
 #data
 <svg><tbody><title><tfoot>
 #errors
-#document-fragment
-tbody
 #document
 | <svg svg>
 |   <svg tbody>
 |     <svg title>
+|       <tfoot>
 
 #data
 <svg><tbody><title></table>
 #errors
-#document-fragment
-tbody
 #document
 | <svg svg>
 |   <svg tbody>
@@ -63,8 +46,6 @@ tbody
 #data
 <svg><thead><title></table>
 #errors
-#document-fragment
-tbody
 #document
 | <svg svg>
 |   <svg thead>
@@ -73,8 +54,6 @@ tbody
 #data
 <svg><tfoot><title></table>
 #errors
-#document-fragment
-tbody
 #document
 | <svg svg>
 |   <svg tfoot>

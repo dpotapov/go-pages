@@ -4,12 +4,9 @@
 (1,45): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <math math>
-|       <math mn>
-|         definitionURL="foo"
+| <math math>
+|   <math mn>
+|     definitionURL="foo"
 
 #data
 <!doctype html><html></p><!--foo-->
@@ -18,9 +15,8 @@
 #document
 | <!DOCTYPE html>
 | <html>
+|   <p>
 |   <!-- foo -->
-|   <head>
-|   <body>
 
 #data
 <!doctype html><head></head></p><!--foo-->
@@ -28,10 +24,9 @@
 (1,32): unexpected-end-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <!-- foo -->
-|   <body>
+| <head>
+| <p>
+| <!-- foo -->
 
 #data
 <!doctype html><body><p><pre>
@@ -39,11 +34,9 @@
 (1,29): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|     <pre>
+| <body>
+|   <p>
+|   <pre>
 
 #data
 <!doctype html><body><p><listing>
@@ -51,11 +44,9 @@
 (1,33): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|     <listing>
+| <body>
+|   <p>
+|   <listing>
 
 #data
 <!doctype html><p><plaintext>
@@ -63,11 +54,8 @@
 (1,29): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|     <plaintext>
+| <p>
+| <plaintext>
 
 #data
 <!doctype html><p><h1>
@@ -75,11 +63,8 @@
 (1,22): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|     <h1>
+| <p>
+| <h1>
 
 #data
 <!doctype html><isindex type="hidden">
@@ -87,11 +72,8 @@
 (1,38): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <isindex>
-|       type="hidden"
+| <isindex>
+|   type="hidden"
 
 #data
 <!doctype html><ruby><p><rp>
@@ -99,12 +81,9 @@
 (1,28): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <ruby>
-|       <p>
-|       <rp>
+| <ruby>
+|   <p>
+|   <rp>
 
 #data
 <!doctype html><ruby><div><span><rp>
@@ -113,13 +92,10 @@
 (1,36): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <ruby>
-|       <div>
-|         <span>
-|           <rp>
+| <ruby>
+|   <div>
+|     <span>
+|       <rp>
 
 #data
 <!doctype html><ruby><div><p><rp>
@@ -128,13 +104,10 @@
 (1,33): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <ruby>
-|       <div>
-|         <p>
-|         <rp>
+| <ruby>
+|   <div>
+|     <p>
+|     <rp>
 
 #data
 <!doctype html><ruby><p><rt>
@@ -142,12 +115,9 @@
 (1,28): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <ruby>
-|       <p>
-|       <rt>
+| <ruby>
+|   <p>
+|   <rt>
 
 #data
 <!doctype html><ruby><div><span><rt>
@@ -156,13 +126,10 @@
 (1,36): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <ruby>
-|       <div>
-|         <span>
-|           <rt>
+| <ruby>
+|   <div>
+|     <span>
+|       <rt>
 
 #data
 <!doctype html><ruby><div><p><rt>
@@ -171,13 +138,10 @@
 (1,33): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <ruby>
-|       <div>
-|         <p>
-|         <rt>
+| <ruby>
+|   <div>
+|     <p>
+|     <rt>
 
 #data
 <html><ruby>a<rb>b<rt></ruby></html>
@@ -185,13 +149,11 @@
 (1,6): expected-doctype-but-got-start-tag
 #document
 | <html>
-|   <head>
-|   <body>
-|     <ruby>
-|       "a"
-|       <rb>
-|         "b"
-|       <rt>
+|   <ruby>
+|     "a"
+|     <rb>
+|       "b"
+|     <rt>
 
 #data
 <html><ruby>a<rp>b<rt></ruby></html>
@@ -199,13 +161,11 @@
 (1,6): expected-doctype-but-got-start-tag
 #document
 | <html>
-|   <head>
-|   <body>
-|     <ruby>
-|       "a"
-|       <rp>
-|         "b"
-|       <rt>
+|   <ruby>
+|     "a"
+|     <rp>
+|       "b"
+|     <rt>
 
 #data
 <html><ruby>a<rt>b<rt></ruby></html>
@@ -213,13 +173,11 @@
 (1,6): expected-doctype-but-got-start-tag
 #document
 | <html>
-|   <head>
-|   <body>
-|     <ruby>
-|       "a"
-|       <rt>
-|         "b"
-|       <rt>
+|   <ruby>
+|     "a"
+|     <rt>
+|       "b"
+|     <rt>
 
 #data
 <html><ruby>a<rtc>b<rt>c<rb>d</ruby></html>
@@ -227,16 +185,14 @@
 (1,6): expected-doctype-but-got-start-tag
 #document
 | <html>
-|   <head>
-|   <body>
-|     <ruby>
-|       "a"
-|       <rtc>
-|         "b"
-|         <rt>
-|           "c"
-|       <rb>
-|         "d"
+|   <ruby>
+|     "a"
+|     <rtc>
+|       "b"
+|       <rt>
+|         "c"
+|     <rb>
+|       "d"
 
 #data
 <!doctype html><math/><foo>
@@ -244,11 +200,8 @@
 (1,27): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <math math>
-|     <foo>
+| <math math>
+| <foo>
 
 #data
 <!doctype html><svg/><foo>
@@ -256,11 +209,8 @@
 (1,26): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <svg svg>
-|     <foo>
+| <svg svg>
+| <foo>
 
 #data
 <!doctype html><div></body><!--foo-->
@@ -268,10 +218,7 @@
 (1,27): expected-one-end-tag-but-got-another
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <div>
+| <div>
 |   <!-- foo -->
 
 #data
@@ -281,14 +228,11 @@
 (1,42): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <h1>
-|       <div>
-|         <h3>
-|           <span>
-|         "foo"
+| <h1>
+|   <div>
+|     <h3>
+|       <span>
+|     "foo"
 
 #data
 <!doctype html><p></h3>foo
@@ -296,11 +240,8 @@
 (1,23): end-tag-too-early
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|       "foo"
+| <p>
+|   "foo"
 
 #data
 <!doctype html><h3><li>abc</h2>foo
@@ -308,13 +249,10 @@
 (1,31): end-tag-too-early
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <h3>
-|       <li>
-|         "abc"
-|     "foo"
+| <h3>
+|   <li>
+|     "abc"
+| "foo"
 
 #data
 <!doctype html><table>abc<!--foo-->
@@ -325,12 +263,9 @@
 (1,35): eof-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     "abc"
-|     <table>
-|       <!-- foo -->
+| "abc"
+| <table>
+|   <!-- foo -->
 
 #data
 <!doctype html><table>  <!--foo-->
@@ -338,12 +273,9 @@
 (1,34): eof-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       "  "
-|       <!-- foo -->
+| <table>
+|   "  "
+|   <!-- foo -->
 
 #data
 <!doctype html><table> b <!--foo-->
@@ -354,12 +286,9 @@
 (1,35): eof-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     " b "
-|     <table>
-|       <!-- foo -->
+| " b "
+| <table>
+|   <!-- foo -->
 
 #data
 <!doctype html><select><option><option>
@@ -367,12 +296,9 @@
 (1,39): eof-in-select
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       <option>
-|       <option>
+| <select>
+|   <option>
+|   <option>
 
 #data
 <!doctype html><select><option></optgroup>
@@ -381,11 +307,8 @@
 (1,42): eof-in-select
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       <option>
+| <select>
+|   <option>
 
 #data
 <!doctype html><select><option></optgroup>
@@ -394,23 +317,17 @@
 (1,42): eof-in-select
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       <option>
+| <select>
+|   <option>
 
 #data
 <!doctype html><dd><optgroup><dd>
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <dd>
-|       <optgroup>
-|     <dd>
+| <dd>
+|   <optgroup>
+| <dd>
 
 #data
 <!doctype html><p><math><mi><p><h1>
@@ -418,14 +335,11 @@
 (1,35): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|       <math math>
-|         <math mi>
-|           <p>
-|           <h1>
+| <p>
+|   <math math>
+|     <math mi>
+|       <p>
+|       <h1>
 
 #data
 <!doctype html><p><math><mo><p><h1>
@@ -433,14 +347,11 @@
 (1,35): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|       <math math>
-|         <math mo>
-|           <p>
-|           <h1>
+| <p>
+|   <math math>
+|     <math mo>
+|       <p>
+|       <h1>
 
 #data
 <!doctype html><p><math><mn><p><h1>
@@ -448,14 +359,11 @@
 (1,35): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|       <math math>
-|         <math mn>
-|           <p>
-|           <h1>
+| <p>
+|   <math math>
+|     <math mn>
+|       <p>
+|       <h1>
 
 #data
 <!doctype html><p><math><ms><p><h1>
@@ -463,14 +371,11 @@
 (1,35): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|       <math math>
-|         <math ms>
-|           <p>
-|           <h1>
+| <p>
+|   <math math>
+|     <math ms>
+|       <p>
+|       <h1>
 
 #data
 <!doctype html><p><math><mtext><p><h1>
@@ -478,14 +383,11 @@
 (1,38): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|       <math math>
-|         <math mtext>
-|           <p>
-|           <h1>
+| <p>
+|   <math math>
+|     <math mtext>
+|       <p>
+|       <h1>
 
 #data
 <!doctype html><frameset></noframes>
@@ -494,9 +396,7 @@
 (1,36): eof-in-frameset
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <frameset>
+| <frameset>
 
 #data
 <!doctype html><html c=d><body></html><html a=b>
@@ -507,7 +407,6 @@
 | <html>
 |   a="b"
 |   c="d"
-|   <head>
 |   <body>
 
 #data
@@ -519,7 +418,6 @@
 | <html>
 |   a="b"
 |   c="d"
-|   <head>
 |   <frameset>
 
 #data
@@ -528,9 +426,8 @@
 #document
 | <!DOCTYPE html>
 | <html>
-|   <head>
 |   <frameset>
-| <!-- foo -->
+|   <!-- foo -->
 
 #data
 <!doctype html><html><frameset></frameset></html>  
@@ -538,7 +435,6 @@
 #document
 | <!DOCTYPE html>
 | <html>
-|   <head>
 |   <frameset>
 |   "  "
 
@@ -551,8 +447,8 @@
 #document
 | <!DOCTYPE html>
 | <html>
-|   <head>
 |   <frameset>
+|   "abc"
 
 #data
 <!doctype html><html><frameset></frameset></html><p>
@@ -561,8 +457,8 @@
 #document
 | <!DOCTYPE html>
 | <html>
-|   <head>
 |   <frameset>
+|   <p>
 
 #data
 <!doctype html><html><frameset></frameset></html></p>
@@ -571,8 +467,8 @@
 #document
 | <!DOCTYPE html>
 | <html>
-|   <head>
 |   <frameset>
+|   <p>
 
 #data
 <html><frameset></frameset></html><!doctype html>
@@ -581,7 +477,6 @@
 (1,49): unexpected-doctype
 #document
 | <html>
-|   <head>
 |   <frameset>
 
 #data
@@ -590,9 +485,8 @@
 (1,31): unexpected-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
+| <body>
+|   <frameset>
 
 #data
 <!doctype html><p><frameset><frame>
@@ -601,8 +495,7 @@
 (1,35): eof-in-frameset
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
+| <p>
 |   <frameset>
 |     <frame>
 
@@ -612,11 +505,9 @@
 (1,29): unexpected-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|       "a"
+| <p>
+|   "a"
+|   <frameset>
 
 #data
 <!doctype html><p> <frameset><frame>
@@ -625,8 +516,8 @@
 (1,36): eof-in-frameset
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
+| <p>
+|   " "
 |   <frameset>
 |     <frame>
 
@@ -637,10 +528,8 @@
 (1,30): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <pre>
+| <pre>
+|   <frameset>
 
 #data
 <!doctype html><listing><frameset>
@@ -649,10 +538,8 @@
 (1,34): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <listing>
+| <listing>
+|   <frameset>
 
 #data
 <!doctype html><li><frameset>
@@ -660,10 +547,8 @@
 (1,29): unexpected-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <li>
+| <li>
+|   <frameset>
 
 #data
 <!doctype html><dd><frameset>
@@ -671,10 +556,8 @@
 (1,29): unexpected-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <dd>
+| <dd>
+|   <frameset>
 
 #data
 <!doctype html><dt><frameset>
@@ -682,10 +565,8 @@
 (1,29): unexpected-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <dt>
+| <dt>
+|   <frameset>
 
 #data
 <!doctype html><button><frameset>
@@ -694,10 +575,8 @@
 (1,33): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <button>
+| <button>
+|   <frameset>
 
 #data
 <!doctype html><applet><frameset>
@@ -706,10 +585,8 @@
 (1,33): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <applet>
+| <applet>
+|   <frameset>
 
 #data
 <!doctype html><marquee><frameset>
@@ -718,10 +595,8 @@
 (1,34): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <marquee>
+| <marquee>
+|   <frameset>
 
 #data
 <!doctype html><object><frameset>
@@ -730,10 +605,8 @@
 (1,33): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <object>
+| <object>
+|   <frameset>
 
 #data
 <!doctype html><table><frameset>
@@ -743,10 +616,8 @@
 (1,32): eof-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <table>
+| <frameset>
+| <table>
 
 #data
 <!doctype html><area><frameset>
@@ -754,10 +625,8 @@
 (1,31): unexpected-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <area>
+| <area>
+| <frameset>
 
 #data
 <!doctype html><basefont><frameset>
@@ -765,10 +634,8 @@
 (1,35): eof-in-frameset
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|     <basefont>
-|   <frameset>
+| <basefont>
+| <frameset>
 
 #data
 <!doctype html><bgsound><frameset>
@@ -776,10 +643,8 @@
 (1,34): eof-in-frameset
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|     <bgsound>
-|   <frameset>
+| <bgsound>
+| <frameset>
 
 #data
 <!doctype html><br><frameset>
@@ -787,10 +652,8 @@
 (1,29): unexpected-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <br>
+| <br>
+| <frameset>
 
 #data
 <!doctype html><embed><frameset>
@@ -798,10 +661,8 @@
 (1,32): unexpected-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <embed>
+| <embed>
+| <frameset>
 
 #data
 <!doctype html><img><frameset>
@@ -809,10 +670,8 @@
 (1,30): unexpected-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <img>
+| <img>
+| <frameset>
 
 #data
 <!doctype html><input><frameset>
@@ -820,10 +679,8 @@
 (1,32): unexpected-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <input>
+| <input>
+| <frameset>
 
 #data
 <!doctype html><keygen><frameset>
@@ -831,10 +688,8 @@
 (1,33): unexpected-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <keygen>
+| <keygen>
+| <frameset>
 
 #data
 <!doctype html><wbr><frameset>
@@ -842,10 +697,8 @@
 (1,30): unexpected-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <wbr>
+| <wbr>
+| <frameset>
 
 #data
 <!doctype html><hr><frameset>
@@ -853,10 +706,8 @@
 (1,29): unexpected-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <hr>
+| <hr>
+| <frameset>
 
 #data
 <!doctype html><textarea></textarea><frameset>
@@ -864,10 +715,8 @@
 (1,46): unexpected-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <textarea>
+| <textarea>
+| <frameset>
 
 #data
 <!doctype html><xmp></xmp><frameset>
@@ -875,10 +724,8 @@
 (1,36): unexpected-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <xmp>
+| <xmp>
+| <frameset>
 
 #data
 <!doctype html><iframe></iframe><frameset>
@@ -886,10 +733,8 @@
 (1,42): unexpected-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <iframe>
+| <iframe>
+| <frameset>
 
 #data
 <!doctype html><select></select><frameset>
@@ -897,10 +742,7 @@
 (1,42): unexpected-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
+| <select>
 
 #data
 <!doctype html><svg></svg><frameset><frame>
@@ -909,10 +751,9 @@
 (1,43): eof-in-frameset
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <frameset>
-|     <frame>
+| <svg svg>
+| <frameset>
+|   <frame>
 
 #data
 <!doctype html><math></math><frameset><frame>
@@ -921,10 +762,9 @@
 (1,45): eof-in-frameset
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <frameset>
-|     <frame>
+| <math math>
+| <frameset>
+|   <frame>
 
 #data
 <!doctype html><svg><foreignObject><div> <frameset><frame>
@@ -933,10 +773,12 @@
 (1,58): eof-in-frameset
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <frameset>
-|     <frame>
+| <svg svg>
+|   <svg foreignObject>
+|     <div>
+|       " "
+|       <frameset>
+|         <frame>
 
 #data
 <!doctype html><svg>a</svg><frameset><frame>
@@ -945,11 +787,10 @@
 (1,44): unexpected-start-tag-ignored
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <svg svg>
-|       "a"
+| <svg svg>
+|   "a"
+| <frameset>
+|   <frame>
 
 #data
 <!doctype html><svg> </svg><frameset><frame>
@@ -958,10 +799,10 @@
 (1,44): eof-in-frameset
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <frameset>
-|     <frame>
+| <svg svg>
+|   " "
+| <frameset>
+|   <frame>
 
 #data
 <html>aaa<frameset></frameset>
@@ -971,9 +812,8 @@
 (1,30): unexpected-end-tag
 #document
 | <html>
-|   <head>
-|   <body>
-|     "aaa"
+|   "aaa"
+|   <frameset>
 
 #data
 <html> a <frameset></frameset>
@@ -983,9 +823,8 @@
 (1,30): unexpected-end-tag
 #document
 | <html>
-|   <head>
-|   <body>
-|     "a "
+|   " a "
+|   <frameset>
 
 #data
 <!doctype html><div><frameset>
@@ -994,8 +833,7 @@
 (1,30): eof-in-frameset
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
+| <div>
 |   <frameset>
 
 #data
@@ -1006,10 +844,9 @@
 (1,36): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
+| <div>
 |   <body>
-|     <div>
+|     <frameset>
 
 #data
 <!doctype html><p><math></p>a
@@ -1018,12 +855,9 @@
 (1,28): unexpected-end-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|       <math math>
-|     "a"
+| <p>
+|   <math math>
+| "a"
 
 #data
 <!doctype html><p><math><mn><span></p>a
@@ -1032,15 +866,12 @@
 (1,39): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|       <math math>
-|         <math mn>
-|           <span>
-|             <p>
-|             "a"
+| <p>
+|   <math math>
+|     <math mn>
+|       <span>
+|         <p>
+|         "a"
 
 #data
 <!doctype html><math></html>
@@ -1050,45 +881,34 @@
 (1,28): unexpected-end-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <math math>
+| <math math>
 
 #data
 <!doctype html><meta charset="ascii">
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|     <meta>
-|       charset="ascii"
-|   <body>
+| <meta>
+|   charset="ascii"
 
 #data
 <!doctype html><meta http-equiv="content-type" content="text/html;charset=ascii">
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|     <meta>
-|       content="text/html;charset=ascii"
-|       http-equiv="content-type"
-|   <body>
+| <meta>
+|   content="text/html;charset=ascii"
+|   http-equiv="content-type"
 
 #data
 <!doctype html><head><!--aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa--><meta charset="utf8">
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|     <!-- aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa -->
-|     <meta>
-|       charset="utf8"
-|   <body>
+| <head>
+|   <!-- aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa -->
+|   <meta>
+|     charset="utf8"
 
 #data
 <!doctype html><html a=b><head></head><html c=d>
@@ -1100,7 +920,6 @@
 |   a="b"
 |   c="d"
 |   <head>
-|   <body>
 
 #data
 <!doctype html><image/>
@@ -1108,10 +927,7 @@
 (1,23): image-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <img>
+| <img>
 
 #data
 <!doctype html>a<i>b<table>c<b>d</i>e</b>f
@@ -1127,16 +943,13 @@
 (1,42): eof-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     "a"
-|     <i>
-|       "bc"
-|       <b>
-|         "de"
-|       "f"
-|       <table>
+| "a"
+| <i>
+|   "bc"
+|   <b>
+|     "de"
+|   "f"
+|   <table>
 
 #data
 <!doctype html><table><i>a<b>b<div>c<a>d</i>e</b>f
@@ -1160,25 +973,22 @@
 (1,50): eof-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
+| <i>
+|   "a"
+|   <b>
+|     "b"
+| <b>
+| <div>
+|   <b>
 |     <i>
-|       "a"
-|       <b>
-|         "b"
-|     <b>
-|     <div>
-|       <b>
-|         <i>
-|           "c"
-|           <a>
-|             "d"
-|         <a>
-|           "e"
+|       "c"
 |       <a>
-|         "f"
-|     <table>
+|         "d"
+|     <a>
+|       "e"
+|   <a>
+|     "f"
+| <table>
 
 #data
 <!doctype html><i>a<b>b<div>c<a>d</i>e</b>f
@@ -1190,24 +1000,21 @@
 (1,43): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
+| <i>
+|   "a"
+|   <b>
+|     "b"
+| <b>
+| <div>
+|   <b>
 |     <i>
-|       "a"
-|       <b>
-|         "b"
-|     <b>
-|     <div>
-|       <b>
-|         <i>
-|           "c"
-|           <a>
-|             "d"
-|         <a>
-|           "e"
+|       "c"
 |       <a>
-|         "f"
+|         "d"
+|     <a>
+|       "e"
+|   <a>
+|     "f"
 
 #data
 <!doctype html><table><i>a<b>b<div>c</i>
@@ -1223,18 +1030,15 @@
 (1,40): eof-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
+| <i>
+|   "a"
+|   <b>
+|     "b"
+| <b>
+|   <div>
 |     <i>
-|       "a"
-|       <b>
-|         "b"
-|     <b>
-|       <div>
-|         <i>
-|           "c"
-|     <table>
+|       "c"
+| <table>
 
 #data
 <!doctype html><table><i>a<b>b<div>c<a>d</i>e</b>f
@@ -1258,25 +1062,22 @@
 (1,50): eof-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
+| <i>
+|   "a"
+|   <b>
+|     "b"
+| <b>
+| <div>
+|   <b>
 |     <i>
-|       "a"
-|       <b>
-|         "b"
-|     <b>
-|     <div>
-|       <b>
-|         <i>
-|           "c"
-|           <a>
-|             "d"
-|         <a>
-|           "e"
+|       "c"
 |       <a>
-|         "f"
-|     <table>
+|         "d"
+|     <a>
+|       "e"
+|   <a>
+|     "f"
+| <table>
 
 #data
 <!doctype html><table><i>a<div>b<tr>c<b>d</i>e
@@ -1294,22 +1095,19 @@
 (1,46): eof-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <i>
-|       "a"
-|       <div>
-|         "b"
-|     <i>
-|       "c"
-|       <b>
-|         "d"
-|     <b>
-|       "e"
-|     <table>
-|       <tbody>
-|         <tr>
+| <i>
+|   "a"
+|   <div>
+|     "b"
+| <i>
+|   "c"
+|   <b>
+|     "d"
+| <b>
+|   "e"
+| <table>
+|   <tbody>
+|     <tr>
 
 #data
 <!doctype html><table><td><table><i>a<div>b<b>c</i>d
@@ -1328,43 +1126,36 @@
 (1,52): eof-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <tr>
-|           <td>
-|             <i>
-|               "a"
-|             <div>
-|               <i>
-|                 "b"
-|                 <b>
-|                   "c"
-|               <b>
-|                 "d"
-|             <table>
+| <table>
+|   <tbody>
+|     <tr>
+|       <td>
+|         <i>
+|           "a"
+|         <div>
+|           <i>
+|             "b"
+|             <b>
+|               "c"
+|           <b>
+|             "d"
+|         <table>
 
 #data
 <!doctype html><body><bgsound>
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <bgsound>
+| <body>
+|   <bgsound>
 
 #data
 <!doctype html><body><basefont>
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <basefont>
+| <body>
+|   <basefont>
 
 #data
 <!doctype html><a><b></a><basefont>
@@ -1372,12 +1163,9 @@
 (1,25): adoption-agency-1.3
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <a>
-|       <b>
-|     <basefont>
+| <a>
+|   <b>
+| <basefont>
 
 #data
 <!doctype html><a><b></a><bgsound>
@@ -1385,12 +1173,9 @@
 (1,25): adoption-agency-1.3
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <a>
-|       <b>
-|     <bgsound>
+| <a>
+|   <b>
+| <bgsound>
 
 #data
 <!doctype html><figcaption><article></figcaption>a
@@ -1398,12 +1183,9 @@
 (1,49): end-tag-too-early
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <figcaption>
-|       <article>
-|     "a"
+| <figcaption>
+|   <article>
+| "a"
 
 #data
 <!doctype html><summary><article></summary>a
@@ -1411,12 +1193,9 @@
 (1,43): end-tag-too-early
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <summary>
-|       <article>
-|     "a"
+| <summary>
+|   <article>
+| "a"
 
 #data
 <!doctype html><p><a><plaintext>b
@@ -1425,14 +1204,11 @@
 (1,33): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|       <a>
-|     <plaintext>
-|       <a>
-|         "b"
+| <p>
+|   <a>
+| <plaintext>
+|   <a>
+|     "b"
 
 #data
 <!DOCTYPE html><div>a<a></div>b<p>c</p>d
@@ -1441,14 +1217,11 @@
 (1,40): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <div>
-|       "a"
-|       <a>
-|     <a>
-|       "b"
-|       <p>
-|         "c"
-|       "d"
+| <div>
+|   "a"
+|   <a>
+| <a>
+|   "b"
+|   <p>
+|     "c"
+|   "d"

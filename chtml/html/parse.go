@@ -5,8 +5,6 @@
 package html
 
 import (
-	"errors"
-	"fmt"
 	"io"
 	"strings"
 
@@ -30,11 +28,7 @@ type parser struct {
 	// elements (section 12.2.4.3).
 	oe, afe nodeStack
 	// Element pointers (section 12.2.4.4).
-	head, form *html.Node
-	// Other parsing state flags (section 12.2.4.5).
-	framesetOK bool
-	// The stack of template insertion modes
-	templateStack insertionModeStack
+	form *html.Node
 	// im is the current insertion mode.
 	im insertionMode
 	// originalIM is the insertion mode to go back to after completing a text
@@ -43,13 +37,6 @@ type parser struct {
 	// fosterParenting is whether new elements should be inserted according to
 	// the foster parenting rules (section 12.2.6.1).
 	fosterParenting bool
-	// quirks is whether the parser is operating in "quirks mode."
-	quirks bool
-	// fragment is whether the parser is parsing an HTML fragment.
-	fragment bool
-	// context is the context element when parsing an HTML fragment
-	// (section 12.4).
-	context *html.Node
 }
 
 func (p *parser) top() *html.Node {
@@ -156,33 +143,6 @@ func (p *parser) indexOfElementInScope(s scope, matchTags ...a.Atom) int {
 // open elements.
 func (p *parser) elementInScope(s scope, matchTags ...a.Atom) bool {
 	return p.indexOfElementInScope(s, matchTags...) != -1
-}
-
-// clearStackToContext pops elements off the stack of open elements until a
-// scope-defined element is found.
-func (p *parser) clearStackToContext(s scope) {
-	for i := len(p.oe) - 1; i >= 0; i-- {
-		tagAtom := p.oe[i].DataAtom
-		switch s {
-		case tableScope:
-			if tagAtom == a.Html || tagAtom == a.Table || tagAtom == a.Template {
-				p.oe = p.oe[:i+1]
-				return
-			}
-		case tableRowScope:
-			if tagAtom == a.Html || tagAtom == a.Tr || tagAtom == a.Template {
-				p.oe = p.oe[:i+1]
-				return
-			}
-		case tableBodyScope:
-			if tagAtom == a.Html || tagAtom == a.Tbody || tagAtom == a.Tfoot || tagAtom == a.Thead || tagAtom == a.Template {
-				p.oe = p.oe[:i+1]
-				return
-			}
-		default:
-			panic("unreachable")
-		}
-	}
 }
 
 // parseGenericRawTextElement implements the generic raw text element parsing
@@ -438,432 +398,16 @@ func (p *parser) setOriginalIM() {
 	p.originalIM = p.im
 }
 
-// Section 12.2.4.1, "reset the insertion mode".
-func (p *parser) resetInsertionMode() {
-	for i := len(p.oe) - 1; i >= 0; i-- {
-		n := p.oe[i]
-		last := i == 0
-		if last && p.context != nil {
-			n = p.context
-		}
-
-		switch n.DataAtom {
-		case a.Select:
-			if !last {
-				for ancestor, first := n, p.oe[0]; ancestor != first; {
-					ancestor = p.oe[p.oe.index(ancestor)-1]
-					switch ancestor.DataAtom {
-					case a.Template:
-						p.im = inSelectIM
-						return
-					case a.Table:
-						p.im = inSelectInTableIM
-						return
-					}
-				}
-			}
-			p.im = inSelectIM
-		case a.Td, a.Th:
-			// TODO: remove this divergence from the HTML5 spec.
-			//
-			// See https://bugs.chromium.org/p/chromium/issues/detail?id=829668
-			p.im = inCellIM
-		case a.Tr:
-			p.im = inRowIM
-		case a.Tbody, a.Thead, a.Tfoot:
-			p.im = inTableBodyIM
-		case a.Caption:
-			p.im = inCaptionIM
-		case a.Colgroup:
-			p.im = inColumnGroupIM
-		case a.Table:
-			p.im = inTableIM
-		case a.Template:
-			// TODO: remove this divergence from the HTML5 spec.
-			if n.Namespace != "" {
-				continue
-			}
-			p.im = p.templateStack.top()
-		case a.Head:
-			// TODO: remove this divergence from the HTML5 spec.
-			//
-			// See https://bugs.chromium.org/p/chromium/issues/detail?id=829668
-			p.im = inHeadIM
-		case a.Body:
-			p.im = inBodyIM
-		case a.Frameset:
-			p.im = inFramesetIM
-		case a.Html:
-			if p.head == nil {
-				p.im = beforeHeadIM
-			} else {
-				p.im = afterHeadIM
-			}
-		default:
-			if last {
-				p.im = inBodyIM
-				return
-			}
-			continue
-		}
-		return
-	}
-}
-
 const whitespace = " \t\r\n\f"
 
-// Section 12.2.6.4.1.
-func initialIM(p *parser) bool {
-	switch p.tok.Type {
-	case html.TextToken:
-		p.tok.Data = strings.TrimLeft(p.tok.Data, whitespace)
-		if len(p.tok.Data) == 0 {
-			// It was all whitespace, so ignore it.
-			return true
-		}
-	case html.CommentToken:
-		p.doc.AppendChild(&html.Node{
-			Type: html.CommentNode,
-			Data: p.tok.Data,
-		})
-		return true
-	case html.DoctypeToken:
-		n, quirks := parseDoctype(p.tok.Data)
-		p.doc.AppendChild(n)
-		p.quirks = quirks
-		p.im = beforeHTMLIM
-		return true
-	}
-	p.quirks = true
-	p.im = beforeHTMLIM
-	return false
-}
-
-// Section 12.2.6.4.2.
-func beforeHTMLIM(p *parser) bool {
-	switch p.tok.Type {
-	case html.DoctypeToken:
-		// Ignore the token.
-		return true
-	case html.TextToken:
-		p.tok.Data = strings.TrimLeft(p.tok.Data, whitespace)
-		if len(p.tok.Data) == 0 {
-			// It was all whitespace, so ignore it.
-			return true
-		}
-	case html.StartTagToken:
-		if p.tok.DataAtom == a.Html {
-			p.addElement()
-			p.im = beforeHeadIM
-			return true
-		}
-	case html.EndTagToken:
-		switch p.tok.DataAtom {
-		case a.Head, a.Body, a.Html, a.Br:
-			p.parseImpliedToken(html.StartTagToken, a.Html, a.Html.String())
-			return false
-		default:
-			// Ignore the token.
-			return true
-		}
-	case html.CommentToken:
-		p.doc.AppendChild(&html.Node{
-			Type: html.CommentNode,
-			Data: p.tok.Data,
-		})
-		return true
-	}
-	p.parseImpliedToken(html.StartTagToken, a.Html, a.Html.String())
-	return false
-}
-
-// Section 12.2.6.4.3.
-func beforeHeadIM(p *parser) bool {
-	switch p.tok.Type {
-	case html.TextToken:
-		p.tok.Data = strings.TrimLeft(p.tok.Data, whitespace)
-		if len(p.tok.Data) == 0 {
-			// It was all whitespace, so ignore it.
-			return true
-		}
-	case html.StartTagToken:
-		switch p.tok.DataAtom {
-		case a.Head:
-			p.addElement()
-			p.head = p.top()
-			p.im = inHeadIM
-			return true
-		case a.Html:
-			return inBodyIM(p)
-		}
-	case html.EndTagToken:
-		switch p.tok.DataAtom {
-		case a.Head, a.Body, a.Html, a.Br:
-			p.parseImpliedToken(html.StartTagToken, a.Head, a.Head.String())
-			return false
-		default:
-			// Ignore the token.
-			return true
-		}
-	case html.CommentToken:
-		p.addChild(&html.Node{
-			Type: html.CommentNode,
-			Data: p.tok.Data,
-		})
-		return true
-	case html.DoctypeToken:
-		// Ignore the token.
-		return true
-	}
-
-	p.parseImpliedToken(html.StartTagToken, a.Head, a.Head.String())
-	return false
-}
-
-// Section 12.2.6.4.4.
-func inHeadIM(p *parser) bool {
-	switch p.tok.Type {
-	case html.TextToken:
-		s := strings.TrimLeft(p.tok.Data, whitespace)
-		if len(s) < len(p.tok.Data) {
-			// Add the initial whitespace to the current node.
-			p.addText(p.tok.Data[:len(p.tok.Data)-len(s)])
-			if s == "" {
-				return true
-			}
-			p.tok.Data = s
-		}
-	case html.StartTagToken:
-		switch p.tok.DataAtom {
-		case a.Html:
-			return inBodyIM(p)
-		case a.Base, a.Basefont, a.Bgsound, a.Link, a.Meta:
-			p.addElement()
-			p.oe.pop()
-			p.acknowledgeSelfClosingTag()
-			return true
-		case a.Noscript:
-			p.addElement()
-			p.im = inHeadNoscriptIM
-			// Don't let the tokenizer go into raw text mode when for <noscript> tag and parse
-			// its content as regular HTML.
-			p.tokenizer.NextIsNotRawText()
-			return true
-		case a.Script, a.Title:
-			p.addElement()
-			p.setOriginalIM()
-			p.im = textIM
-			return true
-		case a.Noframes, a.Style:
-			p.parseGenericRawTextElement()
-			return true
-		case a.Head:
-			// Ignore the token.
-			return true
-		case a.Template:
-			// TODO: remove this divergence from the HTML5 spec.
-			//
-			// We don't handle all of the corner cases when mixing foreign
-			// content (i.e. <math> or <svg>) with <template>. Without this
-			// early return, we can get into an infinite loop, possibly because
-			// of the "TODO... further divergence" a little below.
-			//
-			// As a workaround, if we are mixing foreign content and templates,
-			// just ignore the rest of the HTML. Foreign content is rare and a
-			// relatively old HTML feature. Templates are also rare and a
-			// relatively new HTML feature. Their combination is very rare.
-			for _, e := range p.oe {
-				if e.Namespace != "" {
-					p.im = ignoreTheRemainingTokens
-					return true
-				}
-			}
-
-			p.addElement()
-			p.afe = append(p.afe, &scopeMarker)
-			p.framesetOK = false
-			p.im = inTemplateIM
-			p.templateStack = append(p.templateStack, inTemplateIM)
-			return true
-		}
-	case html.EndTagToken:
-		switch p.tok.DataAtom {
-		case a.Head:
-			p.oe.pop()
-			p.im = afterHeadIM
-			return true
-		case a.Body, a.Html, a.Br:
-			p.parseImpliedToken(html.EndTagToken, a.Head, a.Head.String())
-			return false
-		case a.Template:
-			if !p.oe.contains(a.Template) {
-				return true
-			}
-			// TODO: remove this further divergence from the HTML5 spec.
-			//
-			// See https://bugs.chromium.org/p/chromium/issues/detail?id=829668
-			p.generateImpliedEndTags()
-			for i := len(p.oe) - 1; i >= 0; i-- {
-				if n := p.oe[i]; n.Namespace == "" && n.DataAtom == a.Template {
-					p.oe = p.oe[:i]
-					break
-				}
-			}
-			p.clearActiveFormattingElements()
-			p.templateStack.pop()
-			p.resetInsertionMode()
-			return true
-		default:
-			// Ignore the token.
-			return true
-		}
-	case html.CommentToken:
-		p.addChild(&html.Node{
-			Type: html.CommentNode,
-			Data: p.tok.Data,
-		})
-		return true
-	case html.DoctypeToken:
-		// Ignore the token.
-		return true
-	}
-
-	p.parseImpliedToken(html.EndTagToken, a.Head, a.Head.String())
-	return false
-}
-
-// Section 12.2.6.4.5.
-func inHeadNoscriptIM(p *parser) bool {
-	switch p.tok.Type {
-	case html.DoctypeToken:
-		// Ignore the token.
-		return true
-	case html.StartTagToken:
-		switch p.tok.DataAtom {
-		case a.Html:
-			return inBodyIM(p)
-		case a.Basefont, a.Bgsound, a.Link, a.Meta, a.Noframes, a.Style:
-			return inHeadIM(p)
-		case a.Head:
-			// Ignore the token.
-			return true
-		case a.Noscript:
-			// Don't let the tokenizer go into raw text mode even when a <noscript>
-			// tag is in "in head noscript" insertion mode.
-			p.tokenizer.NextIsNotRawText()
-			// Ignore the token.
-			return true
-		}
-	case html.EndTagToken:
-		switch p.tok.DataAtom {
-		case a.Noscript, a.Br:
-		default:
-			// Ignore the token.
-			return true
-		}
-	case html.TextToken:
-		s := strings.TrimLeft(p.tok.Data, whitespace)
-		if len(s) == 0 {
-			// It was all whitespace.
-			return inHeadIM(p)
-		}
-	case html.CommentToken:
-		return inHeadIM(p)
-	}
-	p.oe.pop()
-	if p.top().DataAtom != a.Head {
-		panic("html: the new current node will be a head element.")
-	}
-	p.im = inHeadIM
-	if p.tok.DataAtom == a.Noscript {
-		return true
-	}
-	return false
-}
-
-// Section 12.2.6.4.6.
-func afterHeadIM(p *parser) bool {
-	switch p.tok.Type {
-	case html.TextToken:
-		s := strings.TrimLeft(p.tok.Data, whitespace)
-		if len(s) < len(p.tok.Data) {
-			// Add the initial whitespace to the current node.
-			p.addText(p.tok.Data[:len(p.tok.Data)-len(s)])
-			if s == "" {
-				return true
-			}
-			p.tok.Data = s
-		}
-	case html.StartTagToken:
-		switch p.tok.DataAtom {
-		case a.Html:
-			return inBodyIM(p)
-		case a.Body:
-			p.addElement()
-			p.framesetOK = false
-			p.im = inBodyIM
-			return true
-		case a.Frameset:
-			p.addElement()
-			p.im = inFramesetIM
-			return true
-		case a.Base, a.Basefont, a.Bgsound, a.Link, a.Meta, a.Noframes, a.Script, a.Style, a.Template, a.Title:
-			p.oe = append(p.oe, p.head)
-			defer p.oe.remove(p.head)
-			return inHeadIM(p)
-		case a.Head:
-			// Ignore the token.
-			return true
-		}
-	case html.EndTagToken:
-		switch p.tok.DataAtom {
-		case a.Body, a.Html, a.Br:
-			// Drop down to creating an implied <body> tag.
-		case a.Template:
-			return inHeadIM(p)
-		default:
-			// Ignore the token.
-			return true
-		}
-	case html.CommentToken:
-		p.addChild(&html.Node{
-			Type: html.CommentNode,
-			Data: p.tok.Data,
-		})
-		return true
-	case html.DoctypeToken:
-		// Ignore the token.
-		return true
-	}
-
-	p.parseImpliedToken(html.StartTagToken, a.Body, a.Body.String())
-	p.framesetOK = true
-	return false
-}
-
-// copyAttributes copies attributes of src not found on dst to dst.
-func copyAttributes(dst *html.Node, src html.Token) {
-	if len(src.Attr) == 0 {
-		return
-	}
-	attr := map[string]string{}
-	for _, t := range dst.Attr {
-		attr[t.Key] = t.Val
-	}
-	for _, t := range src.Attr {
-		if _, ok := attr[t.Key]; !ok {
-			dst.Attr = append(dst.Attr, t)
-			attr[t.Key] = t.Val
-		}
-	}
-}
-
-// Section 12.2.6.4.7.
 func inBodyIM(p *parser) bool {
 	switch p.tok.Type {
+	case html.DoctypeToken:
+		n := parseDoctype(p.tok.Data)
+		p.addChild(n)
 	case html.TextToken:
 		d := p.tok.Data
-		switch n := p.oe.top(); n.DataAtom {
+		switch n := p.top(); n.DataAtom {
 		case a.Pre, a.Listing:
 			if n.FirstChild == nil {
 				// Ignore a newline at the start of a <pre> block.
@@ -881,43 +425,8 @@ func inBodyIM(p *parser) bool {
 		}
 		p.reconstructActiveFormattingElements()
 		p.addText(d)
-		if p.framesetOK && strings.TrimLeft(d, whitespace) != "" {
-			// There were non-whitespace characters inserted.
-			p.framesetOK = false
-		}
 	case html.StartTagToken:
 		switch p.tok.DataAtom {
-		case a.Html:
-			if p.oe.contains(a.Template) {
-				return true
-			}
-			copyAttributes(p.oe[0], p.tok)
-		case a.Base, a.Basefont, a.Bgsound, a.Link, a.Meta, a.Noframes, a.Script, a.Style, a.Template, a.Title:
-			return inHeadIM(p)
-		case a.Body:
-			if p.oe.contains(a.Template) {
-				return true
-			}
-			if len(p.oe) >= 2 {
-				body := p.oe[1]
-				if body.Type == html.ElementNode && body.DataAtom == a.Body {
-					p.framesetOK = false
-					copyAttributes(body, p.tok)
-				}
-			}
-		case a.Frameset:
-			if !p.framesetOK || len(p.oe) < 2 || p.oe[1].DataAtom != a.Body {
-				// Ignore the token.
-				return true
-			}
-			body := p.oe[1]
-			if body.Parent != nil {
-				body.Parent.RemoveChild(body)
-			}
-			p.oe = p.oe[:1]
-			p.addElement()
-			p.im = inFramesetIM
-			return true
 		case a.Address, a.Article, a.Aside, a.Blockquote, a.Center, a.Details, a.Dialog, a.Dir, a.Div, a.Dl, a.Fieldset, a.Figcaption, a.Figure, a.Footer, a.Header, a.Hgroup, a.Main, a.Menu, a.Nav, a.Ol, a.P, a.Section, a.Summary, a.Ul:
 			p.popUntil(buttonScope, a.P)
 			p.addElement()
@@ -931,8 +440,6 @@ func inBodyIM(p *parser) bool {
 		case a.Pre, a.Listing:
 			p.popUntil(buttonScope, a.P)
 			p.addElement()
-			// The newline, if any, will be dealt with by the TextToken case.
-			p.framesetOK = false
 		case a.Form:
 			if p.form != nil && !p.oe.contains(a.Template) {
 				// Ignore the token
@@ -944,7 +451,6 @@ func inBodyIM(p *parser) bool {
 				p.form = p.top()
 			}
 		case a.Li:
-			p.framesetOK = false
 			for i := len(p.oe) - 1; i >= 0; i-- {
 				node := p.oe[i]
 				switch node.DataAtom {
@@ -962,7 +468,6 @@ func inBodyIM(p *parser) bool {
 			p.popUntil(buttonScope, a.P)
 			p.addElement()
 		case a.Dd, a.Dt:
-			p.framesetOK = false
 			for i := len(p.oe) - 1; i >= 0; i-- {
 				node := p.oe[i]
 				switch node.DataAtom {
@@ -986,7 +491,6 @@ func inBodyIM(p *parser) bool {
 			p.popUntil(defaultScope, a.Button)
 			p.reconstructActiveFormattingElements()
 			p.addElement()
-			p.framesetOK = false
 		case a.A:
 			for i := len(p.afe) - 1; i >= 0 && p.afe[i].Type != scopeMarkerNode; i-- {
 				if n := p.afe[i]; n.Type == html.ElementNode && n.DataAtom == a.A {
@@ -1012,15 +516,9 @@ func inBodyIM(p *parser) bool {
 			p.reconstructActiveFormattingElements()
 			p.addElement()
 			p.afe = append(p.afe, &scopeMarker)
-			p.framesetOK = false
 		case a.Table:
-			if !p.quirks {
-				p.popUntil(buttonScope, a.P)
-			}
+			p.popUntil(buttonScope, a.P)
 			p.addElement()
-			p.framesetOK = false
-			p.im = inTableIM
-			return true
 		case a.Area, a.Br, a.Embed, a.Img, a.Input, a.Keygen, a.Wbr:
 			p.reconstructActiveFormattingElements()
 			p.addElement()
@@ -1036,7 +534,6 @@ func inBodyIM(p *parser) bool {
 					}
 				}
 			}
-			p.framesetOK = false
 		case a.Param, a.Source, a.Track:
 			p.addElement()
 			p.oe.pop()
@@ -1046,7 +543,6 @@ func inBodyIM(p *parser) bool {
 			p.addElement()
 			p.oe.pop()
 			p.acknowledgeSelfClosingTag()
-			p.framesetOK = false
 		case a.Image:
 			p.tok.DataAtom = a.Img
 			p.tok.Data = a.Img.String()
@@ -1054,15 +550,12 @@ func inBodyIM(p *parser) bool {
 		case a.Textarea:
 			p.addElement()
 			p.setOriginalIM()
-			p.framesetOK = false
 			p.im = textIM
 		case a.Xmp:
 			p.popUntil(buttonScope, a.P)
 			p.reconstructActiveFormattingElements()
-			p.framesetOK = false
 			p.parseGenericRawTextElement()
 		case a.Iframe:
-			p.framesetOK = false
 			p.parseGenericRawTextElement()
 		case a.Noembed:
 			p.parseGenericRawTextElement()
@@ -1072,12 +565,6 @@ func inBodyIM(p *parser) bool {
 			// Don't let the tokenizer go into raw text mode when for <noscript> tag and parse
 			// its content as regular HTML.
 			p.tokenizer.NextIsNotRawText()
-		case a.Select:
-			p.reconstructActiveFormattingElements()
-			p.addElement()
-			p.framesetOK = false
-			p.im = inSelectIM
-			return true
 		case a.Optgroup, a.Option:
 			if p.top().DataAtom == a.Option {
 				p.oe.pop()
@@ -1109,8 +596,6 @@ func inBodyIM(p *parser) bool {
 				p.acknowledgeSelfClosingTag()
 			}
 			return true
-		case a.Caption, a.Col, a.Colgroup, a.Frame, a.Head, a.Tbody, a.Td, a.Tfoot, a.Th, a.Thead, a.Tr:
-			// Ignore the token.
 		default:
 			p.reconstructActiveFormattingElements()
 			p.addElement()
@@ -1173,8 +658,6 @@ func inBodyIM(p *parser) bool {
 		case a.Br:
 			p.tok.Type = html.StartTagToken
 			return false
-		case a.Template:
-			return inHeadIM(p)
 		default:
 			p.inBodyEndTagOther(p.tok.DataAtom, p.tok.Data)
 		}
@@ -1185,18 +668,22 @@ func inBodyIM(p *parser) bool {
 		})
 	case html.ErrorToken:
 		// TODO: remove this divergence from the HTML5 spec.
-		if len(p.templateStack) > 0 {
-			p.im = inTemplateIM
-			return false
-		}
-		for _, e := range p.oe {
-			switch e.DataAtom {
-			case a.Dd, a.Dt, a.Li, a.Optgroup, a.Option, a.P, a.Rb, a.Rp, a.Rt, a.Rtc, a.Tbody, a.Td, a.Tfoot, a.Th,
-				a.Thead, a.Tr, a.Body, a.Html:
-			default:
-				return true
+		return true
+		/*
+			if len(p.templateStack) > 0 {
+				p.im = inTemplateIM
+				return false
 			}
-		}
+			for _, e := range p.oe {
+				switch e.DataAtom {
+				case a.Dd, a.Dt, a.Li, a.Optgroup, a.Option, a.P, a.Rb, a.Rp, a.Rt, a.Rtc, a.Tbody, a.Td, a.Tfoot, a.Th,
+					a.Thead, a.Tr, a.Body, a.Html:
+				default:
+					return true
+				}
+			}
+
+		*/
 	}
 
 	return true
@@ -1211,7 +698,7 @@ func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom, tagName string) {
 	// refactor this code to be more idiomatic.
 
 	// Steps 1-2
-	if current := p.oe.top(); current.Data == tagName && p.afe.index(current) == -1 {
+	if current := p.top(); current.Data == tagName && p.afe.index(current) == -1 {
 		p.oe.pop()
 		return
 	}
@@ -1266,7 +753,10 @@ func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom, tagName string) {
 		}
 
 		// Steps 12-13. Find the common ancestor and bookmark node.
-		commonAncestor := p.oe[feIndex-1]
+		commonAncestor := p.doc
+		if feIndex > 0 {
+			commonAncestor = p.oe[feIndex-1]
+		}
 		bookmark := p.afe.index(formattingElement)
 
 		// Step 14. The inner loop. Find the lastNode to reparent.
@@ -1407,547 +897,6 @@ func textIM(p *parser) bool {
 	return p.tok.Type == html.EndTagToken
 }
 
-// Section 12.2.6.4.9.
-func inTableIM(p *parser) bool {
-	switch p.tok.Type {
-	case html.TextToken:
-		p.tok.Data = strings.Replace(p.tok.Data, "\x00", "", -1)
-		switch p.oe.top().DataAtom {
-		case a.Table, a.Tbody, a.Tfoot, a.Thead, a.Tr:
-			if strings.Trim(p.tok.Data, whitespace) == "" {
-				p.addText(p.tok.Data)
-				return true
-			}
-		}
-	case html.StartTagToken:
-		switch p.tok.DataAtom {
-		case a.Caption:
-			p.clearStackToContext(tableScope)
-			p.afe = append(p.afe, &scopeMarker)
-			p.addElement()
-			p.im = inCaptionIM
-			return true
-		case a.Colgroup:
-			p.clearStackToContext(tableScope)
-			p.addElement()
-			p.im = inColumnGroupIM
-			return true
-		case a.Col:
-			p.parseImpliedToken(html.StartTagToken, a.Colgroup, a.Colgroup.String())
-			return false
-		case a.Tbody, a.Tfoot, a.Thead:
-			p.clearStackToContext(tableScope)
-			p.addElement()
-			p.im = inTableBodyIM
-			return true
-		case a.Td, a.Th, a.Tr:
-			p.parseImpliedToken(html.StartTagToken, a.Tbody, a.Tbody.String())
-			return false
-		case a.Table:
-			if p.popUntil(tableScope, a.Table) {
-				p.resetInsertionMode()
-				return false
-			}
-			// Ignore the token.
-			return true
-		case a.Style, a.Script, a.Template:
-			return inHeadIM(p)
-		case a.Input:
-			for _, t := range p.tok.Attr {
-				if t.Key == "type" && strings.ToLower(t.Val) == "hidden" {
-					p.addElement()
-					p.oe.pop()
-					return true
-				}
-			}
-			// Otherwise drop down to the default action.
-		case a.Form:
-			if p.oe.contains(a.Template) || p.form != nil {
-				// Ignore the token.
-				return true
-			}
-			p.addElement()
-			p.form = p.oe.pop()
-		case a.Select:
-			p.reconstructActiveFormattingElements()
-			switch p.top().DataAtom {
-			case a.Table, a.Tbody, a.Tfoot, a.Thead, a.Tr:
-				p.fosterParenting = true
-			}
-			p.addElement()
-			p.fosterParenting = false
-			p.framesetOK = false
-			p.im = inSelectInTableIM
-			return true
-		}
-	case html.EndTagToken:
-		switch p.tok.DataAtom {
-		case a.Table:
-			if p.popUntil(tableScope, a.Table) {
-				p.resetInsertionMode()
-				return true
-			}
-			// Ignore the token.
-			return true
-		case a.Body, a.Caption, a.Col, a.Colgroup, a.Html, a.Tbody, a.Td, a.Tfoot, a.Th, a.Thead, a.Tr:
-			// Ignore the token.
-			return true
-		case a.Template:
-			return inHeadIM(p)
-		}
-	case html.CommentToken:
-		p.addChild(&html.Node{
-			Type: html.CommentNode,
-			Data: p.tok.Data,
-		})
-		return true
-	case html.DoctypeToken:
-		// Ignore the token.
-		return true
-	case html.ErrorToken:
-		return inBodyIM(p)
-	}
-
-	p.fosterParenting = true
-	defer func() { p.fosterParenting = false }()
-
-	return inBodyIM(p)
-}
-
-// Section 12.2.6.4.11.
-func inCaptionIM(p *parser) bool {
-	switch p.tok.Type {
-	case html.StartTagToken:
-		switch p.tok.DataAtom {
-		case a.Caption, a.Col, a.Colgroup, a.Tbody, a.Td, a.Tfoot, a.Thead, a.Tr:
-			if !p.popUntil(tableScope, a.Caption) {
-				// Ignore the token.
-				return true
-			}
-			p.clearActiveFormattingElements()
-			p.im = inTableIM
-			return false
-		case a.Select:
-			p.reconstructActiveFormattingElements()
-			p.addElement()
-			p.framesetOK = false
-			p.im = inSelectInTableIM
-			return true
-		}
-	case html.EndTagToken:
-		switch p.tok.DataAtom {
-		case a.Caption:
-			if p.popUntil(tableScope, a.Caption) {
-				p.clearActiveFormattingElements()
-				p.im = inTableIM
-			}
-			return true
-		case a.Table:
-			if !p.popUntil(tableScope, a.Caption) {
-				// Ignore the token.
-				return true
-			}
-			p.clearActiveFormattingElements()
-			p.im = inTableIM
-			return false
-		case a.Body, a.Col, a.Colgroup, a.Html, a.Tbody, a.Td, a.Tfoot, a.Th, a.Thead, a.Tr:
-			// Ignore the token.
-			return true
-		}
-	}
-	return inBodyIM(p)
-}
-
-// Section 12.2.6.4.12.
-func inColumnGroupIM(p *parser) bool {
-	switch p.tok.Type {
-	case html.TextToken:
-		s := strings.TrimLeft(p.tok.Data, whitespace)
-		if len(s) < len(p.tok.Data) {
-			// Add the initial whitespace to the current node.
-			p.addText(p.tok.Data[:len(p.tok.Data)-len(s)])
-			if s == "" {
-				return true
-			}
-			p.tok.Data = s
-		}
-	case html.CommentToken:
-		p.addChild(&html.Node{
-			Type: html.CommentNode,
-			Data: p.tok.Data,
-		})
-		return true
-	case html.DoctypeToken:
-		// Ignore the token.
-		return true
-	case html.StartTagToken:
-		switch p.tok.DataAtom {
-		case a.Html:
-			return inBodyIM(p)
-		case a.Col:
-			p.addElement()
-			p.oe.pop()
-			p.acknowledgeSelfClosingTag()
-			return true
-		case a.Template:
-			return inHeadIM(p)
-		}
-	case html.EndTagToken:
-		switch p.tok.DataAtom {
-		case a.Colgroup:
-			if p.oe.top().DataAtom == a.Colgroup {
-				p.oe.pop()
-				p.im = inTableIM
-			}
-			return true
-		case a.Col:
-			// Ignore the token.
-			return true
-		case a.Template:
-			return inHeadIM(p)
-		}
-	case html.ErrorToken:
-		return inBodyIM(p)
-	}
-	if p.oe.top().DataAtom != a.Colgroup {
-		return true
-	}
-	p.oe.pop()
-	p.im = inTableIM
-	return false
-}
-
-// Section 12.2.6.4.13.
-func inTableBodyIM(p *parser) bool {
-	switch p.tok.Type {
-	case html.StartTagToken:
-		switch p.tok.DataAtom {
-		case a.Tr:
-			p.clearStackToContext(tableBodyScope)
-			p.addElement()
-			p.im = inRowIM
-			return true
-		case a.Td, a.Th:
-			p.parseImpliedToken(html.StartTagToken, a.Tr, a.Tr.String())
-			return false
-		case a.Caption, a.Col, a.Colgroup, a.Tbody, a.Tfoot, a.Thead:
-			if p.popUntil(tableScope, a.Tbody, a.Thead, a.Tfoot) {
-				p.im = inTableIM
-				return false
-			}
-			// Ignore the token.
-			return true
-		}
-	case html.EndTagToken:
-		switch p.tok.DataAtom {
-		case a.Tbody, a.Tfoot, a.Thead:
-			if p.elementInScope(tableScope, p.tok.DataAtom) {
-				p.clearStackToContext(tableBodyScope)
-				p.oe.pop()
-				p.im = inTableIM
-			}
-			return true
-		case a.Table:
-			if p.popUntil(tableScope, a.Tbody, a.Thead, a.Tfoot) {
-				p.im = inTableIM
-				return false
-			}
-			// Ignore the token.
-			return true
-		case a.Body, a.Caption, a.Col, a.Colgroup, a.Html, a.Td, a.Th, a.Tr:
-			// Ignore the token.
-			return true
-		}
-	case html.CommentToken:
-		p.addChild(&html.Node{
-			Type: html.CommentNode,
-			Data: p.tok.Data,
-		})
-		return true
-	}
-
-	return inTableIM(p)
-}
-
-// Section 12.2.6.4.14.
-func inRowIM(p *parser) bool {
-	switch p.tok.Type {
-	case html.StartTagToken:
-		switch p.tok.DataAtom {
-		case a.Td, a.Th:
-			p.clearStackToContext(tableRowScope)
-			p.addElement()
-			p.afe = append(p.afe, &scopeMarker)
-			p.im = inCellIM
-			return true
-		case a.Caption, a.Col, a.Colgroup, a.Tbody, a.Tfoot, a.Thead, a.Tr:
-			if p.popUntil(tableScope, a.Tr) {
-				p.im = inTableBodyIM
-				return false
-			}
-			// Ignore the token.
-			return true
-		}
-	case html.EndTagToken:
-		switch p.tok.DataAtom {
-		case a.Tr:
-			if p.popUntil(tableScope, a.Tr) {
-				p.im = inTableBodyIM
-				return true
-			}
-			// Ignore the token.
-			return true
-		case a.Table:
-			if p.popUntil(tableScope, a.Tr) {
-				p.im = inTableBodyIM
-				return false
-			}
-			// Ignore the token.
-			return true
-		case a.Tbody, a.Tfoot, a.Thead:
-			if p.elementInScope(tableScope, p.tok.DataAtom) {
-				p.parseImpliedToken(html.EndTagToken, a.Tr, a.Tr.String())
-				return false
-			}
-			// Ignore the token.
-			return true
-		case a.Body, a.Caption, a.Col, a.Colgroup, a.Html, a.Td, a.Th:
-			// Ignore the token.
-			return true
-		}
-	}
-
-	return inTableIM(p)
-}
-
-// Section 12.2.6.4.15.
-func inCellIM(p *parser) bool {
-	switch p.tok.Type {
-	case html.StartTagToken:
-		switch p.tok.DataAtom {
-		case a.Caption, a.Col, a.Colgroup, a.Tbody, a.Td, a.Tfoot, a.Th, a.Thead, a.Tr:
-			if p.popUntil(tableScope, a.Td, a.Th) {
-				// Close the cell and reprocess.
-				p.clearActiveFormattingElements()
-				p.im = inRowIM
-				return false
-			}
-			// Ignore the token.
-			return true
-		case a.Select:
-			p.reconstructActiveFormattingElements()
-			p.addElement()
-			p.framesetOK = false
-			p.im = inSelectInTableIM
-			return true
-		}
-	case html.EndTagToken:
-		switch p.tok.DataAtom {
-		case a.Td, a.Th:
-			if !p.popUntil(tableScope, p.tok.DataAtom) {
-				// Ignore the token.
-				return true
-			}
-			p.clearActiveFormattingElements()
-			p.im = inRowIM
-			return true
-		case a.Body, a.Caption, a.Col, a.Colgroup, a.Html:
-			// Ignore the token.
-			return true
-		case a.Table, a.Tbody, a.Tfoot, a.Thead, a.Tr:
-			if !p.elementInScope(tableScope, p.tok.DataAtom) {
-				// Ignore the token.
-				return true
-			}
-			// Close the cell and reprocess.
-			if p.popUntil(tableScope, a.Td, a.Th) {
-				p.clearActiveFormattingElements()
-			}
-			p.im = inRowIM
-			return false
-		}
-	}
-	return inBodyIM(p)
-}
-
-// Section 12.2.6.4.16.
-func inSelectIM(p *parser) bool {
-	switch p.tok.Type {
-	case html.TextToken:
-		p.addText(strings.Replace(p.tok.Data, "\x00", "", -1))
-	case html.StartTagToken:
-		switch p.tok.DataAtom {
-		case a.Html:
-			return inBodyIM(p)
-		case a.Option:
-			if p.top().DataAtom == a.Option {
-				p.oe.pop()
-			}
-			p.addElement()
-		case a.Optgroup:
-			if p.top().DataAtom == a.Option {
-				p.oe.pop()
-			}
-			if p.top().DataAtom == a.Optgroup {
-				p.oe.pop()
-			}
-			p.addElement()
-		case a.Select:
-			if !p.popUntil(selectScope, a.Select) {
-				// Ignore the token.
-				return true
-			}
-			p.resetInsertionMode()
-		case a.Input, a.Keygen, a.Textarea:
-			if p.elementInScope(selectScope, a.Select) {
-				p.parseImpliedToken(html.EndTagToken, a.Select, a.Select.String())
-				return false
-			}
-			// In order to properly ignore <textarea>, we need to change the tokenizer mode.
-			p.tokenizer.NextIsNotRawText()
-			// Ignore the token.
-			return true
-		case a.Script, a.Template:
-			return inHeadIM(p)
-		case a.Iframe, a.Noembed, a.Noframes, a.Noscript, a.Plaintext, a.Style, a.Title, a.Xmp:
-			// Don't let the tokenizer go into raw text mode when there are raw tags
-			// to be ignored. These tags should be ignored from the tokenizer
-			// properly.
-			p.tokenizer.NextIsNotRawText()
-			// Ignore the token.
-			return true
-		}
-	case html.EndTagToken:
-		switch p.tok.DataAtom {
-		case a.Option:
-			if p.top().DataAtom == a.Option {
-				p.oe.pop()
-			}
-		case a.Optgroup:
-			i := len(p.oe) - 1
-			if p.oe[i].DataAtom == a.Option {
-				i--
-			}
-			if p.oe[i].DataAtom == a.Optgroup {
-				p.oe = p.oe[:i]
-			}
-		case a.Select:
-			if !p.popUntil(selectScope, a.Select) {
-				// Ignore the token.
-				return true
-			}
-			p.resetInsertionMode()
-		case a.Template:
-			return inHeadIM(p)
-		}
-	case html.CommentToken:
-		p.addChild(&html.Node{
-			Type: html.CommentNode,
-			Data: p.tok.Data,
-		})
-	case html.DoctypeToken:
-		// Ignore the token.
-		return true
-	case html.ErrorToken:
-		return inBodyIM(p)
-	}
-
-	return true
-}
-
-// Section 12.2.6.4.17.
-func inSelectInTableIM(p *parser) bool {
-	switch p.tok.Type {
-	case html.StartTagToken, html.EndTagToken:
-		switch p.tok.DataAtom {
-		case a.Caption, a.Table, a.Tbody, a.Tfoot, a.Thead, a.Tr, a.Td, a.Th:
-			if p.tok.Type == html.EndTagToken && !p.elementInScope(tableScope, p.tok.DataAtom) {
-				// Ignore the token.
-				return true
-			}
-			// This is like p.popUntil(selectScope, a.Select), but it also
-			// matches <math select>, not just <select>. Matching the MathML
-			// tag is arguably incorrect (conceptually), but it mimics what
-			// Chromium does.
-			for i := len(p.oe) - 1; i >= 0; i-- {
-				if n := p.oe[i]; n.DataAtom == a.Select {
-					p.oe = p.oe[:i]
-					break
-				}
-			}
-			p.resetInsertionMode()
-			return false
-		}
-	}
-	return inSelectIM(p)
-}
-
-// Section 12.2.6.4.18.
-func inTemplateIM(p *parser) bool {
-	switch p.tok.Type {
-	case html.TextToken, html.CommentToken, html.DoctypeToken:
-		return inBodyIM(p)
-	case html.StartTagToken:
-		switch p.tok.DataAtom {
-		case a.Base, a.Basefont, a.Bgsound, a.Link, a.Meta, a.Noframes, a.Script, a.Style, a.Template, a.Title:
-			return inHeadIM(p)
-		case a.Caption, a.Colgroup, a.Tbody, a.Tfoot, a.Thead:
-			p.templateStack.pop()
-			p.templateStack = append(p.templateStack, inTableIM)
-			p.im = inTableIM
-			return false
-		case a.Col:
-			p.templateStack.pop()
-			p.templateStack = append(p.templateStack, inColumnGroupIM)
-			p.im = inColumnGroupIM
-			return false
-		case a.Tr:
-			p.templateStack.pop()
-			p.templateStack = append(p.templateStack, inTableBodyIM)
-			p.im = inTableBodyIM
-			return false
-		case a.Td, a.Th:
-			p.templateStack.pop()
-			p.templateStack = append(p.templateStack, inRowIM)
-			p.im = inRowIM
-			return false
-		default:
-			p.templateStack.pop()
-			p.templateStack = append(p.templateStack, inBodyIM)
-			p.im = inBodyIM
-			return false
-		}
-	case html.EndTagToken:
-		switch p.tok.DataAtom {
-		case a.Template:
-			return inHeadIM(p)
-		default:
-			// Ignore the token.
-			return true
-		}
-	case html.ErrorToken:
-		if !p.oe.contains(a.Template) {
-			// Ignore the token.
-			return true
-		}
-		// TODO: remove this divergence from the HTML5 spec.
-		//
-		// See https://bugs.chromium.org/p/chromium/issues/detail?id=829668
-		p.generateImpliedEndTags()
-		for i := len(p.oe) - 1; i >= 0; i-- {
-			if n := p.oe[i]; n.Namespace == "" && n.DataAtom == a.Template {
-				p.oe = p.oe[:i]
-				break
-			}
-		}
-		p.clearActiveFormattingElements()
-		p.templateStack.pop()
-		p.resetInsertionMode()
-		return false
-	}
-	return false
-}
-
 // Section 12.2.6.4.19.
 func afterBodyIM(p *parser) bool {
 	switch p.tok.Type {
@@ -1966,9 +915,6 @@ func afterBodyIM(p *parser) bool {
 		}
 	case html.EndTagToken:
 		if p.tok.DataAtom == a.Html {
-			if !p.fragment {
-				p.im = afterAfterBodyIM
-			}
 			return true
 		}
 	case html.CommentToken:
@@ -1986,173 +932,10 @@ func afterBodyIM(p *parser) bool {
 	return false
 }
 
-// Section 12.2.6.4.20.
-func inFramesetIM(p *parser) bool {
-	switch p.tok.Type {
-	case html.CommentToken:
-		p.addChild(&html.Node{
-			Type: html.CommentNode,
-			Data: p.tok.Data,
-		})
-	case html.TextToken:
-		// Ignore all text but whitespace.
-		s := strings.Map(func(c rune) rune {
-			switch c {
-			case ' ', '\t', '\n', '\f', '\r':
-				return c
-			}
-			return -1
-		}, p.tok.Data)
-		if s != "" {
-			p.addText(s)
-		}
-	case html.StartTagToken:
-		switch p.tok.DataAtom {
-		case a.Html:
-			return inBodyIM(p)
-		case a.Frameset:
-			p.addElement()
-		case a.Frame:
-			p.addElement()
-			p.oe.pop()
-			p.acknowledgeSelfClosingTag()
-		case a.Noframes:
-			return inHeadIM(p)
-		}
-	case html.EndTagToken:
-		switch p.tok.DataAtom {
-		case a.Frameset:
-			if p.oe.top().DataAtom != a.Html {
-				p.oe.pop()
-				if p.oe.top().DataAtom != a.Frameset {
-					p.im = afterFramesetIM
-					return true
-				}
-			}
-		}
-	default:
-		// Ignore the token.
-	}
-	return true
-}
-
-// Section 12.2.6.4.21.
-func afterFramesetIM(p *parser) bool {
-	switch p.tok.Type {
-	case html.CommentToken:
-		p.addChild(&html.Node{
-			Type: html.CommentNode,
-			Data: p.tok.Data,
-		})
-	case html.TextToken:
-		// Ignore all text but whitespace.
-		s := strings.Map(func(c rune) rune {
-			switch c {
-			case ' ', '\t', '\n', '\f', '\r':
-				return c
-			}
-			return -1
-		}, p.tok.Data)
-		if s != "" {
-			p.addText(s)
-		}
-	case html.StartTagToken:
-		switch p.tok.DataAtom {
-		case a.Html:
-			return inBodyIM(p)
-		case a.Noframes:
-			return inHeadIM(p)
-		}
-	case html.EndTagToken:
-		switch p.tok.DataAtom {
-		case a.Html:
-			p.im = afterAfterFramesetIM
-			return true
-		}
-	default:
-		// Ignore the token.
-	}
-	return true
-}
-
-// Section 12.2.6.4.22.
-func afterAfterBodyIM(p *parser) bool {
-	switch p.tok.Type {
-	case html.ErrorToken:
-		// Stop parsing.
-		return true
-	case html.TextToken:
-		s := strings.TrimLeft(p.tok.Data, whitespace)
-		if len(s) == 0 {
-			// It was all whitespace.
-			return inBodyIM(p)
-		}
-	case html.StartTagToken:
-		if p.tok.DataAtom == a.Html {
-			return inBodyIM(p)
-		}
-	case html.CommentToken:
-		p.doc.AppendChild(&html.Node{
-			Type: html.CommentNode,
-			Data: p.tok.Data,
-		})
-		return true
-	case html.DoctypeToken:
-		return inBodyIM(p)
-	}
-	p.im = inBodyIM
-	return false
-}
-
-// Section 12.2.6.4.23.
-func afterAfterFramesetIM(p *parser) bool {
-	switch p.tok.Type {
-	case html.CommentToken:
-		p.doc.AppendChild(&html.Node{
-			Type: html.CommentNode,
-			Data: p.tok.Data,
-		})
-	case html.TextToken:
-		// Ignore all text but whitespace.
-		s := strings.Map(func(c rune) rune {
-			switch c {
-			case ' ', '\t', '\n', '\f', '\r':
-				return c
-			}
-			return -1
-		}, p.tok.Data)
-		if s != "" {
-			p.tok.Data = s
-			return inBodyIM(p)
-		}
-	case html.StartTagToken:
-		switch p.tok.DataAtom {
-		case a.Html:
-			return inBodyIM(p)
-		case a.Noframes:
-			return inHeadIM(p)
-		}
-	case html.DoctypeToken:
-		return inBodyIM(p)
-	default:
-		// Ignore the token.
-	}
-	return true
-}
-
-func ignoreTheRemainingTokens(p *parser) bool {
-	return true
-}
-
-const whitespaceOrNUL = whitespace + "\x00"
-
 // Section 12.2.6.5
 func parseForeignContent(p *parser) bool {
 	switch p.tok.Type {
 	case html.TextToken:
-		if p.framesetOK {
-			p.framesetOK = strings.TrimLeft(p.tok.Data, whitespaceOrNUL) == ""
-		}
 		p.tok.Data = strings.Replace(p.tok.Data, "\x00", "\ufffd", -1)
 		p.addText(p.tok.Data)
 	case html.CommentToken:
@@ -2161,30 +944,7 @@ func parseForeignContent(p *parser) bool {
 			Data: p.tok.Data,
 		})
 	case html.StartTagToken:
-		if !p.fragment {
-			b := breakout[p.tok.Data]
-			if p.tok.DataAtom == a.Font {
-			loop:
-				for _, attr := range p.tok.Attr {
-					switch attr.Key {
-					case "color", "face", "size":
-						b = true
-						break loop
-					}
-				}
-			}
-			if b {
-				for i := len(p.oe) - 1; i >= 0; i-- {
-					n := p.oe[i]
-					if n.Namespace == "" || htmlIntegrationPoint(n) || mathMLTextIntegrationPoint(n) {
-						p.oe = p.oe[:i+1]
-						break
-					}
-				}
-				return false
-			}
-		}
-		current := p.adjustedCurrentNode()
+		current := p.oe.top()
 		switch current.Namespace {
 		case "math":
 			adjustAttributeNames(p.tok.Attr, mathMLAttributeAdjustments)
@@ -2229,20 +989,12 @@ func parseForeignContent(p *parser) bool {
 	return true
 }
 
-// Section 12.2.4.2.
-func (p *parser) adjustedCurrentNode() *html.Node {
-	if len(p.oe) == 1 && p.fragment && p.context != nil {
-		return p.context
-	}
-	return p.oe.top()
-}
-
 // Section 12.2.6.
 func (p *parser) inForeignContent() bool {
 	if len(p.oe) == 0 {
 		return false
 	}
-	n := p.adjustedCurrentNode()
+	n := p.oe.top()
 	if n.Namespace == "" {
 		return false
 	}
@@ -2325,15 +1077,6 @@ func (p *parser) parse() error {
 }
 
 // Parse returns the parse tree for the HTML from the given Reader.
-//
-// It implements the HTML5 parsing algorithm
-// (https://html.spec.whatwg.org/multipage/syntax.html#tree-construction),
-// which is very complicated. The resultant tree can contain implicitly created
-// nodes that have no explicit <tag> listed in r's data, and nodes' parents can
-// differ from the nesting implied by a naive processing of start and end
-// <tag>s. Conversely, explicit <tag>s in r's data can be silently dropped,
-// with no corresponding node in the resulting tree.
-//
 // The input is assumed to be UTF-8 encoded.
 func Parse(r io.Reader) (*html.Node, error) {
 	p := &parser{
@@ -2341,82 +1084,11 @@ func Parse(r io.Reader) (*html.Node, error) {
 		doc: &html.Node{
 			Type: html.DocumentNode,
 		},
-		framesetOK: true,
-		im:         initialIM,
+		im: inBodyIM,
 	}
 
 	if err := p.parse(); err != nil {
 		return nil, err
 	}
 	return p.doc, nil
-}
-
-// ParseFragment parses a fragment of HTML and returns the nodes that were
-// found. If the fragment is the InnerHTML for an existing element, pass that
-// element in context.
-//
-// It has the same intricacies as Parse.
-func ParseFragment(r io.Reader, context *html.Node) ([]*html.Node, error) {
-	contextTag := ""
-	if context != nil {
-		if context.Type != html.ElementNode {
-			return nil, errors.New("html: ParseFragment of non-element Node")
-		}
-		// The next check isn't just context.DataAtom.String() == context.Data because
-		// it is valid to pass an element whose tag isn't a known atom. For example,
-		// DataAtom == 0 and Data = "tagfromthefuture" is perfectly consistent.
-		if context.DataAtom != a.Lookup([]byte(context.Data)) {
-			return nil, fmt.Errorf("html: inconsistent Node: DataAtom=%q, Data=%q", context.DataAtom, context.Data)
-		}
-		contextTag = context.DataAtom.String()
-	}
-	p := &parser{
-		doc: &html.Node{
-			Type: html.DocumentNode,
-		},
-		fragment: true,
-		context:  context,
-	}
-	if context != nil && context.Namespace != "" {
-		p.tokenizer = html.NewTokenizer(r)
-	} else {
-		p.tokenizer = html.NewTokenizerFragment(r, contextTag)
-	}
-
-	root := &html.Node{
-		Type:     html.ElementNode,
-		DataAtom: a.Html,
-		Data:     a.Html.String(),
-	}
-	p.doc.AppendChild(root)
-	p.oe = nodeStack{root}
-	if context != nil && context.DataAtom == a.Template {
-		p.templateStack = append(p.templateStack, inTemplateIM)
-	}
-	p.resetInsertionMode()
-
-	for n := context; n != nil; n = n.Parent {
-		if n.Type == html.ElementNode && n.DataAtom == a.Form {
-			p.form = n
-			break
-		}
-	}
-
-	if err := p.parse(); err != nil {
-		return nil, err
-	}
-
-	parent := p.doc
-	if context != nil {
-		parent = root
-	}
-
-	var result []*html.Node
-	for c := parent.FirstChild; c != nil; {
-		next := c.NextSibling
-		parent.RemoveChild(c)
-		result = append(result, c)
-		c = next
-	}
-	return result, nil
 }

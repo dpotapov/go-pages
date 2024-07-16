@@ -22,8 +22,8 @@ import (
 )
 
 type testAttrs struct {
-	text, want, context string
-	scripting           bool
+	text, want string
+	scripting  bool
 }
 
 // readParseTest reads a single test case from r.
@@ -76,38 +76,6 @@ func readParseTest(r *bufio.Reader) (*testAttrs, error) {
 			if line[0] == '#' {
 				break
 			}
-		}
-	}
-
-	if ls := string(line); strings.HasPrefix(ls, "#script-") {
-		switch {
-		case strings.HasSuffix(ls, "-on\n"):
-			ta.scripting = true
-		case strings.HasSuffix(ls, "-off\n"):
-			ta.scripting = false
-		default:
-			return nil, fmt.Errorf(`got %q, want "#script-on" or "#script-off"`, line)
-		}
-		for {
-			line, err = r.ReadSlice('\n')
-			if err != nil {
-				return nil, err
-			}
-			if line[0] == '#' {
-				break
-			}
-		}
-	}
-
-	if string(line) == "#document-fragment\n" {
-		line, err = r.ReadSlice('\n')
-		if err != nil {
-			return nil, err
-		}
-		ta.context = strings.TrimSpace(string(line))
-		line, err = r.ReadSlice('\n')
-		if err != nil {
-			return nil, err
 		}
 	}
 
@@ -271,7 +239,11 @@ func TestParser(t *testing.T) {
 					continue
 				}
 
-				err = testParseCase(ta.text, ta.want, ta.context)
+				if tf == "testdata/webkit/tables01.dat" && i == 6 {
+					t.Logf("skipping to test #%d in %s", i, tf)
+				}
+
+				err = testParseCase(ta.text, ta.want)
 
 				if err != nil {
 					t.Errorf("%s test #%d %q, %s", tf, i, ta.text, err)
@@ -281,30 +253,11 @@ func TestParser(t *testing.T) {
 	}
 }
 
-// Issue 16318
-func TestParserWithoutScripting(t *testing.T) {
-	text := `<noscript><img src='https://golang.org/doc/gopher/frontpage.png' /></noscript><p><img src='https://golang.org/doc/gopher/doc.png' /></p>`
-	want := `| <html>
-|   <head>
-|     <noscript>
-|   <body>
-|     <img>
-|       src="https://golang.org/doc/gopher/frontpage.png"
-|     <p>
-|       <img>
-|         src="https://golang.org/doc/gopher/doc.png"
-`
-
-	if err := testParseCase(text, want, ""); err != nil {
-		t.Errorf("test with scripting is disabled, %q, %s", text, err)
-	}
-}
-
 // testParseCase tests one test case from the test files. If the test does not
 // pass, it returns an error that explains the failure.
 // text is the HTML to be parsed, want is a dump of the correct parse tree,
 // and context is the name of the context node, if any.
-func testParseCase(text, want, context string) (err error) {
+func testParseCase(text, want string) (err error) {
 	defer func() {
 		if x := recover(); x != nil {
 			switch e := x.(type) {
@@ -316,33 +269,9 @@ func testParseCase(text, want, context string) (err error) {
 		}
 	}()
 
-	var doc *html.Node
-	if context == "" {
-		doc, err = Parse(strings.NewReader(text))
-		if err != nil {
-			return err
-		}
-	} else {
-		namespace := ""
-		if i := strings.IndexByte(context, ' '); i >= 0 {
-			namespace, context = context[:i], context[i+1:]
-		}
-		contextNode := &html.Node{
-			Data:      context,
-			DataAtom:  atom.Lookup([]byte(context)),
-			Namespace: namespace,
-			Type:      html.ElementNode,
-		}
-		nodes, err := ParseFragment(strings.NewReader(text), contextNode)
-		if err != nil {
-			return err
-		}
-		doc = &html.Node{
-			Type: html.DocumentNode,
-		}
-		for _, n := range nodes {
-			doc.AppendChild(n)
-		}
+	doc, err := Parse(strings.NewReader(text))
+	if err != nil {
+		return err
 	}
 
 	if err := checkTreeConsistency(doc); err != nil {
@@ -358,7 +287,7 @@ func testParseCase(text, want, context string) (err error) {
 		return fmt.Errorf("got vs want:\n----\n%s----\n%s----", got, want)
 	}
 
-	if renderTestBlacklist[text] || context != "" {
+	if renderTestBlacklist[text] {
 		return nil
 	}
 
@@ -448,31 +377,14 @@ var renderTestBlacklist = map[string]bool{
 	`<!doctype html><svg><plaintext>a</plaintext>b`:           true,
 }
 
-func TestNodeConsistency(t *testing.T) {
-	// inconsistentNode is a Node whose DataAtom and Data do not agree.
-	inconsistentNode := &html.Node{
-		Type:     html.ElementNode,
-		DataAtom: atom.Frameset,
-		Data:     "table",
-	}
-	if _, err := ParseFragment(strings.NewReader("<p>hello</p>"), inconsistentNode); err == nil {
-		t.Errorf("got nil error, want non-nil")
-	}
-}
-
-func TestParseFragmentWithNilContext(t *testing.T) {
-	// This shouldn't panic.
-	ParseFragment(strings.NewReader("<p>hello</p>"), nil)
-}
-
-func TestParseFragmentForeignContentTemplates(t *testing.T) {
+func TestParseForeignContentTemplates(t *testing.T) {
 	srcs := []string{
 		"<math><html><template><mn><template></template></template>",
 		"<math><math><head><mi><template>",
 	}
 	for _, src := range srcs {
 		// The next line shouldn't infinite-loop.
-		ParseFragment(strings.NewReader(src), nil)
+		Parse(strings.NewReader(src))
 	}
 }
 
