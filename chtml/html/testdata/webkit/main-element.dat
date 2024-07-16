@@ -4,28 +4,22 @@
 (1,36): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|       "foo"
-|     <main>
-|       "bar"
-|       <p>
-|         "baz"
+| <p>
+|   "foo"
+| <main>
+|   "bar"
+|   <p>
+|     "baz"
 
 #data
 <!doctype html><main><p>foo</main>bar
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <main>
-|       <p>
-|         "foo"
-|     "bar"
+| <main>
+|   <p>
+|     "foo"
+| "bar"
 
 #data
 <!DOCTYPE html>xxx<svg><x><g><a><main><b>
@@ -34,13 +28,10 @@
  * (1,42) unexpected end of file
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     "xxx"
-|     <svg svg>
-|       <svg x>
-|         <svg g>
-|           <svg a>
-|             <svg main>
-|     <b>
+| "xxx"
+| <svg svg>
+|   <svg x>
+|     <svg g>
+|       <svg a>
+|         <svg main>
+|           <svg b>

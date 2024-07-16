@@ -13,6 +13,9 @@ The parser is based on golang.org/x/net/html with following modifications:
 * There is no goal to follow HTML5 spec.
 * The modified package tries to use the upstream `golang.org/x/net/html` package as much as possible.
 * The contents of the <noscript> tag is always parsed as HTML nodes. The scripting flag is removed.
+* Frameset/frame tags are not handled to simplify the parser. Those tags are deprecated in HTML5.
+* Foreign content is not handled per spec. Nested elements of <svg> and <math> tags are parsed as
+  regular HTML nodes.
 
 Tokenization is done by creating a Tokenizer for an io.Reader r. It is the
 caller's responsibility to ensure that r provides UTF-8 encoded HTML.

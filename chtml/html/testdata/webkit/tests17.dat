@@ -6,13 +6,10 @@
 (1,41): eof-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|     <table>
-|       <tbody>
-|         <tr>
+| <select>
+| <table>
+|   <tbody>
+|     <tr>
 
 #data
 <!doctype html><table><tr><select><td>
@@ -22,14 +19,11 @@
 (1,38): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|     <table>
-|       <tbody>
-|         <tr>
-|           <td>
+| <select>
+| <table>
+|   <tbody>
+|     <tr>
+|       <td>
 
 #data
 <!doctype html><table><tr><td><select><td>
@@ -38,15 +32,12 @@
 (1,42): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <tr>
-|           <td>
-|             <select>
-|           <td>
+| <table>
+|   <tbody>
+|     <tr>
+|       <td>
+|         <select>
+|       <td>
 
 #data
 <!doctype html><table><tr><th><select><td>
@@ -55,15 +46,12 @@
 (1,42): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <tr>
-|           <th>
-|             <select>
-|           <td>
+| <table>
+|   <tbody>
+|     <tr>
+|       <th>
+|         <select>
+|       <td>
 
 #data
 <!doctype html><table><caption><select><tr>
@@ -72,14 +60,11 @@
 (1,43): eof-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <caption>
-|         <select>
-|       <tbody>
-|         <tr>
+| <table>
+|   <caption>
+|     <select>
+|   <tbody>
+|     <tr>
 
 #data
 <!doctype html><select><tr>
@@ -88,10 +73,7 @@
 (1,27): eof-in-select
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
+| <select>
 
 #data
 <!doctype html><select><td>
@@ -100,10 +82,7 @@
 (1,27): eof-in-select
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
+| <select>
 
 #data
 <!doctype html><select><th>
@@ -112,10 +91,7 @@
 (1,27): eof-in-select
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
+| <select>
 
 #data
 <!doctype html><select><tbody>
@@ -124,10 +100,7 @@
 (1,30): eof-in-select
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
+| <select>
 
 #data
 <!doctype html><select><thead>
@@ -136,10 +109,7 @@
 (1,30): eof-in-select
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
+| <select>
 
 #data
 <!doctype html><select><tfoot>
@@ -148,10 +118,7 @@
 (1,30): eof-in-select
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
+| <select>
 
 #data
 <!doctype html><select><caption>
@@ -160,20 +127,14 @@
 (1,32): eof-in-select
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
+| <select>
 
 #data
 <!doctype html><table><tr></table>a
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <tr>
-|     "a"
+| <table>
+|   <tbody>
+|     <tr>
+| "a"

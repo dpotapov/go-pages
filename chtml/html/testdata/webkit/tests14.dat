@@ -4,7 +4,6 @@
 #document
 | <!DOCTYPE html>
 | <html>
-|   <head>
 |   <body>
 |     <xyz:abc>
 
@@ -14,7 +13,6 @@
 #document
 | <!DOCTYPE html>
 | <html>
-|   <head>
 |   <body>
 |     <xyz:abc>
 |     <span>
@@ -27,9 +25,7 @@
 | <!DOCTYPE html>
 | <html>
 |   abc:def="gh"
-|   <head>
-|   <body>
-|     <xyz:abc>
+|   <xyz:abc>
 
 #data
 <!DOCTYPE html><html xml:lang=bar><html xml:lang=foo>
@@ -39,8 +35,6 @@
 | <!DOCTYPE html>
 | <html>
 |   xml:lang="bar"
-|   <head>
-|   <body>
 
 #data
 <!DOCTYPE html><html 123=456>
@@ -49,8 +43,6 @@
 | <!DOCTYPE html>
 | <html>
 |   123="456"
-|   <head>
-|   <body>
 
 #data
 <!DOCTYPE html><html 123=456><html 789=012>
@@ -61,8 +53,6 @@
 | <html>
 |   123="456"
 |   789="012"
-|   <head>
-|   <body>
 
 #data
 <!DOCTYPE html><html><body 789=012>
@@ -70,6 +60,5 @@
 #document
 | <!DOCTYPE html>
 | <html>
-|   <head>
 |   <body>
 |     789="012"

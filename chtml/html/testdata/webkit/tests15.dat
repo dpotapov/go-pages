@@ -5,19 +5,16 @@
 (1,36): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|       <b>
-|         <i>
-|           <u>
-|     <b>
-|       <i>
-|         <u>
-|           " "
-|           <p>
-|             "X"
+| <p>
+|   <b>
+|     <i>
+|       <u>
+| <b>
+|   <i>
+|     <u>
+|       " "
+|       <p>
+|         "X"
 
 #data
 <p><b><i><u></p>
@@ -27,20 +24,17 @@
 (1,16): unexpected-end-tag
 (2,4): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|       <b>
-|         <i>
-|           <u>
-|     <b>
-|       <i>
-|         <u>
-|           "
+| <p>
+|   <b>
+|     <i>
+|       <u>
+| <b>
+|   <i>
+|     <u>
+|       "
 "
-|           <p>
-|             "X"
+|       <p>
+|         "X"
 
 #data
 <!doctype html></html> <head>
@@ -49,10 +43,8 @@
 (1,29): unexpected-start-tag-ignored
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     " "
+| " "
+| <head>
 
 #data
 <!doctype html></body><meta>
@@ -60,10 +52,7 @@
 (1,28): unexpected-start-tag-after-body
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <meta>
+| <meta>
 
 #data
 <html></html><!-- foo -->
@@ -71,9 +60,7 @@
 (1,6): expected-doctype-but-got-start-tag
 #document
 | <html>
-|   <head>
-|   <body>
-| <!--  foo  -->
+|   <!--  foo  -->
 
 #data
 <!doctype html></body><title>X</title>
@@ -81,11 +68,8 @@
 (1,29): unexpected-start-tag-after-body
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <title>
-|       "X"
+| <title>
+|   "X"
 
 #data
 <!doctype html><table> X<meta></table>
@@ -95,12 +79,9 @@
 (1,30): foster-parenting-start-character
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     " X"
-|     <meta>
-|     <table>
+| " X"
+| <meta>
+| <table>
 
 #data
 <!doctype html><table> x</table>
@@ -109,11 +90,8 @@
 (1,24): foster-parenting-character
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     " x"
-|     <table>
+| " x"
+| <table>
 
 #data
 <!doctype html><table> x </table>
@@ -123,11 +101,8 @@
 (1,25): foster-parenting-character
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     " x "
-|     <table>
+| " x "
+| <table>
 
 #data
 <!doctype html><table><tr> x</table>
@@ -136,13 +111,10 @@
 (1,28): foster-parenting-character
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     " x"
-|     <table>
-|       <tbody>
-|         <tr>
+| " x"
+| <table>
+|   <tbody>
+|     <tr>
 
 #data
 <!doctype html><table>X<style> <tr>x </style> </table>
@@ -150,14 +122,11 @@
 (1,23): foster-parenting-character
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     "X"
-|     <table>
-|       <style>
-|         " <tr>x "
-|       " "
+| "X"
+| <table>
+|   <style>
+|     " <tr>x "
+|   " "
 
 #data
 <!doctype html><div><table><a>foo</a> <tr><td>bar</td> </tr></table></div>
@@ -169,19 +138,16 @@
 (1,37): foster-parenting-end-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <div>
-|       <a>
-|         "foo"
-|       <table>
+| <div>
+|   <a>
+|     "foo"
+|   <table>
+|     " "
+|     <tbody>
+|       <tr>
+|         <td>
+|           "bar"
 |         " "
-|         <tbody>
-|           <tr>
-|             <td>
-|               "bar"
-|             " "
 
 #data
 <frame></frame></frame><frameset><frame><frameset><frame></frameset><noframes></frameset><noframes>
@@ -194,14 +160,13 @@
 (1,99): expected-named-closing-tag-but-got-eof
 (1,99): eof-in-frameset
 #document
-| <html>
-|   <head>
-|   <frameset>
-|     <frame>
+| <frame>
+| <frameset>
+|   <frame>
 |     <frameset>
 |       <frame>
-|     <noframes>
-|       "</frameset><noframes>"
+|         <noframes>
+|           "</frameset><noframes>"
 
 #data
 <!DOCTYPE html><object></html>
@@ -210,7 +175,4 @@
 (1,30): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <object>
+| <object>

@@ -3,36 +3,28 @@
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         "Hello"
+| <body>
+|   <template>
+|     content
+|       "Hello"
 
 #data
 <template>Hello</template>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|     <template>
-|       content
-|         "Hello"
-|   <body>
+| <template>
+|   content
+|     "Hello"
 
 #data
 <template></template><div></div>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|     <template>
-|       content
-|   <body>
-|     <div>
+| <template>
+|   content
+| <div>
 
 #data
 <html><template>Hello</template>
@@ -40,23 +32,19 @@ no doctype
 no doctype
 #document
 | <html>
-|   <head>
-|     <template>
-|       content
-|         "Hello"
-|   <body>
+|   <template>
+|     content
+|       "Hello"
 
 #data
 <head><template><div></div></template></head>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|     <template>
-|       content
-|         <div>
-|   <body>
+| <head>
+|   <template>
+|     content
+|       <div>
 
 #data
 <div><template><div><span></template><b>
@@ -65,15 +53,12 @@ no doctype
  * (1,38) mismatched template end tag
  * (1,41) unexpected end of file
 #document
-| <html>
-|   <head>
-|   <body>
-|     <div>
-|       <template>
-|         content
-|           <div>
-|             <span>
-|       <b>
+| <div>
+|   <template>
+|     content
+|       <div>
+|         <span>
+|   <b>
 
 #data
 <div><template></div>Hello
@@ -83,13 +68,10 @@ no doctype
  * (1,27) unexpected end of file in template
  * (1,27) unexpected end of file
 #document
-| <html>
-|   <head>
-|   <body>
-|     <div>
-|       <template>
-|         content
-|           "Hello"
+| <div>
+|   <template>
+|     content
+|       "Hello"
 
 #data
 <div></template></div>
@@ -97,22 +79,16 @@ no doctype
  * (1,6) missing DOCTYPE
  * (1,17) unexpected template end tag
 #document
-| <html>
-|   <head>
-|   <body>
-|     <div>
+| <div>
 
 #data
 <table><template></template></table>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <template>
-|         content
+| <table>
+|   <template>
+|     content
 
 #data
 <table><template></template></div>
@@ -122,12 +98,9 @@ no doctype
  * (1,35) unexpected end tag
  * (1,35) unexpected end of file
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <template>
-|         content
+| <table>
+|   <template>
+|     content
 
 #data
 <table><div><template></template></div>
@@ -137,13 +110,10 @@ no doctype
  * (1,40) unexpected token in table - foster parenting
  * (1,40) unexpected end of file
 #document
-| <html>
-|   <head>
-|   <body>
-|     <div>
-|       <template>
-|         content
-|     <table>
+| <div>
+|   <template>
+|     content
+| <table>
 
 #data
 <table><template></template><div></div>
@@ -153,26 +123,20 @@ bad div in table
 bad /div in table
 eof in table
 #document
-| <html>
-|   <head>
-|   <body>
-|     <div>
-|     <table>
-|       <template>
-|         content
+| <div>
+| <table>
+|   <template>
+|     content
 
 #data
 <table>   <template></template></table>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       "   "
-|       <template>
-|         content
+| <table>
+|   "   "
+|   <template>
+|     content
 
 #data
 <table><tbody><template></template></tbody>
@@ -180,13 +144,10 @@ no doctype
 no doctype
 eof in table
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <template>
-|           content
+| <table>
+|   <tbody>
+|     <template>
+|       content
 
 #data
 <table><tbody><template></tbody></template>
@@ -195,26 +156,20 @@ no doctype
 bad /tbody
 eof in table
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <template>
-|           content
+| <table>
+|   <tbody>
+|     <template>
+|       content
 
 #data
 <table><tbody><template></template></tbody></table>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <template>
-|           content
+| <table>
+|   <tbody>
+|     <template>
+|       content
 
 #data
 <table><thead><template></template></thead>
@@ -222,13 +177,10 @@ no doctype
 no doctype
 eof in table
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <thead>
-|         <template>
-|           content
+| <table>
+|   <thead>
+|     <template>
+|       content
 
 #data
 <table><tfoot><template></template></tfoot>
@@ -236,38 +188,29 @@ eof in table
 no doctype
 eof in table
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tfoot>
-|         <template>
-|           content
+| <table>
+|   <tfoot>
+|     <template>
+|       content
 
 #data
 <select><template></template></select>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       <template>
-|         content
+| <select>
+|   <template>
+|     content
 
 #data
 <select><template><option></option></template></select>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       <template>
-|         content
-|           <option>
+| <select>
+|   <template>
+|     content
+|       <option>
 
 #data
 <template><option></option></select><option></option></template>
@@ -275,39 +218,30 @@ no doctype
 no doctype
 bad /select
 #document
-| <html>
-|   <head>
-|     <template>
-|       content
-|         <option>
-|         <option>
-|   <body>
+| <template>
+|   content
+|     <option>
+|     <option>
 
 #data
 <select><template></template><option></select>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       <template>
-|         content
-|       <option>
+| <select>
+|   <template>
+|     content
+|   <option>
 
 #data
 <select><option><template></template></select>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       <option>
-|         <template>
-|           content
+| <select>
+|   <option>
+|     <template>
+|       content
 
 #data
 <select><template>
@@ -316,12 +250,9 @@ no doctype
 eof in template
 eof in select
 #document
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       <template>
-|         content
+| <select>
+|   <template>
+|     content
 
 #data
 <select><option></option><template>
@@ -330,13 +261,10 @@ no doctype
 eof in template
 eof in select
 #document
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       <option>
-|       <template>
-|         content
+| <select>
+|   <option>
+|   <template>
+|     content
 
 #data
 <select><option></option><template><option>
@@ -345,41 +273,32 @@ no doctype
 eof in template
 eof in select
 #document
-| <html>
-|   <head>
-|   <body>
-|     <select>
+| <select>
+|   <option>
+|   <template>
+|     content
 |       <option>
-|       <template>
-|         content
-|           <option>
 
 #data
 <table><thead><template><td></template></table>
 #errors
  * (1,8) missing DOCTYPE
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <thead>
-|         <template>
-|           content
-|             <td>
+| <table>
+|   <thead>
+|     <template>
+|       content
+|         <td>
 
 #data
 <table><template><thead></template></table>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <template>
-|         content
-|           <thead>
+| <table>
+|   <template>
+|     content
+|       <thead>
 
 #data
 <body><table><template><td></tr><div></template></table>
@@ -388,14 +307,12 @@ no doctype
 bad </tr>
 missing </div>
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <template>
-|         content
-|           <td>
-|             <div>
+| <body>
+|   <table>
+|     <template>
+|       content
+|         <td>
+|           <div>
 
 #data
 <table><template><thead></template></thead></table>
@@ -403,40 +320,31 @@ missing </div>
 no doctype
 bad /thead after /template
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <template>
-|         content
-|           <thead>
+| <table>
+|   <template>
+|     content
+|       <thead>
 
 #data
 <table><thead><template><tr></template></table>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <thead>
-|         <template>
-|           content
-|             <tr>
+| <table>
+|   <thead>
+|     <template>
+|       content
+|         <tr>
 
 #data
 <table><template><tr></template></table>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <template>
-|         content
-|           <tr>
+| <table>
+|   <template>
+|     content
+|       <tr>
 
 #data
 <table><tr><template><td>
@@ -445,47 +353,38 @@ no doctype
 eof in template
 eof in table
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <tr>
-|           <template>
-|             content
-|               <td>
+| <table>
+|   <tbody>
+|     <tr>
+|       <template>
+|         content
+|           <td>
 
 #data
 <table><template><tr><template><td></template></tr></template></table>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <template>
-|         content
-|           <tr>
-|             <template>
-|               content
-|                 <td>
+| <table>
+|   <template>
+|     content
+|       <tr>
+|         <template>
+|           content
+|             <td>
 
 #data
 <table><template><tr><template><td></td></template></tr></template></table>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <template>
-|         content
-|           <tr>
-|             <template>
-|               content
-|                 <td>
+| <table>
+|   <template>
+|     content
+|       <tr>
+|         <template>
+|           content
+|             <td>
 
 #data
 <table><template><td></template>
@@ -493,40 +392,33 @@ no doctype
 no doctype
 eof in table
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <template>
-|         content
-|           <td>
+| <table>
+|   <template>
+|     content
+|       <td>
 
 #data
 <body><template><td></td></template>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <td>
+| <body>
+|   <template>
+|     content
+|       <td>
 
 #data
 <body><template><template><tr></tr></template><td></td></template>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <template>
-|           content
-|             <tr>
-|         <td>
+| <body>
+|   <template>
+|     content
+|       <template>
+|         content
+|           <tr>
+|       <td>
 
 #data
 <table><colgroup><template><col>
@@ -535,14 +427,11 @@ no doctype
 eof in template
 eof in table
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <colgroup>
-|         <template>
-|           content
-|             <col>
+| <table>
+|   <colgroup>
+|     <template>
+|       content
+|         <col>
 
 #data
 <frameset><template><frame></frame></template></frameset>
@@ -552,10 +441,10 @@ eof in table
  * (1,36) unexpected end tag token
  * (1,47) unexpected end tag token
 #document
-| <html>
-|   <head>
-|   <frameset>
-|     <frame>
+| <frameset>
+|   <template>
+|     content
+|       <frame>
 
 #data
 <template><frame></frame></frameset><frame></frame></template>
@@ -567,11 +456,10 @@ eof in table
  * (1,44) unexpected start tag
  * (1,52) unexpected end tag
 #document
-| <html>
-|   <head>
-|     <template>
-|       content
-|   <body>
+| <template>
+|   content
+|     <frame>
+|     <frame>
 
 #data
 <template><div><frameset><span></span></div><span></span></template>
@@ -579,14 +467,12 @@ eof in table
 no doctype
 bad frameset
 #document
-| <html>
-|   <head>
-|     <template>
-|       content
-|         <div>
-|           <span>
+| <template>
+|   content
+|     <div>
+|       <frameset>
 |         <span>
-|   <body>
+|     <span>
 
 #data
 <body><template><div><frameset><span></span></div><span></span></template></body>
@@ -594,28 +480,25 @@ bad frameset
 no doctype
 bad frameset
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <div>
+| <body>
+|   <template>
+|     content
+|       <div>
+|         <frameset>
 |           <span>
-|         <span>
+|       <span>
 
 #data
 <body><template><script>var i = 1;</script><td></td></template>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <script>
-|           "var i = 1;"
-|         <td>
+| <body>
+|   <template>
+|     content
+|       <script>
+|         "var i = 1;"
+|       <td>
 
 #data
 <body><template><tr><div></div></tr></template>
@@ -624,13 +507,11 @@ no doctype
 foster-parented div
 foster-parented /div
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <tr>
-|         <div>
+| <body>
+|   <template>
+|     content
+|       <tr>
+|       <div>
 
 #data
 <body><template><tr></tr><td></td></template>
@@ -638,14 +519,12 @@ foster-parented /div
 no doctype
 unexpected <td>
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <tr>
-|         <tr>
-|           <td>
+| <body>
+|   <template>
+|     content
+|       <tr>
+|       <tr>
+|         <td>
 
 #data
 <body><template><td></td></tr><td></td></template>
@@ -653,13 +532,11 @@ unexpected <td>
 no doctype
 bad </tr>
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <td>
-|         <td>
+| <body>
+|   <template>
+|     content
+|       <td>
+|       <td>
 
 #data
 <body><template><td></td><tbody><td></td></template>
@@ -667,13 +544,11 @@ bad </tr>
 no doctype
 bad <tbody>
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <td>
-|         <td>
+| <body>
+|   <template>
+|     content
+|       <td>
+|       <td>
 
 #data
 <body><template><td></td><caption></caption><td></td></template>
@@ -682,13 +557,11 @@ bad <tbody>
  * (1,35) unexpected start tag in table row
  * (1,45) unexpected end tag in table row
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <td>
-|         <td>
+| <body>
+|   <template>
+|     content
+|       <td>
+|       <td>
 
 #data
 <body><template><td></td><colgroup></caption><td></td></template>
@@ -697,13 +570,11 @@ bad <tbody>
  * (1,36) unexpected start tag in table row
  * (1,46) unexpected end tag in table row
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <td>
-|         <td>
+| <body>
+|   <template>
+|     content
+|       <td>
+|       <td>
 
 #data
 <body><template><td></td></table><td></td></template>
@@ -711,13 +582,11 @@ bad <tbody>
 no doctype
 bad </table>
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <td>
-|         <td>
+| <body>
+|   <template>
+|     content
+|       <td>
+|       <td>
 
 #data
 <body><template><tr></tr><tbody><tr></tr></template>
@@ -725,13 +594,11 @@ bad </table>
 no doctype
 bad <tbody>
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <tr>
-|         <tr>
+| <body>
+|   <template>
+|     content
+|       <tr>
+|       <tr>
 
 #data
 <body><template><tr></tr><caption><tr></tr></template>
@@ -739,13 +606,11 @@ bad <tbody>
 no doctype
 bad <caption>
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <tr>
-|         <tr>
+| <body>
+|   <template>
+|     content
+|       <tr>
+|       <tr>
 
 #data
 <body><template><tr></tr></table><tr></tr></template>
@@ -753,27 +618,23 @@ bad <caption>
 no doctype
 bad </table>
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <tr>
-|         <tr>
+| <body>
+|   <template>
+|     content
+|       <tr>
+|       <tr>
 
 #data
 <body><template><thead></thead><caption></caption><tbody></tbody></template>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <thead>
-|         <caption>
-|         <tbody>
+| <body>
+|   <template>
+|     content
+|       <thead>
+|       <caption>
+|       <tbody>
 
 #data
 <body><template><thead></thead></table><tbody></tbody></template></body>
@@ -781,13 +642,11 @@ no doctype
 no doctype
 bad </table>
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <thead>
-|         <tbody>
+| <body>
+|   <template>
+|     content
+|       <thead>
+|       <tbody>
 
 #data
 <body><template><div><tr></tr></div></template>
@@ -796,91 +655,77 @@ no doctype
 bad tr
 bad /tr
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <div>
+| <body>
+|   <template>
+|     content
+|       <div>
 
 #data
 <body><template><em>Hello</em></template>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <em>
-|           "Hello"
+| <body>
+|   <template>
+|     content
+|       <em>
+|         "Hello"
 
 #data
 <body><template><!--comment--></template>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <!-- comment -->
+| <body>
+|   <template>
+|     content
+|       <!-- comment -->
 
 #data
 <body><template><style></style><td></td></template>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <style>
-|         <td>
+| <body>
+|   <template>
+|     content
+|       <style>
+|       <td>
 
 #data
 <body><template><meta><td></td></template>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <meta>
-|         <td>
+| <body>
+|   <template>
+|     content
+|       <meta>
+|       <td>
 
 #data
 <body><template><link><td></td></template>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <link>
-|         <td>
+| <body>
+|   <template>
+|     content
+|       <link>
+|       <td>
 
 #data
 <body><template><template><tr></tr></template><td></td></template>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <template>
-|           content
-|             <tr>
-|         <td>
+| <body>
+|   <template>
+|     content
+|       <template>
+|         content
+|           <tr>
+|       <td>
 
 #data
 <body><table><colgroup><template><col></col></template></colgroup></table></body>
@@ -888,14 +733,12 @@ no doctype
 no doctype
 bad /col
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <colgroup>
-|         <template>
-|           content
-|             <col>
+| <body>
+|   <table>
+|     <colgroup>
+|       <template>
+|         content
+|           <col>
 
 #data
 <body a=b><template><div></div><body c=d><div></div></body></template></body>
@@ -904,13 +747,13 @@ no doctype
 bad <body>
 bad </body>
 #document
-| <html>
-|   <head>
-|   <body>
-|     a="b"
-|     <template>
-|       content
-|         <div>
+| <body>
+|   a="b"
+|   <template>
+|     content
+|       <div>
+|       <body>
+|         c="d"
 |         <div>
 
 #data
@@ -922,12 +765,10 @@ missing end tags in template
 #document
 | <html>
 |   a="b"
-|   <head>
-|     <template>
-|       content
-|         <div>
-|           <span>
-|   <body>
+|   <template>
+|     content
+|       <div>
+|         <span>
 
 #data
 <html a=b><template><col></col><html b=c><col></col></template>
@@ -939,12 +780,10 @@ bad /col
 #document
 | <html>
 |   a="b"
-|   <head>
-|     <template>
-|       content
-|         <col>
-|         <col>
-|   <body>
+|   <template>
+|     content
+|       <col>
+|       <col>
 
 #data
 <html a=b><template><frame></frame><html b=c><frame></frame></template>
@@ -958,10 +797,10 @@ bad /frame
 #document
 | <html>
 |   a="b"
-|   <head>
-|     <template>
-|       content
-|   <body>
+|   <template>
+|     content
+|       <frame>
+|       <frame>
 
 #data
 <body><template><tr></tr><template></template><td></td></template>
@@ -969,34 +808,30 @@ bad /frame
 no doctype
 unexpected <td>
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <tr>
-|         <template>
-|           content
-|         <tr>
-|           <td>
+| <body>
+|   <template>
+|     content
+|       <tr>
+|       <template>
+|         content
+|       <tr>
+|         <td>
 
 #data
 <body><template><thead></thead><template><tr></tr></template><tr></tr><tfoot></tfoot></template>
 #errors
 no doctype
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <thead>
-|         <template>
-|           content
-|             <tr>
-|         <tbody>
+| <body>
+|   <template>
+|     content
+|       <thead>
+|       <template>
+|         content
 |           <tr>
-|         <tfoot>
+|       <tbody>
+|         <tr>
+|       <tfoot>
 
 #data
 <body><template><template><b><template></template></template>text</template>
@@ -1004,17 +839,15 @@ no doctype
 no doctype
 missing </b>
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <template>
-|           content
-|             <b>
-|               <template>
-|                 content
-|         "text"
+| <body>
+|   <template>
+|     content
+|       <template>
+|         content
+|           <b>
+|             <template>
+|               content
+|       "text"
 
 #data
 <body><template><col><colgroup>
@@ -1023,12 +856,10 @@ no doctype
 bad colgroup
 eof in template
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <col>
+| <body>
+|   <template>
+|     content
+|       <col>
 
 #data
 <body><template><col></colgroup>
@@ -1037,12 +868,10 @@ no doctype
 bogus /colgroup
 eof in template
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <col>
+| <body>
+|   <template>
+|     content
+|       <col>
 
 #data
 <body><template><col><colgroup></template></body>
@@ -1050,12 +879,10 @@ eof in template
 no doctype
 bad colgroup
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <col>
+| <body>
+|   <template>
+|     content
+|       <col>
 
 #data
 <body><template><col><div>
@@ -1064,12 +891,10 @@ bad colgroup
  * (1,27) unexpected token
  * (1,27) unexpected end of file in template
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <col>
+| <body>
+|   <template>
+|     content
+|       <col>
 
 #data
 <body><template><col></div>
@@ -1078,12 +903,10 @@ no doctype
 bad /div
 eof in template
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <col>
+| <body>
+|   <template>
+|     content
+|       <col>
 
 #data
 <body><template><col>Hello
@@ -1092,12 +915,10 @@ no doctype
 unexpected text
 eof in template
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <col>
+| <body>
+|   <template>
+|     content
+|       <col>
 
 #data
 <body><template><i><menu>Foo</i>
@@ -1106,15 +927,13 @@ no doctype
 mising /menu
 eof in template
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
+| <body>
+|   <template>
+|     content
+|       <i>
+|       <menu>
 |         <i>
-|         <menu>
-|           <i>
-|             "Foo"
+|           "Foo"
 
 #data
 <body><template></div><div>Foo</div><template></template><tr></tr>
@@ -1125,15 +944,14 @@ bogus tr
 bogus /tr
 eof in template
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
-|         <div>
-|           "Foo"
-|         <template>
-|           content
+| <body>
+|   <template>
+|     content
+|       <div>
+|         "Foo"
+|       <template>
+|         content
+|       <tr>
 
 #data
 <body><div><template></div><tr><td>Foo</td></tr></template>
@@ -1142,15 +960,13 @@ eof in template
  * (1,28) unexpected token in template
  * (1,60) unexpected end of file
 #document
-| <html>
-|   <head>
-|   <body>
-|     <div>
-|       <template>
-|         content
-|           <tr>
-|             <td>
-|               "Foo"
+| <body>
+|   <div>
+|     <template>
+|       content
+|         <tr>
+|           <td>
+|             "Foo"
 
 #data
 <template></figcaption><sub><table></table>
@@ -1159,13 +975,10 @@ no doctype
 bad /figcaption
 eof in template
 #document
-| <html>
-|   <head>
-|     <template>
-|       content
-|         <sub>
-|           <table>
-|   <body>
+| <template>
+|   content
+|     <sub>
+|       <table>
 
 #data
 <template><template>
@@ -1174,13 +987,10 @@ no doctype
 eof in template
 eof in template
 #document
-| <html>
-|   <head>
+| <template>
+|   content
 |     <template>
 |       content
-|         <template>
-|           content
-|   <body>
 
 #data
 <template><div>
@@ -1188,12 +998,9 @@ eof in template
 no doctype
 eof in template
 #document
-| <html>
-|   <head>
-|     <template>
-|       content
-|         <div>
-|   <body>
+| <template>
+|   content
+|     <div>
 
 #data
 <template><template><div>
@@ -1202,14 +1009,11 @@ no doctype
 eof in template
 eof in template
 #document
-| <html>
-|   <head>
+| <template>
+|   content
 |     <template>
 |       content
-|         <template>
-|           content
-|             <div>
-|   <body>
+|         <div>
 
 #data
 <template><template><table>
@@ -1218,14 +1022,11 @@ no doctype
 eof in template
 eof in template
 #document
-| <html>
-|   <head>
+| <template>
+|   content
 |     <template>
 |       content
-|         <template>
-|           content
-|             <table>
-|   <body>
+|         <table>
 
 #data
 <template><template><tbody>
@@ -1234,14 +1035,11 @@ no doctype
 eof in template
 eof in template
 #document
-| <html>
-|   <head>
+| <template>
+|   content
 |     <template>
 |       content
-|         <template>
-|           content
-|             <tbody>
-|   <body>
+|         <tbody>
 
 #data
 <template><template><tr>
@@ -1250,14 +1048,11 @@ no doctype
 eof in template
 eof in template
 #document
-| <html>
-|   <head>
+| <template>
+|   content
 |     <template>
 |       content
-|         <template>
-|           content
-|             <tr>
-|   <body>
+|         <tr>
 
 #data
 <template><template><td>
@@ -1266,14 +1061,11 @@ no doctype
 eof in template
 eof in template
 #document
-| <html>
-|   <head>
+| <template>
+|   content
 |     <template>
 |       content
-|         <template>
-|           content
-|             <td>
-|   <body>
+|         <td>
 
 #data
 <template><template><caption>
@@ -1282,14 +1074,11 @@ no doctype
 eof in template
 eof in template
 #document
-| <html>
-|   <head>
+| <template>
+|   content
 |     <template>
 |       content
-|         <template>
-|           content
-|             <caption>
-|   <body>
+|         <caption>
 
 #data
 <template><template><colgroup>
@@ -1298,14 +1087,11 @@ no doctype
 eof in template
 eof in template
 #document
-| <html>
-|   <head>
+| <template>
+|   content
 |     <template>
 |       content
-|         <template>
-|           content
-|             <colgroup>
-|   <body>
+|         <colgroup>
 
 #data
 <template><template><col>
@@ -1314,14 +1100,11 @@ no doctype
 eof in template
 eof in template
 #document
-| <html>
-|   <head>
+| <template>
+|   content
 |     <template>
 |       content
-|         <template>
-|           content
-|             <col>
-|   <body>
+|         <col>
 
 #data
 <template><template><tbody><select>
@@ -1331,15 +1114,12 @@ eof in template
  * (1,36) unexpected end of file in template
  * (1,36) unexpected end of file in template
 #document
-| <html>
-|   <head>
+| <template>
+|   content
 |     <template>
 |       content
-|         <template>
-|           content
-|             <tbody>
-|             <select>
-|   <body>
+|         <tbody>
+|         <select>
 
 #data
 <template><template><table>Foo
@@ -1351,15 +1131,12 @@ foster-parenting text o
 eof
 eof
 #document
-| <html>
-|   <head>
+| <template>
+|   content
 |     <template>
 |       content
-|         <template>
-|           content
-|             "Foo"
-|             <table>
-|   <body>
+|         "Foo"
+|         <table>
 
 #data
 <template><template><frame>
@@ -1369,13 +1146,11 @@ bad tag
 eof
 eof
 #document
-| <html>
-|   <head>
+| <template>
+|   content
 |     <template>
 |       content
-|         <template>
-|           content
-|   <body>
+|         <frame>
 
 #data
 <template><template><script>var i
@@ -1385,15 +1160,12 @@ eof in script
 eof in template
 eof in template
 #document
-| <html>
-|   <head>
+| <template>
+|   content
 |     <template>
 |       content
-|         <template>
-|           content
-|             <script>
-|               "var i"
-|   <body>
+|         <script>
+|           "var i"
 
 #data
 <template><template><style>var i
@@ -1403,15 +1175,12 @@ eof in style
 eof in template
 eof in template
 #document
-| <html>
-|   <head>
+| <template>
+|   content
 |     <template>
 |       content
-|         <template>
-|           content
-|             <style>
-|               "var i"
-|   <body>
+|         <style>
+|           "var i"
 
 #data
 <template><table></template><body><span>Foo
@@ -1420,14 +1189,12 @@ no doctype
 missing /table
 bad eof
 #document
-| <html>
-|   <head>
-|     <template>
-|       content
-|         <table>
-|   <body>
-|     <span>
-|       "Foo"
+| <template>
+|   content
+|     <table>
+| <body>
+|   <span>
+|     "Foo"
 
 #data
 <template><td></template><body><span>Foo
@@ -1435,14 +1202,12 @@ bad eof
 no doctype
 bad eof
 #document
-| <html>
-|   <head>
-|     <template>
-|       content
-|         <td>
-|   <body>
-|     <span>
-|       "Foo"
+| <template>
+|   content
+|     <td>
+| <body>
+|   <span>
+|     "Foo"
 
 #data
 <template><object></template><body><span>Foo
@@ -1451,14 +1216,12 @@ no doctype
 missing /object
 bad eof
 #document
-| <html>
-|   <head>
-|     <template>
-|       content
-|         <object>
-|   <body>
-|     <span>
-|       "Foo"
+| <template>
+|   content
+|     <object>
+| <body>
+|   <span>
+|     "Foo"
 
 #data
 <template><svg><template>
@@ -1466,13 +1229,10 @@ bad eof
 no doctype
 eof in template
 #document
-| <html>
-|   <head>
-|     <template>
-|       content
-|         <svg svg>
-|           <svg template>
-|   <body>
+| <template>
+|   content
+|     <svg svg>
+|       <svg template>
 
 #data
 <template><svg><foo><template><foreignObject><div></template><div>
@@ -1481,17 +1241,14 @@ no doctype
 ugly template closure
 bad eof
 #document
-| <html>
-|   <head>
-|     <template>
-|       content
-|         <svg svg>
-|           <svg foo>
-|             <svg template>
-|               <svg foreignObject>
-|                 <div>
-|   <body>
-|     <div>
+| <template>
+|   content
+|     <svg svg>
+|       <svg foo>
+|         <svg template>
+|           <svg foreignObject>
+|             <div>
+| <div>
 
 #data
 <dummy><template><span></dummy>
@@ -1501,13 +1258,10 @@ bad end tag </dummy>
 eof in template
 eof in dummy
 #document
-| <html>
-|   <head>
-|   <body>
-|     <dummy>
-|       <template>
-|         content
-|           <span>
+| <dummy>
+|   <template>
+|     content
+|       <span>
 
 #data
 <body><table><tr><td><select><template>Foo</template><caption>A</table>
@@ -1515,19 +1269,17 @@ eof in dummy
 no doctype
 (1,62): unexpected-caption-in-select-in-table
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <tr>
-|           <td>
-|             <select>
-|               <template>
-|                 content
-|                   "Foo"
-|       <caption>
-|         "A"
+| <body>
+|   <table>
+|     <tbody>
+|       <tr>
+|         <td>
+|           <select>
+|             <template>
+|               content
+|                 "Foo"
+|     <caption>
+|       "A"
 
 #data
 <body></body><template>
@@ -1536,11 +1288,9 @@ no doctype
 (1,23): template-after-body
 (1,24): eof-in-template
 #document
-| <html>
-|   <head>
-|   <body>
-|     <template>
-|       content
+| <body>
+|   <template>
+|     content
 
 #data
 <head></head><template>
@@ -1549,11 +1299,9 @@ no doctype
 (1,23): template-after-head
 (1,24): eof-in-template
 #document
-| <html>
-|   <head>
-|     <template>
-|       content
-|   <body>
+| <head>
+| <template>
+|   content
 
 #data
 <head></head><template>Foo</template>
@@ -1561,12 +1309,10 @@ no doctype
 no doctype
 (1,23): template-after-head
 #document
-| <html>
-|   <head>
-|     <template>
-|       content
-|         "Foo"
-|   <body>
+| <head>
+| <template>
+|   content
+|     "Foo"
 
 #data
 <!DOCTYPE HTML><dummy><table><template><table><template><table><script>
@@ -1577,28 +1323,22 @@ eof template
 eof table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <dummy>
-|       <table>
-|         <template>
-|           content
-|             <table>
-|               <template>
-|                 content
-|                   <table>
-|                     <script>
+| <dummy>
+|   <table>
+|     <template>
+|       content
+|         <table>
+|           <template>
+|             content
+|               <table>
+|                 <script>
 
 #data
 <template><a><table><a>
 #errors
 #document
-| <html>
-|   <head>
-|     <template>
-|       content
-|         <a>
-|           <a>
-|           <table>
-|   <body>
+| <template>
+|   content
+|     <a>
+|       <a>
+|       <table>

@@ -3,11 +3,9 @@
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <title>
-|       "X"
+| <body>
+|   <title>
+|     "X"
 
 #data
 <!doctype html><table><title>X</title></table>
@@ -15,12 +13,9 @@
 (1,29): unexpected-start-tag-implies-table-voodoo
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <title>
-|       "X"
-|     <table>
+| <title>
+|   "X"
+| <table>
 
 #data
 <!doctype html><head></head><title>X</title>
@@ -28,11 +23,8 @@
 (1,35): unexpected-start-tag-out-of-my-head
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|     <title>
-|       "X"
-|   <body>
+| <title>
+|   "X"
 
 #data
 <!doctype html></head><title>X</title>
@@ -40,11 +32,8 @@
 (1,29): unexpected-start-tag-out-of-my-head
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|     <title>
-|       "X"
-|   <body>
+| <title>
+|   "X"
 
 #data
 <!doctype html><table><meta></table>
@@ -52,11 +41,8 @@
 (1,28): unexpected-start-tag-implies-table-voodoo
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <meta>
-|     <table>
+| <meta>
+| <table>
 
 #data
 <!doctype html><table>X<tr><td><table> <meta></table></table>
@@ -65,89 +51,68 @@ unexpected text in table
 (1,45): unexpected-start-tag-implies-table-voodoo
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     "X"
-|     <table>
-|       <tbody>
-|         <tr>
-|           <td>
-|             <meta>
-|             <table>
-|               " "
+| "X"
+| <table>
+|   <tbody>
+|     <tr>
+|       <td>
+|         <meta>
+|         <table>
+|           " "
 
 #data
 <!doctype html><html> <head>
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
 
 #data
 <!doctype html> <head>
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
 
 #data
 <!doctype html><table><style> <tr>x </style> </table>
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <style>
-|         " <tr>x "
-|       " "
+| <table>
+|   <style>
+|     " <tr>x "
+|   " "
 
 #data
 <!doctype html><table><TBODY><script> <tr>x </script> </table>
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <script>
-|           " <tr>x "
-|         " "
+| <table>
+|   <tbody>
+|     <script>
+|       " <tr>x "
+|     " "
 
 #data
 <!doctype html><p><applet><p>X</p></applet>
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
+| <p>
+|   <applet>
 |     <p>
-|       <applet>
-|         <p>
-|           "X"
+|       "X"
 
 #data
 <!doctype html><p><object type="application/x-non-existant-plugin"><p>X</p></object>
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
+| <p>
+|   <object>
+|     type="application/x-non-existant-plugin"
 |     <p>
-|       <object>
-|         type="application/x-non-existant-plugin"
-|         <p>
-|           "X"
+|       "X"
 
 #data
 <!doctype html><listing>
@@ -155,11 +120,8 @@ X</listing>
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <listing>
-|       "X"
+| <listing>
+|   "X"
 
 #data
 <!doctype html><select><input>X
@@ -167,12 +129,9 @@ X</listing>
 (1,30): unexpected-input-in-select
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|     <input>
-|     "X"
+| <select>
+| <input>
+| "X"
 
 #data
 <!doctype html><select><select>X
@@ -180,11 +139,8 @@ X</listing>
 (1,31): unexpected-select-in-select
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|     "X"
+| <select>
+| "X"
 
 #data
 <!doctype html><table><input type=hidDEN></table>
@@ -192,12 +148,9 @@ X</listing>
 (1,41): unexpected-hidden-input-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <input>
-|         type="hidDEN"
+| <table>
+|   <input>
+|     type="hidDEN"
 
 #data
 <!doctype html><table>X<input type=hidDEN></table>
@@ -206,13 +159,10 @@ X</listing>
 (1,42): unexpected-hidden-input-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     "X"
-|     <table>
-|       <input>
-|         type="hidDEN"
+| "X"
+| <table>
+|   <input>
+|     type="hidDEN"
 
 #data
 <!doctype html><table>  <input type=hidDEN></table>
@@ -220,13 +170,10 @@ X</listing>
 (1,43): unexpected-hidden-input-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       "  "
-|       <input>
-|         type="hidDEN"
+| <table>
+|   "  "
+|   <input>
+|     type="hidDEN"
 
 #data
 <!doctype html><table>  <input type='hidDEN'></table>
@@ -234,13 +181,10 @@ X</listing>
 (1,45): unexpected-hidden-input-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       "  "
-|       <input>
-|         type="hidDEN"
+| <table>
+|   "  "
+|   <input>
+|     type="hidDEN"
 
 #data
 <!doctype html><table><input type=" hidden"><input type=hidDEN></table>
@@ -249,14 +193,11 @@ X</listing>
 (1,63): unexpected-hidden-input-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <input>
-|       type=" hidden"
-|     <table>
-|       <input>
-|         type="hidDEN"
+| <input>
+|   type=" hidden"
+| <table>
+|   <input>
+|     type="hidDEN"
 
 #data
 <!doctype html><table><select>X<tr>
@@ -266,50 +207,36 @@ X</listing>
 (1,35): eof-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       "X"
-|     <table>
-|       <tbody>
-|         <tr>
+| <select>
+|   "X"
+| <table>
+|   <tbody>
+|     <tr>
 
 #data
 <!doctype html><select>X</select>
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       "X"
+| <select>
+|   "X"
 
 #data
 <!DOCTYPE hTmL><html></html>
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
 
 #data
 <!DOCTYPE HTML><html></html>
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
 
 #data
 <body>X</body></body>
 #errors
 (1,21): unexpected-end-tag-after-body
-#document-fragment
-html
 #document
 | <head>
 | <body>
@@ -322,27 +249,21 @@ html
 (1,13): unexpected-end-tag
 (1,15): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <div>
-|       <p>
-|         "a b"
+| <div>
+|   <p>
+|     "a b"
 
 #data
 <table><tr><td><code></code> </table>
 #errors
 (1,7): expected-doctype-but-got-start-tag
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <tr>
-|           <td>
-|             <code>
-|             " "
+| <table>
+|   <tbody>
+|     <tr>
+|       <td>
+|         <code>
+|         " "
 
 #data
 <table><b><tr><td>aaa</td></tr>bbb</table>ccc
@@ -354,19 +275,16 @@ html
 (1,34): foster-parenting-character
 (1,45): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <b>
-|     <b>
-|       "bbb"
-|     <table>
-|       <tbody>
-|         <tr>
-|           <td>
-|             "aaa"
-|     <b>
-|       "ccc"
+| <b>
+| <b>
+|   "bbb"
+| <table>
+|   <tbody>
+|     <tr>
+|       <td>
+|         "aaa"
+| <b>
+|   "ccc"
 
 #data
 A<table><tr> B</tr> B</table>
@@ -377,13 +295,10 @@ A<table><tr> B</tr> B</table>
 (1,20): foster-parenting-character
 (1,21): foster-parenting-character
 #document
-| <html>
-|   <head>
-|   <body>
-|     "A B B"
-|     <table>
-|       <tbody>
-|         <tr>
+| "A B B"
+| <table>
+|   <tbody>
+|     <tr>
 
 #data
 A<table><tr> B</tr> </em>C</table>
@@ -396,14 +311,11 @@ A<table><tr> B</tr> </em>C</table>
 (1,25): unexpected-end-tag-in-special-element
 (1,26): foster-parenting-character
 #document
-| <html>
-|   <head>
-|   <body>
-|     "A BC"
-|     <table>
-|       <tbody>
-|         <tr>
-|         " "
+| "A BC"
+| <table>
+|   <tbody>
+|     <tr>
+|     " "
 
 #data
 <select><keygen>
@@ -411,8 +323,5 @@ A<table><tr> B</tr> </em>C</table>
 (1,8): expected-doctype-but-got-start-tag
 (1,16): unexpected-input-in-select
 #document
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|     <keygen>
+| <select>
+| <keygen>

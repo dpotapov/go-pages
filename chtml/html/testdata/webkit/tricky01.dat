@@ -5,15 +5,12 @@ Also not bold.
 (1,3): expected-doctype-but-got-start-tag
 (1,15): adoption-agency-1.3
 #document
-| <html>
-|   <head>
-|   <body>
-|     <b>
-|     <p>
-|       <b>
-|         "Bold "
-|       " Not bold"
-|     "
+| <b>
+| <p>
+|   <b>
+|     "Bold "
+|   " Not bold"
+| "
 Also not bold."
 
 #data
@@ -31,49 +28,49 @@ Also not bold."
 (5,30): adoption-agency-1.3
 #document
 | <html>
-|   <head>
-|   <body>
-|     <font>
-|       color="red"
-|       <i>
-|         "Italic and Red"
+|   "
+"
+|   <font>
+|     color="red"
 |     <i>
-|       <p>
-|         <font>
-|           color="red"
-|           "Italic and Red "
-|         " Just italic."
-|       " Italic only."
-|     " Plain
-"
-|     <p>
-|       "I should not be red. "
-|       <font>
-|         color="red"
-|         "Red. "
-|         <i>
-|           "Italic and red."
-|     <font>
-|       color="red"
-|       <i>
-|         "
-"
+|       "Italic and Red"
+|   <i>
 |     <p>
 |       <font>
 |         color="red"
-|         <i>
-|           "Italic and red. "
-|         " Red."
-|       " I should not be red."
-|     "
+|         "Italic and Red "
+|       " Just italic."
+|     " Italic only."
+|   " Plain
 "
-|     <b>
-|       "Bold "
+|   <p>
+|     "I should not be red. "
+|     <font>
+|       color="red"
+|       "Red. "
 |       <i>
-|         "Bold and italic"
+|         "Italic and red."
+|   <font>
+|     color="red"
 |     <i>
-|       " Only Italic "
-|     " Plain"
+|       "
+"
+|   <p>
+|     <font>
+|       color="red"
+|       <i>
+|         "Italic and red. "
+|       " Red."
+|     " I should not be red."
+|   "
+"
+|   <b>
+|     "Bold "
+|     <i>
+|       "Bold and italic"
+|   <i>
+|     " Only Italic "
+|   " Plain"
 
 #data
 <html><body>
@@ -88,7 +85,6 @@ Also not bold."
 (4,39): unexpected-end-tag
 #document
 | <html>
-|   <head>
 |   <body>
 |     "
 "
@@ -126,21 +122,21 @@ Also not bold."
 (6,7): expected-one-end-tag-but-got-another
 #document
 | <html>
-|   <head>
-|   <body>
-|     <dl>
-|       "
+|   "
 "
-|       <dt>
-|         <b>
-|           "Boo
+|   <dl>
+|     "
 "
-|       <dd>
-|         <b>
-|           "Goo?
+|     <dt>
+|       <b>
+|         "Boo
 "
-|     <b>
-|       "
+|     <dd>
+|       <b>
+|         "Goo?
+"
+|   <b>
+|     "
 "
 
 #data
@@ -154,7 +150,6 @@ Also not bold."
 (3,7): expected-one-end-tag-but-got-another
 #document
 | <html>
-|   <head>
 |   <body>
 |     "
 "
@@ -181,24 +176,21 @@ Also not bold."
 (1,33): foster-parenting-character
 (1,38): foster-parenting-start-tag
 #document
-| <html>
-|   <head>
-|   <body>
-|     <center>
-|       " "
-|       <font>
-|         "a"
-|     <font>
-|       <img>
-|       " "
-|     <table>
-|       " "
-|       <tbody>
-|         <tr>
-|           <td>
-|             " "
-|           " "
+| <center>
+|   " "
+|   <font>
+|     "a"
+| <font>
+|   <img>
+|   " "
+| <table>
+|   " "
+|   <tbody>
+|     <tr>
+|       <td>
 |         " "
+|       " "
+|     " "
 
 #data
 <table><tr><p><a><p>You should see this text.
@@ -235,17 +227,14 @@ Also not bold."
 (1,45): foster-parenting-character
 (1,45): eof-in-table
 #document
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|       <a>
-|     <p>
-|       <a>
-|         "You should see this text."
-|     <table>
-|       <tbody>
-|         <tr>
+| <p>
+|   <a>
+| <p>
+|   <a>
+|     "You should see this text."
+| <table>
+|   <tbody>
+|     <tr>
 
 #data
 <TABLE>
@@ -268,39 +257,33 @@ This page contains an insanely badly-nested tag sequence.
 (7,20): adoption-agency-1.3
 (8,57): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <center>
-|       <center>
-|     <font>
+| <center>
+|   <center>
+| <font>
+|   "
+"
+| <table>
+|   "
+"
+|   <tbody>
+|     <tr>
 |       "
 "
-|     <table>
+|       <td>
+|     <tr>
 |       "
 "
-|       <tbody>
-|         <tr>
-|           "
+| <font>
+|   "
 "
-|           <td>
-|         <tr>
-|           "
+|   <p>
+|   "
 "
-|     <table>
-|       <tbody>
-|         <tr>
-|     <font>
-|       "
-"
-|       <p>
-|       "
-"
-|       <a>
-|     <a>
-|       <font>
-|     <font>
-|       "
+|   <a>
+| <a>
+|   <font>
+| <font>
+|   "
 This page contains an insanely badly-nested tag sequence."
 
 #data
@@ -317,7 +300,8 @@ nobr should have closed the div inside it implicitly. </b><pre>A pre tag outside
 (5,7): expected-one-end-tag-but-got-another
 #document
 | <html>
-|   <head>
+|   "
+"
 |   <body>
 |     "
 "

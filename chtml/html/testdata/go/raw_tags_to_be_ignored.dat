@@ -73,14 +73,11 @@
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       "a"
-|     <table>
-|       <caption>
-|         "b"
+| <select>
+|   "a"
+| <table>
+|   <caption>
+|     "b"
 
 #data
 <!doctype html><table><select><xmp>a<caption>b

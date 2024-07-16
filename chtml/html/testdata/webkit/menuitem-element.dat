@@ -5,10 +5,7 @@
 10: End of file seen and there were open elements.
 10: Unclosed element “menuitem”.
 #document
-| <html>
-|   <head>
-|   <body>
-|     <menuitem>
+| <menuitem>
 
 #data
 </menuitem>
@@ -16,9 +13,6 @@
 11: End tag seen without seeing a doctype first. Expected “<!DOCTYPE html>”.
 11: Stray end tag “menuitem”.
 #document
-| <html>
-|   <head>
-|   <body>
 
 #data
 <!DOCTYPE html><body><menuitem>A
@@ -27,11 +21,9 @@
 31: Unclosed element “menuitem”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <menuitem>
-|       "A"
+| <body>
+|   <menuitem>
+|     "A"
 
 #data
 <!DOCTYPE html><body><menuitem>A<menuitem>B
@@ -41,13 +33,11 @@
 31: Unclosed element “menuitem”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
+| <body>
+|   <menuitem>
+|     "A"
 |     <menuitem>
-|       "A"
-|       <menuitem>
-|         "B"
+|       "B"
 
 #data
 <!DOCTYPE html><body><menuitem>A<menu>B</menu>
@@ -56,13 +46,11 @@
 31: Unclosed element “menuitem”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <menuitem>
-|       "A"
-|       <menu>
-|         "B"
+| <body>
+|   <menuitem>
+|     "A"
+|     <menu>
+|       "B"
 
 #data
 <!DOCTYPE html><body><menuitem>A<hr>B
@@ -71,13 +59,11 @@
 31: Unclosed element “menuitem”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <menuitem>
-|       "A"
-|       <hr>
-|       "B"
+| <body>
+|   <menuitem>
+|     "A"
+|     <hr>
+|     "B"
 
 #data
 <!DOCTYPE html><li><menuitem><li>
@@ -86,12 +72,9 @@
 29: Unclosed element “menuitem”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <li>
-|       <menuitem>
-|     <li>
+| <li>
+|   <menuitem>
+| <li>
 
 #data
 <!DOCTYPE html><menuitem><p></menuitem>x
@@ -101,12 +84,9 @@
 25: Unclosed element “menuitem”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <menuitem>
-|       <p>
-|         "x"
+| <menuitem>
+|   <p>
+|     "x"
 
 #data
 <!DOCTYPE html><p><b></p><menuitem>
@@ -117,13 +97,10 @@
 35: Unclosed element “menuitem”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|       <b>
-|     <b>
-|       <menuitem>
+| <p>
+|   <b>
+| <b>
+|   <menuitem>
 
 #data
 <!DOCTYPE html><menuitem><asdf></menuitem>x
@@ -132,12 +109,9 @@
 31: Unclosed element “asdf”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <menuitem>
-|       <asdf>
-|     "x"
+| <menuitem>
+|   <asdf>
+| "x"
 
 #data
 <!DOCTYPE html></menuitem>
@@ -145,9 +119,6 @@
 26: Stray end tag “menuitem”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
 
 #data
 <!DOCTYPE html><html></menuitem>
@@ -156,8 +127,6 @@
 #document
 | <!DOCTYPE html>
 | <html>
-|   <head>
-|   <body>
 
 #data
 <!DOCTYPE html><head></menuitem>
@@ -165,9 +134,7 @@
 26: Stray end tag “menuitem”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
+| <head>
 
 #data
 <!DOCTYPE html><select><menuitem></select>
@@ -175,10 +142,7 @@
 33: Stray start tag “menuitem”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
+| <select>
 
 #data
 <!DOCTYPE html><option><menuitem>
@@ -187,11 +151,8 @@
 33: Unclosed element “menuitem”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <option>
-|       <menuitem>
+| <option>
+|   <menuitem>
 
 #data
 <!DOCTYPE html><menuitem><option>
@@ -200,11 +161,8 @@
 25: Unclosed element “menuitem”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <menuitem>
-|       <option>
+| <menuitem>
+|   <option>
 
 #data
 <!DOCTYPE html><menuitem></body>
@@ -213,10 +171,7 @@
 25: Unclosed element “menuitem”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <menuitem>
+| <menuitem>
 
 #data
 <!DOCTYPE html><menuitem></html>
@@ -225,10 +180,7 @@
 25: Unclosed element “menuitem”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <menuitem>
+| <menuitem>
 
 #data
 <!DOCTYPE html><menuitem><p>
@@ -237,11 +189,8 @@
 25: Unclosed element “menuitem”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <menuitem>
-|       <p>
+| <menuitem>
+|   <p>
 
 #data
 <!DOCTYPE html><menuitem><li>
@@ -250,8 +199,5 @@
 25: Unclosed element “menuitem”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <menuitem>
-|       <li>
+| <menuitem>
+|   <li>

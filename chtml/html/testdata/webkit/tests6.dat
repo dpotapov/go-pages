@@ -4,10 +4,8 @@
 (1,29): unexpected-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   " "
-|   <body>
+| " "
+| <head>
 
 #data
 <!doctype html><form><div></form><div>
@@ -16,34 +14,25 @@
 (1,38): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <form>
-|       <div>
-|         <div>
+| <form>
+|   <div>
+|     <div>
 
 #data
 <!doctype html><title>&amp;</title>
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|     <title>
-|       "&"
-|   <body>
+| <title>
+|   "&"
 
 #data
 <!doctype html><title><!--&amp;--></title>
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|     <title>
-|       "<!--&-->"
-|   <body>
+| <title>
+|   "<!--&-->"
 
 #data
 <!doctype>
@@ -55,9 +44,6 @@
 (1:10) missing-doctype-name
 #document
 | <!DOCTYPE >
-| <html>
-|   <head>
-|   <body>
 
 #data
 <!---x
@@ -68,9 +54,6 @@
 (1:7) eof-in-comment
 #document
 | <!-- -x -->
-| <html>
-|   <head>
-|   <body>
 
 #data
 <body>
@@ -78,12 +61,11 @@
 #errors
 (1,6): unexpected-start-tag
 (2,5): expected-closing-tag-but-got-eof
-#document-fragment
-div
 #document
-| "
+| <body>
+|   "
 "
-| <div>
+|   <div>
 
 #data
 <frameset></frameset>
@@ -94,11 +76,9 @@ foo
 (2,2): unexpected-char-after-frameset
 (2,3): unexpected-char-after-frameset
 #document
-| <html>
-|   <head>
-|   <frameset>
-|   "
-"
+| <frameset>
+| "
+foo"
 
 #data
 <frameset></frameset>
@@ -107,12 +87,10 @@ foo
 (1,10): expected-doctype-but-got-start-tag
 (2,10): expected-named-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <frameset>
-|   "
+| <frameset>
+| "
 "
-|   <noframes>
+| <noframes>
 
 #data
 <frameset></frameset>
@@ -121,11 +99,10 @@ foo
 (1,10): expected-doctype-but-got-start-tag
 (2,5): unexpected-start-tag-after-frameset
 #document
-| <html>
-|   <head>
-|   <frameset>
-|   "
+| <frameset>
+| "
 "
+| <div>
 
 #data
 <frameset></frameset>
@@ -133,10 +110,8 @@ foo
 #errors
 (1,10): expected-doctype-but-got-start-tag
 #document
-| <html>
-|   <head>
-|   <frameset>
-|   "
+| <frameset>
+| "
 "
 
 #data
@@ -146,10 +121,8 @@ foo
 (1,10): expected-doctype-but-got-start-tag
 (2,6): unexpected-end-tag-after-frameset
 #document
-| <html>
-|   <head>
-|   <frameset>
-|   "
+| <frameset>
+| "
 "
 
 #data
@@ -159,10 +132,7 @@ foo
 (1,12): unexpected-start-tag
 (1,12): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <form>
+| <form>
 
 #data
 <button><button>
@@ -171,11 +141,8 @@ foo
 (1,16): unexpected-start-tag-implies-end-tag
 (1,16): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <button>
-|     <button>
+| <button>
+| <button>
 
 #data
 <table><tr><td></th>
@@ -184,13 +151,10 @@ foo
 (1,20): unexpected-end-tag
 (1,20): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <tr>
-|           <td>
+| <table>
+|   <tbody>
+|     <tr>
+|       <td>
 
 #data
 <table><caption><td>
@@ -199,14 +163,11 @@ foo
 (1,20): unexpected-cell-in-table-body
 (1,20): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <caption>
-|       <tbody>
-|         <tr>
-|           <td>
+| <table>
+|   <caption>
+|   <tbody>
+|     <tr>
+|       <td>
 
 #data
 <table><caption><div>
@@ -214,20 +175,15 @@ foo
 (1,7): expected-doctype-but-got-start-tag
 (1,21): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <caption>
-|         <div>
+| <table>
+|   <caption>
+|     <div>
 
 #data
 </caption><div>
 #errors
 (1,10): XXX-undefined-error
 (1,15): expected-closing-tag-but-got-eof
-#document-fragment
-caption
 #document
 | <div>
 
@@ -238,31 +194,23 @@ caption
 (1,31): expected-one-end-tag-but-got-another
 (1,31): eof-in-table
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <caption>
-|         <div>
+| <table>
+|   <caption>
+|     <div>
 
 #data
 <table><caption></table>
 #errors
 (1,7): expected-doctype-but-got-start-tag
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <caption>
+| <table>
+|   <caption>
 
 #data
 </table><div>
 #errors
 (1,8): unexpected-end-tag
 (1,13): expected-closing-tag-but-got-eof
-#document-fragment
-caption
 #document
 | <div>
 
@@ -282,11 +230,8 @@ caption
 (1,86): unexpected-end-tag
 (1,86): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <caption>
+| <table>
+|   <caption>
 
 #data
 <table><caption><div></div>
@@ -294,12 +239,9 @@ caption
 (1,7): expected-doctype-but-got-start-tag
 (1,27): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <caption>
-|         <div>
+| <table>
+|   <caption>
+|     <div>
 
 #data
 <table><tr><td></body></caption></col></colgroup></html>
@@ -312,13 +254,10 @@ caption
 (1,56): unexpected-end-tag
 (1,56): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <tr>
-|           <td>
+| <table>
+|   <tbody>
+|     <tr>
+|       <td>
 
 #data
 </table></tbody></tfoot></thead></tr><div>
@@ -329,8 +268,6 @@ caption
 (1,32): unexpected-end-tag
 (1,37): unexpected-end-tag
 (1,42): expected-closing-tag-but-got-eof
-#document-fragment
-td
 #document
 | <div>
 
@@ -343,12 +280,9 @@ td
 (1,20): foster-parenting-character-in-table
 (1,20): eof-in-table
 #document
-| <html>
-|   <head>
-|   <body>
-|     "foo"
-|     <table>
-|       <colgroup>
+| "foo"
+| <table>
+|   <colgroup>
 
 #data
 foo<col>
@@ -356,9 +290,8 @@ foo<col>
 (1,1): unexpected-character-in-colgroup
 (1,2): unexpected-character-in-colgroup
 (1,3): unexpected-character-in-colgroup
-#document-fragment
-colgroup
 #document
+| "foo"
 | <col>
 
 #data
@@ -368,11 +301,8 @@ colgroup
 (1,23): no-end-tag
 (1,23): eof-in-table
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <colgroup>
+| <table>
+|   <colgroup>
 
 #data
 <frameset><div>
@@ -381,16 +311,13 @@ colgroup
 (1,15): unexpected-start-tag-in-frameset
 (1,15): eof-in-frameset
 #document
-| <html>
-|   <head>
-|   <frameset>
+| <frameset>
+|   <div>
 
 #data
 </frameset><frame>
 #errors
 (1,11): unexpected-frameset-in-frameset-innerhtml
-#document-fragment
-frameset
 #document
 | <frame>
 
@@ -401,17 +328,13 @@ frameset
 (1,16): unexpected-end-tag-in-frameset
 (1,16): eof-in-frameset
 #document
-| <html>
-|   <head>
-|   <frameset>
+| <frameset>
 
 #data
 </body><div>
 #errors
 (1,7): unexpected-close-tag
 (1,12): expected-closing-tag-but-got-eof
-#document-fragment
-body
 #document
 | <div>
 
@@ -422,20 +345,15 @@ body
 (1,16): unexpected-start-tag-implies-table-voodoo
 (1,16): eof-in-table
 #document
-| <html>
-|   <head>
-|   <body>
-|     <div>
-|     <table>
-|       <tbody>
-|         <tr>
+| <div>
+| <table>
+|   <tbody>
+|     <tr>
 
 #data
 </tr><td>
 #errors
 (1,5): unexpected-end-tag
-#document-fragment
-tr
 #document
 | <td>
 
@@ -445,8 +363,6 @@ tr
 (1,8): unexpected-end-tag
 (1,16): unexpected-end-tag
 (1,24): unexpected-end-tag
-#document-fragment
-tr
 #document
 | <td>
 
@@ -457,14 +373,11 @@ tr
 (1,16): foster-parenting-start-tag
 (1,20): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <div>
-|     <table>
-|       <tbody>
-|         <tr>
-|           <td>
+| <div>
+| <table>
+|   <tbody>
+|     <tr>
+|       <td>
 
 #data
 <caption><col><colgroup><tbody><tfoot><thead><tr>
@@ -475,10 +388,14 @@ tr
 (1,31): unexpected-start-tag
 (1,38): unexpected-start-tag
 (1,45): unexpected-start-tag
-#document-fragment
-tbody
 #document
-| <tr>
+| <caption>
+|   <col>
+|     <colgroup>
+|       <tbody>
+|         <tfoot>
+|           <thead>
+|             <tr>
 
 #data
 <table><tbody></thead>
@@ -487,18 +404,13 @@ tbody
 (1,22): unexpected-end-tag-in-table-body
 (1,22): eof-in-table
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
+| <table>
+|   <tbody>
 
 #data
 </table><tr>
 #errors
 (1,8): unexpected-end-tag
-#document-fragment
-tbody
 #document
 | <tr>
 
@@ -516,11 +428,8 @@ tbody
 (1,70): unexpected-end-tag-in-table-body
 (1,70): eof-in-table
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
+| <table>
+|   <tbody>
 
 #data
 <table><tbody></div>
@@ -530,11 +439,8 @@ tbody
 (1,20): end-tag-too-early
 (1,20): eof-in-table
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
+| <table>
+|   <tbody>
 
 #data
 <table><table>
@@ -543,11 +449,8 @@ tbody
 (1,14): unexpected-start-tag-implies-end-tag
 (1,14): eof-in-table
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|     <table>
+| <table>
+| <table>
 
 #data
 <table></body></caption></col></colgroup></html></tbody></td></tfoot></th></thead></tr>
@@ -566,17 +469,12 @@ tbody
 (1,87): unexpected-end-tag
 (1,87): eof-in-table
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
+| <table>
 
 #data
 </table><tr>
 #errors
 (1,8): unexpected-end-tag
-#document-fragment
-table
 #document
 | <tbody>
 |   <tr>
@@ -585,10 +483,7 @@ table
 <body></body></html>
 #errors
 (1,20): unexpected-end-tag-after-body-innerhtml
-#document-fragment
-html
 #document
-| <head>
 | <body>
 
 #data
@@ -597,7 +492,6 @@ html
 (1,6): expected-doctype-but-got-start-tag
 #document
 | <html>
-|   <head>
 |   <frameset>
 |   " "
 
@@ -607,8 +501,6 @@ html
 #document
 | <!DOCTYPE html "-//W3C//DTD HTML 4.01//EN" "">
 | <html>
-|   <head>
-|   <body>
 
 #data
 <param><frameset></frameset>
@@ -616,9 +508,8 @@ html
 (1,7): expected-doctype-but-got-start-tag
 (1,17): unexpected-start-tag
 #document
-| <html>
-|   <head>
-|   <frameset>
+| <param>
+| <frameset>
 
 #data
 <source><frameset></frameset>
@@ -626,9 +517,8 @@ html
 (1,8): expected-doctype-but-got-start-tag
 (1,18): unexpected-start-tag
 #document
-| <html>
-|   <head>
-|   <frameset>
+| <source>
+| <frameset>
 
 #data
 <track><frameset></frameset>
@@ -636,9 +526,8 @@ html
 (1,7): expected-doctype-but-got-start-tag
 (1,17): unexpected-start-tag
 #document
-| <html>
-|   <head>
-|   <frameset>
+| <track>
+| <frameset>
 
 #data
 </html><frameset></frameset>
@@ -647,9 +536,7 @@ html
 (1,17): expected-eof-but-got-start-tag
 (1,17): unexpected-start-tag
 #document
-| <html>
-|   <head>
-|   <frameset>
+| <frameset>
 
 #data
 </body><frameset></frameset>
@@ -658,6 +545,4 @@ html
 (1,17): unexpected-start-tag-after-body
 (1,17): unexpected-start-tag
 #document
-| <html>
-|   <head>
-|   <frameset>
+| <frameset>

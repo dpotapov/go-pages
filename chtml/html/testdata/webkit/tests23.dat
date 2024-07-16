@@ -5,29 +5,13 @@
 (1,116): unexpected-end-tag
 (1,117): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <p>
+| <p>
+|   <font>
+|     size="4"
+|     <font>
+|       color="red"
 |       <font>
 |         size="4"
-|         <font>
-|           color="red"
-|           <font>
-|             size="4"
-|             <font>
-|               size="4"
-|               <font>
-|                 size="4"
-|                 <font>
-|                   size="4"
-|                   <font>
-|                     size="4"
-|                     <font>
-|                       color="red"
-|     <p>
-|       <font>
-|         color="red"
 |         <font>
 |           size="4"
 |           <font>
@@ -35,8 +19,21 @@
 |             <font>
 |               size="4"
 |               <font>
-|                 color="red"
-|                 "X"
+|                 size="4"
+|                 <font>
+|                   color="red"
+| <p>
+|   <font>
+|     color="red"
+|     <font>
+|       size="4"
+|       <font>
+|         size="4"
+|         <font>
+|           size="4"
+|           <font>
+|             color="red"
+|             "X"
 
 #data
 <p><font size=4><font size=4><font size=4><font size=4><p>X
@@ -45,26 +42,23 @@
 (1,58): unexpected-end-tag
 (1,59): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <p>
+| <p>
+|   <font>
+|     size="4"
+|     <font>
+|       size="4"
 |       <font>
 |         size="4"
 |         <font>
 |           size="4"
-|           <font>
-|             size="4"
-|             <font>
-|               size="4"
-|     <p>
+| <p>
+|   <font>
+|     size="4"
+|     <font>
+|       size="4"
 |       <font>
 |         size="4"
-|         <font>
-|           size="4"
-|           <font>
-|             size="4"
-|             "X"
+|         "X"
 
 #data
 <p><font size=4><font size=4><font size=4><font size="5"><font size=4><p>X
@@ -73,30 +67,27 @@
 (1,73): unexpected-end-tag
 (1,74): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <p>
+| <p>
+|   <font>
+|     size="4"
+|     <font>
+|       size="4"
 |       <font>
 |         size="4"
 |         <font>
-|           size="4"
+|           size="5"
 |           <font>
 |             size="4"
-|             <font>
-|               size="5"
-|               <font>
-|                 size="4"
-|     <p>
+| <p>
+|   <font>
+|     size="4"
+|     <font>
+|       size="4"
 |       <font>
-|         size="4"
+|         size="5"
 |         <font>
 |           size="4"
-|           <font>
-|             size="5"
-|             <font>
-|               size="4"
-|               "X"
+|           "X"
 
 #data
 <p><font size=4 id=a><font size=4 id=b><font size=4><font size=4><p>X
@@ -105,32 +96,29 @@
 (1,68): unexpected-end-tag
 (1,69): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <p>
+| <p>
+|   <font>
+|     id="a"
+|     size="4"
+|     <font>
+|       id="b"
+|       size="4"
 |       <font>
-|         id="a"
 |         size="4"
 |         <font>
-|           id="b"
 |           size="4"
-|           <font>
-|             size="4"
-|             <font>
-|               size="4"
-|     <p>
+| <p>
+|   <font>
+|     id="a"
+|     size="4"
+|     <font>
+|       id="b"
+|       size="4"
 |       <font>
-|         id="a"
 |         size="4"
 |         <font>
-|           id="b"
 |           size="4"
-|           <font>
-|             size="4"
-|             <font>
-|               size="4"
-|               "X"
+|           "X"
 
 #data
 <p><b id=a><b id=a><b id=a><b><object><b id=a><b id=a>X</object><p>Y
@@ -140,29 +128,26 @@
 (1,67): unexpected-end-tag
 (1,68): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <p>
+| <p>
+|   <b>
+|     id="a"
+|     <b>
+|       id="a"
 |       <b>
 |         id="a"
 |         <b>
-|           id="a"
-|           <b>
-|             id="a"
+|           <object>
 |             <b>
-|               <object>
-|                 <b>
-|                   id="a"
-|                   <b>
-|                     id="a"
-|                     "X"
-|     <p>
+|               id="a"
+|               <b>
+|                 id="a"
+|                 "X"
+| <p>
+|   <b>
+|     id="a"
+|     <b>
+|       id="a"
 |       <b>
 |         id="a"
 |         <b>
-|           id="a"
-|           <b>
-|             id="a"
-|             <b>
-|               "Y"
+|           "Y"

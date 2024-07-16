@@ -3,10 +3,7 @@
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     "Test"
+| "Test"
 
 #data
 <textarea>test</div>test
@@ -14,11 +11,8 @@
 (1,10): expected-doctype-but-got-start-tag
 (1,24): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <textarea>
-|       "test</div>test"
+| <textarea>
+|   "test</div>test"
 
 #data
 <table><td>
@@ -27,13 +21,10 @@
 (1,11): unexpected-cell-in-table-body
 (1,11): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <tr>
-|           <td>
+| <table>
+|   <tbody>
+|     <tr>
+|       <td>
 
 #data
 <table><td>test</tbody></table>
@@ -41,14 +32,11 @@
 (1,7): expected-doctype-but-got-start-tag
 (1,11): unexpected-cell-in-table-body
 #document
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <tr>
-|           <td>
-|             "test"
+| <table>
+|   <tbody>
+|     <tr>
+|       <td>
+|         "test"
 
 #data
 <frame>test
@@ -56,10 +44,8 @@
 (1,7): expected-doctype-but-got-start-tag
 (1,7): unexpected-start-tag-ignored
 #document
-| <html>
-|   <head>
-|   <body>
-|     "test"
+| <frame>
+|   "test"
 
 #data
 <!DOCTYPE html><frameset>test
@@ -71,9 +57,8 @@
 (1,29): eof-in-frameset
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <frameset>
+| <frameset>
+|   "test"
 
 #data
 <!DOCTYPE html><frameset> te st
@@ -85,10 +70,8 @@
 (1,29): eof-in-frameset
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <frameset>
-|     "  "
+| <frameset>
+|   " te st"
 
 #data
 <!DOCTYPE html><frameset></frameset> te st
@@ -99,10 +82,8 @@
 (1,29): unexpected-char-after-frameset
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <frameset>
-|   "  "
+| <frameset>
+| " te st"
 
 #data
 <!DOCTYPE html><frameset><!DOCTYPE html>
@@ -111,9 +92,7 @@
 (1,40): eof-in-frameset
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <frameset>
+| <frameset>
 
 #data
 <!DOCTYPE html><font><p><b>test</font>
@@ -122,14 +101,11 @@
 (1,38): adoption-agency-1.3
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <font>
-|     <p>
-|       <font>
-|         <b>
-|           "test"
+| <font>
+| <p>
+|   <font>
+|     <b>
+|       "test"
 
 #data
 <!DOCTYPE html><dt><div><dd>
@@ -137,12 +113,9 @@
 (1,28): end-tag-too-early
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <dt>
-|       <div>
-|     <dd>
+| <dt>
+|   <div>
+| <dd>
 
 #data
 <script></x
@@ -150,11 +123,8 @@
 (1,8): expected-doctype-but-got-start-tag
 (1,11): expected-named-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|     <script>
-|       "</x"
-|   <body>
+| <script>
+|   "</x"
 
 #data
 <table><plaintext><td>
@@ -167,12 +137,9 @@
 (1,22): foster-parenting-character-in-table
 (1,22): eof-in-table
 #document
-| <html>
-|   <head>
-|   <body>
-|     <plaintext>
-|       "<td>"
-|     <table>
+| <plaintext>
+|   "<td>"
+| <table>
 
 #data
 <plaintext></plaintext>
@@ -180,11 +147,8 @@
 (1,11): expected-doctype-but-got-start-tag
 (1,23): expected-closing-tag-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
-|     <plaintext>
-|       "</plaintext>"
+| <plaintext>
+|   "</plaintext>"
 
 #data
 <!DOCTYPE html><table><tr>TEST
@@ -196,13 +160,10 @@
 (1,30): eof-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     "TEST"
-|     <table>
-|       <tbody>
-|         <tr>
+| "TEST"
+| <table>
+|   <tbody>
+|     <tr>
 
 #data
 <!DOCTYPE html><body t1=1><body t2=2><body t3=3 t4=4>
@@ -211,13 +172,13 @@
 (1,53): unexpected-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
+| <body>
+|   t1="1"
 |   <body>
-|     t1="1"
 |     t2="2"
-|     t3="3"
-|     t4="4"
+|     <body>
+|       t3="3"
+|       t4="4"
 
 #data
 </b test
@@ -227,9 +188,6 @@
 #new-errors
 (1:9) eof-in-tag
 #document
-| <html>
-|   <head>
-|   <body>
 
 #data
 <!DOCTYPE html></b test<b &=&amp>X
@@ -244,10 +202,7 @@
 (1:33) end-tag-with-attributes
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     "X"
+| "X"
 
 #data
 <!doctypehtml><scrIPt type=text/x-foobar;baz>X</SCRipt
@@ -258,22 +213,16 @@
 (1:10) missing-whitespace-before-doctype-name
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|     <script>
-|       type="text/x-foobar;baz"
-|       "X</SCRipt"
-|   <body>
+| <script>
+|   type="text/x-foobar;baz"
+|   "X</SCRipt"
 
 #data
 &
 #errors
 (1,1): expected-doctype-but-got-chars
 #document
-| <html>
-|   <head>
-|   <body>
-|     "&"
+| "&"
 
 #data
 &#
@@ -283,10 +232,7 @@
 #new-errors
 (1:3) absence-of-digits-in-numeric-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "&#"
+| "&#"
 
 #data
 &#X
@@ -296,10 +242,7 @@
 #new-errors
 (1:4) absence-of-digits-in-numeric-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "&#X"
+| "&#X"
 
 #data
 &#x
@@ -309,10 +252,7 @@
 #new-errors
 (1:4) absence-of-digits-in-numeric-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "&#x"
+| "&#x"
 
 #data
 &#45
@@ -322,20 +262,14 @@
 #new-errors
 (1:5) missing-semicolon-after-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "-"
+| "-"
 
 #data
 &x-test
 #errors
 (1,2): expected-doctype-but-got-chars
 #document
-| <html>
-|   <head>
-|   <body>
-|     "&x-test"
+| "&x-test"
 
 #data
 <!doctypehtml><p><li>
@@ -345,11 +279,8 @@
 (1:10) missing-whitespace-before-doctype-name
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|     <li>
+| <p>
+| <li>
 
 #data
 <!doctypehtml><p><dt>
@@ -359,11 +290,8 @@
 (1:10) missing-whitespace-before-doctype-name
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|     <dt>
+| <p>
+| <dt>
 
 #data
 <!doctypehtml><p><dd>
@@ -373,11 +301,8 @@
 (1:10) missing-whitespace-before-doctype-name
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|     <dd>
+| <p>
+| <dd>
 
 #data
 <!doctypehtml><p><form>
@@ -388,22 +313,16 @@
 (1:10) missing-whitespace-before-doctype-name
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|     <form>
+| <p>
+| <form>
 
 #data
 <!DOCTYPE html><p></P>X
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <p>
-|     "X"
+| <p>
+| "X"
 
 #data
 &AMP
@@ -413,10 +332,7 @@
 #new-errors
 (1:5) missing-semicolon-after-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "&"
+| "&"
 
 #data
 &AMp;
@@ -426,10 +342,7 @@
 #new-errors
 (1:5) unknown-named-character-reference
 #document
-| <html>
-|   <head>
-|   <body>
-|     "&AMp;"
+| "&AMp;"
 
 #data
 <!DOCTYPE html><html><head></head><body><thisISasillyTESTelementNameToMakeSureCrazyTagNamesArePARSEDcorrectLY>
@@ -448,10 +361,7 @@
 (1,24): unexpected-char-after-body
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     "XX"
+| "XX"
 
 #data
 <!DOCTYPE html><!-- X
@@ -462,9 +372,6 @@
 #document
 | <!DOCTYPE html>
 | <!--  X -->
-| <html>
-|   <head>
-|   <body>
 
 #data
 <!DOCTYPE html><table><caption>test TEST</caption><td>test
@@ -473,16 +380,13 @@
 (1,58): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <caption>
-|         "test TEST"
-|       <tbody>
-|         <tr>
-|           <td>
-|             "test"
+| <table>
+|   <caption>
+|     "test TEST"
+|   <tbody>
+|     <tr>
+|       <td>
+|         "test"
 
 #data
 <!DOCTYPE html><select><option><optgroup>
@@ -490,12 +394,9 @@
 (1,41): eof-in-select
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       <option>
-|       <optgroup>
+| <select>
+|   <option>
+|   <optgroup>
 
 #data
 <!DOCTYPE html><select><optgroup><option></optgroup><option><select><option>
@@ -503,14 +404,11 @@
 (1,68): unexpected-select-in-select
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       <optgroup>
-|         <option>
-|       <option>
+| <select>
+|   <optgroup>
 |     <option>
+|   <option>
+| <option>
 
 #data
 <!DOCTYPE html><select><optgroup><option><optgroup>
@@ -518,38 +416,29 @@
 (1,51): eof-in-select
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       <optgroup>
-|         <option>
-|       <optgroup>
+| <select>
+|   <optgroup>
+|     <option>
+|   <optgroup>
 
 #data
 <!DOCTYPE html><datalist><option>foo</datalist>bar
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <datalist>
-|       <option>
-|         "foo"
-|     "bar"
+| <datalist>
+|   <option>
+|     "foo"
+| "bar"
 
 #data
 <!DOCTYPE html><font><input><input></font>
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <font>
-|       <input>
-|       <input>
+| <font>
+|   <input>
+|   <input>
 
 #data
 <!DOCTYPE html><!-- XXX - XXX -->
@@ -557,9 +446,6 @@
 #document
 | <!DOCTYPE html>
 | <!--  XXX - XXX  -->
-| <html>
-|   <head>
-|   <body>
 
 #data
 <!DOCTYPE html><!-- XXX - XXX
@@ -570,9 +456,6 @@
 #document
 | <!DOCTYPE html>
 | <!--  XXX - XXX -->
-| <html>
-|   <head>
-|   <body>
 
 #data
 <!DOCTYPE html><!-- XXX - XXX - XXX -->
@@ -580,9 +463,6 @@
 #document
 | <!DOCTYPE html>
 | <!--  XXX - XXX - XXX  -->
-| <html>
-|   <head>
-|   <body>
 
 #data
 test
@@ -590,10 +470,7 @@ test
 #errors
 (2,4): expected-doctype-but-got-chars
 #document
-| <html>
-|   <head>
-|   <body>
-|     "test
+| "test
 test"
 
 #data
@@ -601,11 +478,9 @@ test"
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <title>
-|       "test</body>"
+| <body>
+|   <title>
+|     "test</body>"
 
 #data
 <!DOCTYPE html><body><title>X</title><meta name=z><link rel=foo><style>
@@ -613,17 +488,15 @@ x { content:"</style" } </style>
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <title>
-|       "X"
-|     <meta>
-|       name="z"
-|     <link>
-|       rel="foo"
-|     <style>
-|       "
+| <body>
+|   <title>
+|     "X"
+|   <meta>
+|     name="z"
+|   <link>
+|     rel="foo"
+|   <style>
+|     "
 x { content:"</style" } "
 
 #data
@@ -631,11 +504,8 @@ x { content:"</style" } "
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       <optgroup>
+| <select>
+|   <optgroup>
 
 #data
  
@@ -643,18 +513,14 @@ x { content:"</style" } "
 #errors
 (2,1): expected-doctype-but-got-eof
 #document
-| <html>
-|   <head>
-|   <body>
 
 #data
 <!DOCTYPE html>  <html>
 #errors
 #document
 | <!DOCTYPE html>
+| "  "
 | <html>
-|   <head>
-|   <body>
 
 #data
 <!DOCTYPE html><script>
@@ -662,16 +528,13 @@ x { content:"</style" } "
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|     <script>
-|       "
+| <script>
+|   "
 "
-|     "  "
-|     <title>
-|       "x"
-|     "  "
-|   <body>
+| "  "
+| <title>
+|   "x"
+| "  "
 
 #data
 <!DOCTYPE html><html><body><html id=x>
@@ -681,7 +544,6 @@ x { content:"</style" } "
 | <!DOCTYPE html>
 | <html>
 |   id="x"
-|   <head>
 |   <body>
 
 #data
@@ -690,11 +552,9 @@ x { content:"</style" } "
 (1,36): non-html-root
 #document
 | <!DOCTYPE html>
+| "X"
 | <html>
 |   id="x"
-|   <head>
-|   <body>
-|     "X"
 
 #data
 <!DOCTYPE html><head><html id=x>
@@ -702,10 +562,7 @@ x { content:"</style" } "
 (1,32): non-html-root
 #document
 | <!DOCTYPE html>
-| <html>
-|   id="x"
-|   <head>
-|   <body>
+| <head>
 
 #data
 <!DOCTYPE html>X</html>X
@@ -713,20 +570,14 @@ x { content:"</style" } "
 (1,24): expected-eof-but-got-char
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     "XX"
+| "XX"
 
 #data
 <!DOCTYPE html>X</html> 
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     "X "
+| "X "
 
 #data
 <!DOCTYPE html>X</html><p>X
@@ -734,12 +585,9 @@ x { content:"</style" } "
 (1,26): expected-eof-but-got-start-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     "X"
-|     <p>
-|       "X"
+| "X"
+| <p>
+|   "X"
 
 #data
 <!DOCTYPE html>X<p/x/y/z>
@@ -753,14 +601,11 @@ x { content:"</style" } "
 (1:24) unexpected-solidus-in-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     "X"
-|     <p>
-|       x=""
-|       y=""
-|       z=""
+| "X"
+| <p>
+|   x=""
+|   y=""
+|   z=""
 
 #data
 <!DOCTYPE html><!--x--
@@ -771,9 +616,6 @@ x { content:"</style" } "
 #document
 | <!DOCTYPE html>
 | <!-- x -->
-| <html>
-|   <head>
-|   <body>
 
 #data
 <!DOCTYPE html><table><tr><td></p></table>
@@ -781,14 +623,11 @@ x { content:"</style" } "
 (1,34): unexpected-end-tag
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <tr>
-|           <td>
-|             <p>
+| <table>
+|   <tbody>
+|     <tr>
+|       <td>
+|         <p>
 
 #data
 <!DOCTYPE <!DOCTYPE HTML>><!--<!--x-->-->
@@ -801,21 +640,15 @@ x { content:"</style" } "
 (1:35) nested-comment
 #document
 | <!DOCTYPE <!doctype>
-| <html>
-|   <head>
-|   <body>
-|     ">"
-|     <!-- <!--x -->
-|     "-->"
+| ">"
+| <!-- <!--x -->
+| "-->"
 
 #data
 <!doctype html><div><form></form><div></div></div>
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <div>
-|       <form>
-|       <div>
+| <div>
+|   <form>
+|   <div>

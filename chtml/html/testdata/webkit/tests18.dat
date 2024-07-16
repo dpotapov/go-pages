@@ -5,11 +5,8 @@
 23: End of file seen and there were open elements.
 11: Unclosed element “plaintext”.
 #document
-| <html>
-|   <head>
-|   <body>
-|     <plaintext>
-|       "</plaintext>"
+| <plaintext>
+|   "</plaintext>"
 
 #data
 <!doctype html><plaintext></plaintext>
@@ -17,11 +14,8 @@
 (1,38): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <plaintext>
-|       "</plaintext>"
+| <plaintext>
+|   "</plaintext>"
 
 #data
 <!doctype html><html><plaintext></plaintext>
@@ -31,10 +25,8 @@
 #document
 | <!DOCTYPE html>
 | <html>
-|   <head>
-|   <body>
-|     <plaintext>
-|       "</plaintext>"
+|   <plaintext>
+|     "</plaintext>"
 
 #data
 <!doctype html><head><plaintext></plaintext>
@@ -43,11 +35,9 @@
 32: Unclosed element “plaintext”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <plaintext>
-|       "</plaintext>"
+| <head>
+|   <plaintext>
+|     "</plaintext>"
 
 #data
 <!doctype html><html><noscript><plaintext></plaintext>
@@ -55,13 +45,10 @@
 42: Bad start tag in “plaintext” in “head”.
 54: End of file seen and there were open elements.
 42: Unclosed element “plaintext”.
-#script-off
 #document
 | <!DOCTYPE html>
 | <html>
-|   <head>
-|     <noscript>
-|   <body>
+|   <noscript>
 |     <plaintext>
 |       "</plaintext>"
 
@@ -72,11 +59,8 @@
 33: Unclosed element “plaintext”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <plaintext>
-|       "</plaintext>"
+| <plaintext>
+|   "</plaintext>"
 
 #data
 <!doctype html><body><plaintext></plaintext>
@@ -85,11 +69,9 @@
 32: Unclosed element “plaintext”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <plaintext>
-|       "</plaintext>"
+| <body>
+|   <plaintext>
+|     "</plaintext>"
 
 #data
 <!doctype html><table><plaintext></plaintext>
@@ -99,12 +81,9 @@
 (1,45): eof-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <plaintext>
-|       "</plaintext>"
-|     <table>
+| <plaintext>
+|   "</plaintext>"
+| <table>
 
 #data
 <!doctype html><table><tbody><plaintext></plaintext>
@@ -114,13 +93,10 @@
 (1,52): eof-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <plaintext>
-|       "</plaintext>"
-|     <table>
-|       <tbody>
+| <plaintext>
+|   "</plaintext>"
+| <table>
+|   <tbody>
 
 #data
 <!doctype html><table><tbody><tr><plaintext></plaintext>
@@ -130,14 +106,11 @@
 (1,56): eof-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <plaintext>
-|       "</plaintext>"
-|     <table>
-|       <tbody>
-|         <tr>
+| <plaintext>
+|   "</plaintext>"
+| <table>
+|   <tbody>
+|     <tr>
 
 #data
 <!doctype html><table><td><plaintext></plaintext>
@@ -146,15 +119,12 @@
 (1,49): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <tr>
-|           <td>
-|             <plaintext>
-|               "</plaintext>"
+| <table>
+|   <tbody>
+|     <tr>
+|       <td>
+|         <plaintext>
+|           "</plaintext>"
 
 #data
 <!doctype html><table><caption><plaintext></plaintext>
@@ -162,13 +132,10 @@
 (1,54): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <caption>
-|         <plaintext>
-|           "</plaintext>"
+| <table>
+|   <caption>
+|     <plaintext>
+|       "</plaintext>"
 
 #data
 <!doctype html><table><colgroup><plaintext></plaintext>
@@ -180,13 +147,10 @@
 22: Unclosed element “table”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <plaintext>
-|       "</plaintext>"
-|     <table>
-|       <colgroup>
+| <plaintext>
+|   "</plaintext>"
+| <table>
+|   <colgroup>
 
 #data
 <!doctype html><select><plaintext></plaintext>X
@@ -197,11 +161,8 @@
 23: Unclosed element “select”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       "X"
+| <select>
+|   "X"
 
 #data
 <!doctype html><table><select><plaintext>a<caption>b
@@ -214,14 +175,11 @@
 22: Unclosed element “table”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       "a"
-|     <table>
-|       <caption>
-|         "b"
+| <select>
+|   "a"
+| <table>
+|   <caption>
+|     "b"
 
 #data
 <!doctype html><template><plaintext>a</template>b
@@ -231,13 +189,10 @@
 25: Unclosed element “template”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|     <template>
-|       content
-|         <plaintext>
-|           "a</template>b"
-|   <body>
+| <template>
+|   content
+|     <plaintext>
+|       "a</template>b"
 
 #data
 <!doctype html><body></body><plaintext></plaintext>
@@ -247,11 +202,9 @@
 39: Unclosed element “plaintext”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <plaintext>
-|       "</plaintext>"
+| <body>
+|   <plaintext>
+|     "</plaintext>"
 
 #data
 <!doctype html><frameset><plaintext></plaintext>
@@ -262,9 +215,9 @@
 25: Unclosed element “frameset”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <frameset>
+| <frameset>
+|   <plaintext>
+|     "</plaintext>"
 
 #data
 <!doctype html><frameset></frameset><plaintext></plaintext>
@@ -273,9 +226,9 @@
 59: Stray end tag “plaintext”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <frameset>
+| <frameset>
+| <plaintext>
+|   "</plaintext>"
 
 #data
 <!doctype html><body></body></html><plaintext></plaintext>
@@ -285,11 +238,9 @@
 46: Unclosed element “plaintext”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <plaintext>
-|       "</plaintext>"
+| <body>
+|   <plaintext>
+|     "</plaintext>"
 
 #data
 <!doctype html><frameset></frameset></html><plaintext></plaintext>
@@ -298,9 +249,9 @@
 66: Stray end tag “plaintext”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <frameset>
+| <frameset>
+| <plaintext>
+|   "</plaintext>"
 
 #data
 <!doctype html><svg><plaintext>a</plaintext>b
@@ -309,13 +260,10 @@
 20: Unclosed element “svg”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <svg svg>
-|       <svg plaintext>
-|         "a"
-|       "b"
+| <svg svg>
+|   <svg plaintext>
+|     "a"
+|   "b"
 
 #data
 <!doctype html><svg><title><plaintext>a</plaintext>b
@@ -326,13 +274,10 @@
 20: Unclosed element “svg”.
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <svg svg>
-|       <svg title>
-|         <plaintext>
-|           "a</plaintext>b"
+| <svg svg>
+|   <svg title>
+|     <plaintext>
+|       "a</plaintext>b"
 
 #data
 <!doctype html><table><tr><style></script></style>abc
@@ -343,15 +288,12 @@
 (1,53): eof-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     "abc"
-|     <table>
-|       <tbody>
-|         <tr>
-|           <style>
-|             "</script>"
+| "abc"
+| <table>
+|   <tbody>
+|     <tr>
+|       <style>
+|         "</script>"
 
 #data
 <!doctype html><table><tr><script></style></script>abc
@@ -362,15 +304,12 @@
 (1,54): eof-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     "abc"
-|     <table>
-|       <tbody>
-|         <tr>
-|           <script>
-|             "</style>"
+| "abc"
+| <table>
+|   <tbody>
+|     <tr>
+|       <script>
+|         "</style>"
 
 #data
 <!doctype html><table><caption><style></script></style>abc
@@ -378,14 +317,11 @@
 (1,58): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <caption>
-|         <style>
-|           "</script>"
-|         "abc"
+| <table>
+|   <caption>
+|     <style>
+|       "</script>"
+|     "abc"
 
 #data
 <!doctype html><table><td><style></script></style>abc
@@ -394,16 +330,13 @@
 (1,53): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <tr>
-|           <td>
-|             <style>
-|               "</script>"
-|             "abc"
+| <table>
+|   <tbody>
+|     <tr>
+|       <td>
+|         <style>
+|           "</script>"
+|         "abc"
 
 #data
 <!doctype html><select><script></style></script>abc
@@ -411,13 +344,10 @@
 (1,51): eof-in-select
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       <script>
-|         "</style>"
-|       "abc"
+| <select>
+|   <script>
+|     "</style>"
+|   "abc"
 
 #data
 <!doctype html><table><select><script></style></script>abc
@@ -426,14 +356,11 @@
 (1,58): eof-in-select
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       <script>
-|         "</style>"
-|       "abc"
-|     <table>
+| <select>
+|   <script>
+|     "</style>"
+|   "abc"
+| <table>
 
 #data
 <!doctype html><table><tr><select><script></style></script>abc
@@ -442,16 +369,13 @@
 (1,62): eof-in-select
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <select>
-|       <script>
-|         "</style>"
-|       "abc"
-|     <table>
-|       <tbody>
-|         <tr>
+| <select>
+|   <script>
+|     "</style>"
+|   "abc"
+| <table>
+|   <tbody>
+|     <tr>
 
 #data
 <!doctype html><frameset></frameset><noframes>abc
@@ -459,23 +383,19 @@
 (1,49): expected-named-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <frameset>
-|   <noframes>
-|     "abc"
+| <frameset>
+| <noframes>
+|   "abc"
 
 #data
 <!doctype html><frameset></frameset><noframes>abc</noframes><!--abc-->
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <frameset>
-|   <noframes>
-|     "abc"
-|   <!-- abc -->
+| <frameset>
+| <noframes>
+|   "abc"
+| <!-- abc -->
 
 #data
 <!doctype html><frameset></frameset></html><noframes>abc
@@ -483,22 +403,18 @@
 (1,56): expected-named-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <frameset>
-|   <noframes>
-|     "abc"
+| <frameset>
+| <noframes>
+|   "abc"
 
 #data
 <!doctype html><frameset></frameset></html><noframes>abc</noframes><!--abc-->
 #errors
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <frameset>
-|   <noframes>
-|     "abc"
+| <frameset>
+| <noframes>
+|   "abc"
 | <!-- abc -->
 
 #data
@@ -507,13 +423,10 @@
 (1,41): eof-in-table
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <tr>
-|       <tfoot>
+| <table>
+|   <tbody>
+|     <tr>
+|   <tfoot>
 
 #data
 <!doctype html><table><td><svg></svg>abc<td>
@@ -522,13 +435,10 @@
 (1,44): expected-closing-tag-but-got-eof
 #document
 | <!DOCTYPE html>
-| <html>
-|   <head>
-|   <body>
-|     <table>
-|       <tbody>
-|         <tr>
-|           <td>
-|             <svg svg>
-|             "abc"
-|           <td>
+| <table>
+|   <tbody>
+|     <tr>
+|       <td>
+|         <svg svg>
+|         "abc"
+|       <td>
