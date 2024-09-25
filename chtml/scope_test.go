@@ -11,10 +11,10 @@ import (
 
 func TestBaseScope_NewScope(t *testing.T) {
 	vars := map[string]any{"key": "value"}
-	scope := NewScope(vars)
+	scope := NewBaseScope(vars)
 
 	if scope == nil {
-		t.Fatal("NewScope returned nil")
+		t.Fatal("NewBaseScope returned nil")
 	}
 
 	if len(scope.Vars()) != 1 || scope.Vars()["key"] != "value" {
@@ -23,7 +23,7 @@ func TestBaseScope_NewScope(t *testing.T) {
 }
 
 func TestBaseScope_Spawn(t *testing.T) {
-	parent := NewScope(nil)
+	parent := NewBaseScope(nil)
 	childVars := map[string]any{"child": "value"}
 	child := parent.Spawn(childVars)
 
@@ -38,7 +38,7 @@ func TestBaseScope_Spawn(t *testing.T) {
 
 func TestBaseScope_Vars(t *testing.T) {
 	vars := map[string]any{"key": "value"}
-	scope := NewScope(vars)
+	scope := NewBaseScope(vars)
 
 	scopeVars := scope.Vars()
 	if len(scopeVars) != 1 || scopeVars["key"] != "value" {
@@ -52,7 +52,7 @@ func TestBaseScope_Vars(t *testing.T) {
 }
 
 func TestBaseScope_Touch(t *testing.T) {
-	scope := NewScope(nil)
+	scope := NewBaseScope(nil)
 	scope.Touch()
 
 	select {
@@ -68,7 +68,7 @@ func TestBaseScope_Touch(t *testing.T) {
 	select {
 	case <-scope.Touched():
 	case <-time.After(100 * time.Millisecond):
-		t.Error("Touch did not trigger the parent's Touched channel")
+		t.Error("Touch did not trigger the parent'scope Touched channel")
 	}
 }
 
@@ -82,7 +82,7 @@ func TestUnmarshalScope(t *testing.T) {
 	}{
 		{
 			name:  "Struct target",
-			scope: NewScope(map[string]any{"full_name": "John", "age": 30}),
+			scope: NewBaseScope(map[string]any{"full_name": "John", "age": 30}),
 			target: &struct {
 				FullName string
 				Age      int
@@ -94,19 +94,19 @@ func TestUnmarshalScope(t *testing.T) {
 		},
 		{
 			name:   "Empty map target",
-			scope:  NewScope(map[string]any{"name": "John", "age": 30}),
+			scope:  NewBaseScope(map[string]any{"name": "John", "age": 30}),
 			target: &map[string]any{},
 			want:   &map[string]any{},
 		},
 		{
 			name:   "Map target",
-			scope:  NewScope(map[string]any{"name": "John", "age": 30}),
+			scope:  NewBaseScope(map[string]any{"name": "John", "age": 30}),
 			target: &map[string]any{"name": "", "age": 0},
 			want:   &map[string]any{"name": "John", "age": 30},
 		},
 		{
 			name:  "Invalid target (non-pointer)",
-			scope: NewScope(map[string]any{"name": "John", "age": 30}),
+			scope: NewBaseScope(map[string]any{"name": "John", "age": 30}),
 			target: struct {
 				Name string
 				Age  int
@@ -115,7 +115,7 @@ func TestUnmarshalScope(t *testing.T) {
 		},
 		{
 			name:  "Invalid target (nil pointer)",
-			scope: NewScope(map[string]any{"name": "John", "age": 30}),
+			scope: NewBaseScope(map[string]any{"name": "John", "age": 30}),
 			target: (*struct {
 				Name string
 				Age  int
@@ -124,7 +124,7 @@ func TestUnmarshalScope(t *testing.T) {
 		},
 		{
 			name:  "Incompatible types",
-			scope: NewScope(map[string]any{"name": "John", "age": "thirty"}),
+			scope: NewBaseScope(map[string]any{"name": "John", "age": "thirty"}),
 			target: &struct {
 				Name string
 				Age  int
@@ -133,7 +133,7 @@ func TestUnmarshalScope(t *testing.T) {
 		},
 		{
 			name: "Type conversion",
-			scope: NewScope(map[string]any{
+			scope: NewBaseScope(map[string]any{
 				"int":        "30",
 				"float":      "12.3",
 				"bool_true":  "T",
@@ -167,7 +167,7 @@ func TestUnmarshalScope(t *testing.T) {
 		},
 		{
 			name: "Type conversion for Map target",
-			scope: NewScope(map[string]any{
+			scope: NewBaseScope(map[string]any{
 				"int":        "30",
 				"float":      "12.3",
 				"bool_true":  "foobar",
@@ -225,7 +225,7 @@ func TestMarshalScope(t *testing.T) {
 	}{
 		{
 			name:  "Struct source",
-			scope: NewScope(map[string]any{}),
+			scope: NewBaseScope(map[string]any{}),
 			src: struct {
 				FullName string
 				Age      int
@@ -234,13 +234,13 @@ func TestMarshalScope(t *testing.T) {
 		},
 		{
 			name:  "Map source",
-			scope: NewScope(map[string]any{}),
+			scope: NewBaseScope(map[string]any{}),
 			src:   map[string]any{"Full-Name": "Alice", "Age": 25},
 			want:  map[string]any{"full_name": "Alice", "age": 25},
 		},
 		{
 			name:      "Invalid source (non-struct, non-map)",
-			scope:     NewScope(map[string]any{}),
+			scope:     NewBaseScope(map[string]any{}),
 			src:       []any{"Name", "Alice"},
 			expectErr: true,
 		},

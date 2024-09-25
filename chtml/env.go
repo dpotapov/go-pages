@@ -185,12 +185,12 @@ func AnyToHtml(a any) *html.Node {
 
 func appendChild(p, c *html.Node) {
 	if c.Parent != nil {
-		c = cloneTree(c)
+		c = cloneHtmlTree(c)
 	}
 	p.AppendChild(c)
 }
 
-func cloneNode(n *html.Node) *html.Node {
+func cloneHtmlNode(n *html.Node) *html.Node {
 	clone := &html.Node{
 		Type:     n.Type,
 		DataAtom: n.DataAtom,
@@ -203,10 +203,10 @@ func cloneNode(n *html.Node) *html.Node {
 	return clone
 }
 
-func cloneTree(src *html.Node) *html.Node {
-	clone := cloneNode(src)
+func cloneHtmlTree(src *html.Node) *html.Node {
+	clone := cloneHtmlNode(src)
 	for child := src.FirstChild; child != nil; child = child.NextSibling {
-		c := cloneTree(child)
+		c := cloneHtmlTree(child)
 		clone.AppendChild(c)
 	}
 	return clone
