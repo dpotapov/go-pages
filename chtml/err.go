@@ -1,31 +1,50 @@
 package chtml
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 
-	"github.com/beevik/etree"
 	"golang.org/x/net/html"
 )
+
+var (
+	// ErrComponentNotFound is returned by Importer implementations when a component is not found.
+	ErrComponentNotFound = errors.New("component not found")
+
+	// ErrImportNotAllowed is returned when an Importer is not set for the component.
+	ErrImportNotAllowed = errors.New("imports are not allowed")
+)
+
+type UnrecognizedArgumentError struct {
+	Name string
+}
+
+func (e *UnrecognizedArgumentError) Error() string {
+	return fmt.Sprintf("unrecognized argument %s", e.Name)
+}
+
+func (e *UnrecognizedArgumentError) Is(target error) bool {
+	var ua *UnrecognizedArgumentError
+	if errors.As(target, &ua) {
+		return e.Name == ua.Name
+	}
+	return false
+}
 
 type ComponentError struct {
 	name string
 	err  error
 	path string
-	doc  *etree.Element
+	html *html.Node
 }
 
-func newComponentError(compName string, t etree.Token, err error) *ComponentError {
-	path := ""
-	if el, ok := t.(*etree.Element); ok {
-		path = el.GetPath()
-	} else {
-		path = t.Parent().GetPath()
-	}
+func newComponentError(compName string, n *Node, err error) *ComponentError {
 	return &ComponentError{
 		name: compName,
 		err:  err,
-		path: path,
-		doc:  buildErrorContext(t),
+		path: "",
+		html: buildErrorContext(n),
 	}
 }
 
@@ -41,130 +60,107 @@ func (e *ComponentError) Unwrap() error {
 }
 
 func (e *ComponentError) HTMLContext() string {
-	return renderErrorContext(e.doc)
+	var buf strings.Builder
+	_ = html.Render(&buf, e.html)
+
+	return buf.String()
 }
 
 // errorContextBuilder is a type to organize helper functions for building error context trees.
-type errorContextBuilder struct{}
+type errorContextBuilder struct {
+	html *html.Node
+}
 
-func (b errorContextBuilder) addPrevSiblings(doc *etree.Element, t etree.Token) {
-	if t.Parent() == nil {
-		return
-	}
-
-	siblings, i := t.Parent().Child, t.Index()
-
-	for j, c := i-1, 0; j >= 0; j-- {
-		// skip non-white space text nodes
-		if cd, ok := siblings[j].(*etree.CharData); ok && cd.IsWhitespace() {
-			continue
-		}
-		if c == 2 {
-			doc.AddChild(etree.NewText("..."))
-			break
-		} else {
-			b.addToken(doc, siblings[j])
+func (b errorContextBuilder) addPrevSiblings(src *Node) {
+	var nodesToAdd []*Node
+	for s, c := src.PrevSibling, 0; s != nil && c < 2; s = s.PrevSibling {
+		nodesToAdd = append(nodesToAdd, s)
+		if !s.IsWhitespace() {
 			c++
 		}
+		if c == 2 && s.PrevSibling != nil {
+			nodesToAdd = append(nodesToAdd, &Node{Type: html.TextNode, Data: NewExprRaw("...")})
+		}
+	}
+	for i := len(nodesToAdd) - 1; i >= 0; i-- {
+		b.addNode(nodesToAdd[i], true)
 	}
 }
 
-func (b errorContextBuilder) addNextSiblings(doc *etree.Element, t etree.Token) {
-	if t.Parent() == nil {
-		return
-	}
-
-	siblings, i := t.Parent().Child, t.Index()
-
-	for j, c := i+1, 0; j < len(siblings); j++ {
-		// skip non-white space text nodes
-		if cd, ok := siblings[j].(*etree.CharData); ok && cd.IsWhitespace() {
-			continue
-		}
-		if c == 2 {
-			doc.AddChild(etree.NewText("..."))
-			break
-		} else {
-			b.addToken(doc, siblings[j])
+func (b errorContextBuilder) addNextSiblings(src *Node) {
+	for s, c := src.NextSibling, 0; s != nil && c < 2; s = s.NextSibling {
+		if !s.IsWhitespace() {
 			c++
 		}
-	}
-}
-
-func (b errorContextBuilder) addToken(doc *etree.Element, t etree.Token) {
-	switch el := t.(type) {
-	case *etree.Element:
-		clone := etree.NewElement(el.FullTag())
-		clone.Attr = make([]etree.Attr, len(el.Attr))
-		copy(clone.Attr, el.Attr)
-		if el.ChildElements() != nil {
-			clone.AddChild(etree.NewText("..."))
-		} else {
-			clone.SetText(el.Text())
+		b.addNode(s, true)
+		if c == 2 && s.NextSibling != nil {
+			b.html.AppendChild(&html.Node{Type: html.TextNode, Data: "..."})
 		}
-		doc.AddChild(clone)
-	case *etree.CharData:
-		if !el.IsWhitespace() {
-			doc.AddChild(etree.NewText(el.Data))
+	}
+}
+
+// converts the given Node into html.Node and adds it to the HTML error context tree.
+// If the Node has child nodes, the placeholder "..." is added to the tree.
+func (b errorContextBuilder) addNode(src *Node, children bool) {
+	n := &html.Node{
+		Type:      src.Type,
+		DataAtom:  src.DataAtom,
+		Data:      src.Data.RawString(),
+		Namespace: src.Namespace,
+	}
+	if len(src.Attr) > 0 {
+		n.Attr = make([]html.Attribute, len(src.Attr))
+		for i, a := range src.Attr {
+			n.Attr[i] = html.Attribute{Key: a.Key, Val: a.Val.RawString()}
 		}
-	default:
-		doc.AddChild(t)
-	}
-}
-
-func (b errorContextBuilder) wrapParent(doc *etree.Element, t etree.Token) *etree.Element {
-	parent := t.Parent()
-	if parent == nil || parent.Tag == "" {
-		return doc // do not wrap the root element
 	}
 
-	doc.Space = parent.Space
-	doc.Tag = parent.Tag
-	doc.Attr = make([]etree.Attr, len(parent.Attr))
-	copy(doc.Attr, parent.Attr)
-
-	wrapper := &etree.Element{}
-	wrapper.AddChild(doc)
-
-	return wrapper
-}
-
-// buildErrorContext creates an XML tree around the token t to provide context for an error.
-func buildErrorContext(t etree.Token) *etree.Element {
-	doc := &etree.Element{}
-	b := errorContextBuilder{}
-	b.addPrevSiblings(doc, t)
-	b.addToken(doc, t)
-	b.addNextSiblings(doc, t)
-	doc = b.wrapParent(doc, t)
-	return doc
-}
-
-func renderErrorContext(doc *etree.Element) string {
-	dst := &html.Node{Type: html.DocumentNode}
-
-	// traverse the etree.Element and build the html.Node
-	var render func(*html.Node, *etree.Element)
-	render = func(dst *html.Node, src *etree.Element) {
-		for _, c := range src.Child {
-			switch t := c.(type) {
-			case *etree.Element:
-				n := &html.Node{Type: html.ElementNode, Data: t.FullTag()}
-				for _, a := range t.Attr {
-					n.Attr = append(n.Attr, html.Attribute{Key: a.Key, Val: a.Value})
-				}
-				dst.AppendChild(n)
-				render(n, t)
-			case *etree.CharData:
-				dst.AppendChild(&html.Node{Type: html.TextNode, Data: t.Data})
+	if children && src.FirstChild != nil {
+		var nonTextNode *Node
+		for c := src.FirstChild; c != nil; c = c.NextSibling {
+			if c.Type == html.TextNode {
+				n.AppendChild(&html.Node{Type: html.TextNode, Data: c.Data.RawString()})
+			} else {
+				n.AppendChild(&html.Node{Type: html.TextNode, Data: "..."})
+				nonTextNode = c
+				break
+			}
+		}
+		for c := src.LastChild; nonTextNode != nil && c != nonTextNode; c = c.PrevSibling {
+			if c.Type == html.TextNode {
+				n.AppendChild(&html.Node{Type: html.TextNode, Data: c.Data.RawString()})
 			}
 		}
 	}
+	b.html.AppendChild(n)
+}
 
-	render(dst, doc)
+func (b errorContextBuilder) wrapParent(src *Node) {
+	if src.Parent == nil || src.Parent.Type != html.ElementNode {
+		return
+	}
+	b.addNode(src.Parent, false)
 
-	var buf strings.Builder
-	_ = html.Render(&buf, dst)
+	// reparent nodes
+	newParent := b.html.LastChild
+	for {
+		child := b.html.FirstChild
+		if child == newParent {
+			break
+		}
+		b.html.RemoveChild(child)
+		newParent.AppendChild(child)
+	}
+}
 
-	return buf.String()
+// buildErrorContext creates an XML tree around the token t to provide context for an error.
+func buildErrorContext(n *Node) *html.Node {
+	b := errorContextBuilder{
+		html: &html.Node{Type: html.DocumentNode},
+	}
+	b.addPrevSiblings(n)
+	b.addNode(n, true)
+	b.addNextSiblings(n)
+	b.wrapParent(n)
+	return b.html
 }

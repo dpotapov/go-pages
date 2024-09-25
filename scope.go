@@ -23,7 +23,7 @@ var _ chtml.Scope = (*scope)(nil)
 
 func newScope(vars map[string]any, req *http.Request, route map[string]string) *scope {
 	return &scope{
-		BaseScope: chtml.NewScope(vars),
+		BaseScope: chtml.NewBaseScope(vars),
 		globals: &scopeGlobals{
 			req:        req,
 			route:      route,

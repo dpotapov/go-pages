@@ -54,7 +54,7 @@ func TestHttpCallComponent_Render(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := chtml.NewScope(tt.vars)
+			s := chtml.NewBaseScope(tt.vars)
 
 			comp := NewHttpCallComponent(mux)
 			defer comp.Dispose()

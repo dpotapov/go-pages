@@ -31,7 +31,7 @@ type Scope interface {
 	// the Component's Render() method using the Scope.Vars() method.
 	Spawn(vars map[string]any) Scope
 
-	// Vars returns variables stored in the scope.
+	// Vars provides access to variables stored in the scope.
 	Vars() map[string]any
 
 	// Touch marks the component as changed. The implementation should re-render the page
@@ -48,7 +48,7 @@ type BaseScope struct {
 
 var _ Scope = (*BaseScope)(nil)
 
-func NewScope(vars map[string]any) *BaseScope {
+func NewBaseScope(vars map[string]any) *BaseScope {
 	t := make(chan struct{}, 1)
 	return &BaseScope{
 		vars:    vars,
