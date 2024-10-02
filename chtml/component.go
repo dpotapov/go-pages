@@ -70,10 +70,13 @@ func (c *chtmlComponent) Render(s Scope) (any, error) {
 	// Check inputs: scope.Vars() keys should be a subset of c.doc.Attr keys.
 	attrMap := make(map[string]any, len(c.doc.Attr))
 	for _, attr := range c.doc.Attr {
-		attrMap[attr.Key] = attr.Val
+		attrMap[attr.Key] = attr.Val // TODO: should we evaluate chtml.Expr here?
 	}
 
 	for k := range s.Vars() {
+		if k == "_" {
+			continue
+		}
 		if _, ok := attrMap[k]; !ok {
 			// c.error(c.el, fmt.Errorf("unrecognized argument %s", k))
 			return nil, &UnrecognizedArgumentError{Name: k}

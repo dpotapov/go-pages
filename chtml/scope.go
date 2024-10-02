@@ -137,7 +137,7 @@ func UnmarshalScope(s Scope, target any) error {
 			targetElem.Set(reflect.MakeMap(targetElem.Type()))
 		}
 		for _, key := range targetElem.MapKeys() {
-			k := key.String()
+			k := toSnakeCase(key.String())
 			if val, ok := snakeCaseVars[k]; ok {
 				if val == nil {
 					continue

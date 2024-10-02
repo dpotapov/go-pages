@@ -321,7 +321,11 @@ func (p *chtmlParser) parseImportElement(n *Node) {
 
 	if n.FirstChild != nil {
 		c := &chtmlComponent{
-			doc:            n,
+			doc: &Node{
+				Type:       html.DocumentNode,
+				FirstChild: n.FirstChild,
+				Attr:       n.Attr,
+			},
 			env:            p.env,
 			renderComments: true,
 			importer:       p.importer,

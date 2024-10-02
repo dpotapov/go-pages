@@ -90,7 +90,9 @@ func (c *chtmlComponent) renderDocument(n *Node) *html.Node {
 				continue
 			}
 			if n == c.doc {
-				c.env[attr.Key] = v
+				if _, ok := c.env[attr.Key]; !ok {
+					c.env[attr.Key] = v
+				}
 			}
 		} else {
 			doc.AppendChild(AnyToHtml(rr))
@@ -130,7 +132,7 @@ func (c *chtmlComponent) renderElement(n *Node) any {
 			})
 		} else {
 			if c := AnyToHtml(rr); c != nil {
-				clone.AppendChild(c)
+				clone.AppendChild(cloneHtmlTree(c))
 			}
 		}
 	}
@@ -155,7 +157,16 @@ func (c *chtmlComponent) renderImport(n *Node) any {
 		vars["_"] = nil
 		for child := n.FirstChild; child != nil; child = child.NextSibling {
 			rr := c.render(child)
-			vars["_"] = AnyPlusAny(vars["_"], rr)
+			if attr, ok := rr.(Attribute); ok {
+				v, err := attr.Val.Value(&c.vm, env(c.env))
+				if err != nil {
+					c.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
+					return nil
+				}
+				vars[attr.Key] = v
+			} else {
+				vars["_"] = AnyPlusAny(vars["_"], rr)
+			}
 		}
 	}
 

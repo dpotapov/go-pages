@@ -141,6 +141,11 @@ func TestRenderCHTMLImports(t *testing.T) {
 			want: `<p>Hi</p>`,
 		},
 		{
+			name: "define simple attr",
+			text: `<c:attr name="text">Hi</c:attr>${text}`,
+			want: `Hi`,
+		},
+		{
 			name: "import with arg - another way",
 			text: `<c:comp2><c:attr name="text">Hi</c:attr></c:comp2>`,
 			want: `<p>Hi</p>`,
@@ -166,18 +171,12 @@ func TestRenderCHTMLImports(t *testing.T) {
 }
 
 func testRenderCase(text, want string, opts *ComponentOptions) (err error) {
-	defer func() {
-		if x := recover(); x != nil {
-			switch e := x.(type) {
-			case error:
-				err = e
-			default:
-				err = fmt.Errorf("%v", e)
-			}
-		}
-	}()
+	var imp Importer
+	if opts != nil {
+		imp = opts.Importer
+	}
 
-	doc, err := Parse(strings.NewReader(text), nil)
+	doc, err := Parse(strings.NewReader(text), imp)
 	if err != nil {
 		return err
 	}
