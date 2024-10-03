@@ -305,6 +305,13 @@ func (p *chtmlParser) parseImportElement(n *Node) {
 		p.error(fmt.Errorf("import %q: %w", n.Data.RawString(), err))
 		return
 	}
+	defer func() {
+		if d, ok := comp.(Disposable); ok {
+			if err := d.Dispose(); err != nil {
+				p.error(fmt.Errorf("dispose import %s: %w", compName, err))
+			}
+		}
+	}()
 
 	// convert n.Attr to a map for the scope
 	vars := make(map[string]any, len(n.Attr))

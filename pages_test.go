@@ -15,7 +15,7 @@ func TestPages_Handler(t *testing.T) {
 		wantStatus int
 		wantBody   string
 	}{
-		{"GET /", 200, "<h1>Index</h1><div>index-content</div>"},
+		{"GET /", 200, "\n\n<h1>Index</h1>\n\n<div>index-content</div>\n\n"},
 		{"GET /asset.css", 200, "body { background: #fff; }\n"},
 		{"GET /index.html", 404, "Not Found\n"},
 		{"GET /js", 404, "Not Found\n"},

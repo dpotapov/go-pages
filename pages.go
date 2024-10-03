@@ -430,51 +430,34 @@ func (h *Handler) matchFile(seg, dir string, entries []fs.DirEntry, params map[s
 // importer builds a chtml.Importer that allows resolving components relative to
 // provided dir path.
 // Components are resolved by searching the name + ".chtml" extension in ComponentSearchPath.
-func (h *Handler) importer(dir string) chtml.ImporterFunc {
+func (h *Handler) importer(dir string) chtml.Importer {
 	searchPath := h.ComponentSearchPath
 	if len(searchPath) == 0 {
 		searchPath = defaultSearchPath
 	}
 
-	parsed := map[string]chtml.Importer{}
-
-	return func(name string) (chtml.Component, error) {
-		if h.CustomImporter != nil {
-			prov, err := h.CustomImporter.Import(name)
-			if err == nil || !errors.Is(err, chtml.ErrComponentNotFound) {
-				return prov, err
-			}
-		}
-
-		if cf, ok := h.BuiltinComponents[name]; ok {
-			return cf, nil
-		}
-
-		for _, sp := range searchPath {
-			p := name + chtmlExt
-
-			// if the search path is absolute, ignore the source component's path:
-			if path.IsAbs(sp) {
-				p = path.Join(sp, p)
-			} else {
-				p = path.Join(dir, sp, p)
-			}
-
-			imp, ok := parsed[p]
-			if !ok {
-				var err error
-				imp, err = chtml.ParseFile(h.FileSystem, p, h.importer(path.Dir(p)))
-				if err == chtml.ErrComponentNotFound {
-					continue
-				}
-				parsed[p] = imp
-			}
-
-			return imp.Import("")
-		}
-
-		return nil, chtml.ErrComponentNotFound
+	return &pagesImporter{
+		dir:        dir,
+		h:          h,
+		searchPath: searchPath,
+		parsed:     make(map[string]*chtml.Node),
 	}
+}
+
+func (h *Handler) parseFile(fname string, imp chtml.Importer) (*chtml.Node, error) {
+	if strings.HasPrefix(fname, "/") {
+		fname = fname[1:]
+	}
+	f, err := h.FileSystem.Open(fname)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, chtml.ErrComponentNotFound
+		}
+		return nil, fmt.Errorf("open component %s: %w", fname, err)
+	}
+	defer func() { _ = f.Close() }()
+
+	return chtml.Parse(f, imp)
 }
 
 // cleanPath returns the canonical path for p, eliminating . and .. elements.
@@ -608,4 +591,73 @@ func NewRequestArg(r *http.Request) *RequestArg {
 	}
 
 	return model
+}
+
+type pagesImporter struct {
+	dir        string
+	h          *Handler
+	searchPath []string
+	parsed     map[string]*chtml.Node // TODO: change to sync.Map
+}
+
+func (imp *pagesImporter) Import(name string) (chtml.Component, error) {
+	if imp.h.CustomImporter != nil {
+		prov, err := imp.h.CustomImporter.Import(name)
+		if err == nil || !errors.Is(err, chtml.ErrComponentNotFound) {
+			return prov, err
+		}
+	}
+
+	if cf, ok := imp.h.BuiltinComponents[name]; ok {
+		return cf, nil
+	}
+
+	for _, sp := range imp.searchPath {
+		p := name + chtmlExt
+
+		// if the search path is absolute, ignore the source component's path:
+		if path.IsAbs(sp) {
+			p = path.Join(sp, p)
+		} else {
+			p = path.Join(imp.dir, sp, p)
+		}
+
+		parsed, ok := imp.parsed[p]
+		if !ok {
+			var err error
+			parsed, err = parseFile(imp.h.FileSystem, p, &pagesImporter{
+				dir:        path.Dir(p),
+				h:          imp.h,
+				searchPath: imp.searchPath,
+				parsed:     imp.parsed,
+			})
+			if err == chtml.ErrComponentNotFound {
+				continue
+			}
+			imp.parsed[p] = parsed
+		}
+		return chtml.NewComponent(parsed, &chtml.ComponentOptions{
+			Importer: imp,
+		}), nil
+	}
+
+	return nil, chtml.ErrComponentNotFound
+}
+
+// ParseFile parses the CHTML component from the given file. Unlike Parse, it may also watch
+// for changes in the file and trigger a re-parse when necessary.
+func parseFile(fsys fs.FS, fname string, imp chtml.Importer) (*chtml.Node, error) {
+	if strings.HasPrefix(fname, "/") {
+		fname = fname[1:]
+	}
+	f, err := fsys.Open(fname)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, chtml.ErrComponentNotFound
+		}
+		return nil, fmt.Errorf("open component %s: %w", fname, err)
+	}
+	defer func() { _ = f.Close() }()
+
+	return chtml.Parse(f, imp)
 }

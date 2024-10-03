@@ -3,7 +3,6 @@ package chtml
 import (
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/expr-lang/expr/vm"
 )
@@ -13,6 +12,16 @@ type Component interface {
 	// an HTML document (*html.Node) or anything else that can be sent over the wire or
 	// passed to another Component as an input.
 	Render(s Scope) (any, error)
+}
+
+// Disposable is an optional interface for components that require explicit resource cleanup.
+// Components that allocate resources such as files, network connections, or memory buffers
+// should implement this interface to release those resources when they are no longer needed.
+type Disposable interface {
+	// Dispose releases any resources held by the component.
+	// It should be called when the component is no longer needed to prevent resource leaks.
+	// If an error occurs during disposal, it should be returned.
+	Dispose() error
 }
 
 type ComponentOptions struct {
@@ -60,7 +69,7 @@ type chtmlComponent struct {
 }
 
 var _ Component = (*chtmlComponent)(nil)
-var _ io.Closer = (*chtmlComponent)(nil)
+var _ Disposable = (*chtmlComponent)(nil)
 
 // Render evaluates expressions in the CHTML document and returns either a new *html.Node tree with
 // HTML content or a data object if the result of the evaluation is not HTML.
@@ -84,7 +93,9 @@ func (c *chtmlComponent) Render(s Scope) (any, error) {
 	}
 
 	// Copy default values from c.args into a new map.
-	c.env = map[string]any{"_": nil}
+	if c.env == nil {
+		c.env = map[string]any{"_": nil}
+	}
 	for _, attr := range c.doc.Attr {
 		v, err := attr.Val.Value(&c.vm, env(c.env))
 		if err != nil {
@@ -104,11 +115,11 @@ func (c *chtmlComponent) Render(s Scope) (any, error) {
 		return nil, err
 	}
 
-	// Evaluate the component'scope expressions
+	// Evaluate the component's expressions
 	return c.render(c.doc), errors.Join(c.errs...)
 }
 
-func (c *chtmlComponent) Close() error {
+func (c *chtmlComponent) Dispose() error {
 	for n := range c.children {
 		c.closeChildren(n, 0)
 	}
@@ -120,9 +131,9 @@ func (c *chtmlComponent) Close() error {
 func (c *chtmlComponent) closeChildren(n *Node, idx int) {
 	if comps, ok := c.children[n]; ok {
 		for i := idx; i < len(comps); i++ {
-			if d, ok := comps[i].(io.Closer); ok {
-				if err := d.Close(); err != nil {
-					c.error(n, fmt.Errorf("close child %d: %w", i, err))
+			if d, ok := comps[i].(Disposable); ok {
+				if err := d.Dispose(); err != nil {
+					c.error(n, fmt.Errorf("dispose child %d: %w", i, err))
 				}
 			}
 		}

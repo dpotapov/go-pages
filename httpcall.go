@@ -100,7 +100,7 @@ func (c *HttpCallComponent) Render(s chtml.Scope) (any, error) {
 	return c.render(&args), nil
 }
 
-func (c *HttpCallComponent) Dispose() {
+func (c *HttpCallComponent) Dispose() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -109,6 +109,7 @@ func (c *HttpCallComponent) Dispose() {
 		close(c.pollingStop)
 		c.pollingStop = nil
 	}
+	return nil
 }
 
 func (c *HttpCallComponent) startPolling(s chtml.Scope, stopChan chan struct{}) {
