@@ -1,33 +1,6 @@
 package chtml
 
 /*
-func TestParse(t *testing.T) {
-	scope := `
-		<c:arg name="link1">http://foo.bar</c:arg>
-		<p>Links:</p>
-		<ul>
-			<li><a href="foo">Foo</a></li>
-			<li><a href="/bar/baz">BarBaz</a></li>
-		</ul>`
-	r := strings.NewReader(scope)
-	imp, err := Parse(r, nil)
-	if err != nil {
-		t.Errorf("Parse() error = %v", err)
-		return
-	}
-	parser := imp.(*chtmlParserOld)
-
-	// Check inpSchema:
-	require.Equal(t, 2, len(parser.inpSchema))
-	require.Equal(t, new(any), parser.inpSchema["_"])
-	require.Equal(t, "http://foo.bar", parser.inpSchema["link1"])
-
-	// Check links:
-	require.Len(t, parser.doc.Element.ChildElements(), 3)
-	ul := parser.doc.Element.SelectElement("ul")
-	require.NotNil(t, ul)
-	require.Len(t, ul.ChildElements(), 2)
-}
 
 func importFunc(name string) (Component, error) {
 	scope := ""
@@ -59,91 +32,8 @@ func TestComponent_ParseAndRender(t *testing.T) {
 		output   string
 		wantErr  error
 	}{
-		{"empty", "", "", nil},
-		{"helloWorld", "Hello, world!", "Hello, world!", nil},
-		{"textNodeExpansion", `<c:arg name="foo">bar</c:arg>Hello, ${foo}!`, "Hello, bar!", nil},
-		{"textNodeExpansion2", `<c:arg name="foo">bar</c:arg><p>Hello, ${foo}!</p>`, "<p>Hello, bar!</p>", nil},
-		{"attrExpansion", `<c:arg name="foo">bar</c:arg><a href="${foo}">Link</a>`, `<a href="bar">Link</a>`, nil},
-
-		// Testing conditionals (c:if, c:else-if, c:else)
-		{"ifTrue", `<p c:if="true">Hello, world!</p>`, `<p>Hello, world!</p>`, nil},
-		{"ifFalse", `<p c:if="false">Hello, world!</p>`, ``, nil},
-		{"ifElse1", `<p c:if="true">OK</p><p c:else>NOTOK</p>`, `<p>OK</p>`, nil},
-		{"ifElse2", `<p c:if="false">NOTOK</p><p c:else>OK</p>`, `<p>OK</p>`, nil},
-		{"ifIfElse1",
-			`<p c:if="true">OK</p><p c:if="false">NOTOK</p><p c:else>OK</p>`, `<p>OK</p><p>OK</p>`, nil},
-		{"ifIfElse2",
-			`<p c:if="false">NOTOK1</p><p c:if="true">OK</p><p c:else>NOTOK2</p>`, `<p>OK</p>`, nil},
-		{"ifIfElse3",
-			`<p c:if="false">NOTOK</p><p c:if="false">NOTOK</p><p c:else>OK</p>`, `<p>OK</p>`, nil},
-		{"ifElifElse1",
-			`<p c:if="true">OK</p><p c:else-if="false">NOTOK</p><p c:else>NOTOK</p>`, `<p>OK</p>`, nil},
-		{"ifElifElse2",
-			`<p c:if="false">NOTOK</p><p c:else-if="true">OK</p><p c:else>NOTOK</p>`, `<p>OK</p>`, nil},
-		{"ifElifElse3",
-			`<p c:if="false">NOTOK</p><p c:else-if="false">NOTOK</p><p c:else>OK</p>`, `<p>OK</p>`, nil},
-
-		// Testing loops (c:for)
-		{"forEmpty", `<p c:for="x in []">Hello, ${x}!</p>`, ``, nil},
-		{"forOne", `<p c:for="x in ['foo']">${x}</p>`, `<p>foo</p>`, nil},
-		{"forTwo", `<p c:for="x in ['foo', 'bar']">${x}</p>`, `<p>foo</p><p>bar</p>`, nil},
-		{"forWords", `<c:arg name="words">${['foo', 'bar', 'baz']}</c:arg><ul><li c:for="w in words">${w}</li></ul>`,
-			`<ul><li>foo</li><li>bar</li><li>baz</li></ul>`, nil},
-		{"forNumbers", `<c:arg name="numbers">${[1,2,3]}</c:arg><p c:for="i in numbers">${i}</p>`, `<p>1</p><p>2</p><p>3</p>`, nil},
-
-		{"forIfFalse", `<p c:for="x in ['foo']" c:if="false">${x}</p>`, ``, nil},
-		{"forIfTrue", `<p c:for="x in ['foo']" c:if="true">${x}</p>`, `<p>foo</p>`, nil},
-
-		// Testing imports (<c:NAME>)
-		{"simpleImport", `<c:hello-world />`, `Hello, World!`, nil},
-		{"importWithArg", `<c:greeting></c:greeting>`, `Hello, !`, nil},
-		{"importWithArg2", `<c:greeting>Bill</c:greeting>`, `Hello, Bill!`, nil},
 
 		// Test component arguments
-		{
-			name:     "argString",
-			template: `<c:simple-page title="Title">Content</c:simple-page>`,
-			output:   `<h1>Title</h1><div>Content</div>`,
-			wantErr:  nil,
-		},
-		{
-			name: "argVar",
-			template: `
-				<c:arg name="page_title">Default Title</c:arg>
-				<c:arg name="page_content">Default Content</c:arg>
-				<c:simple-page title="${page_title}">
-					${page_content}
-				</c:simple-page>`,
-			output: `<h1>Default Title</h1><div>
-					Default Content
-				</div>`,
-			wantErr: nil,
-		},
-		{
-			name: "htmlTitleAndContent",
-			template: `
-				<c:arg name="page_title">
-					<i>Default Title</i>
-				</c:arg>
-				<c:arg name="page_content">
-					<strong>Default Content</strong>
-				</c:arg>
-				<c:simple-page title="${page_title}">
-					<p>${page_content}</p>
-				</c:simple-page>`,
-			output: `<h1>
-					<i>Default Title</i>
-				</h1><div><p>
-					<strong>Default Content</strong>
-				</p></div>`,
-			wantErr: nil,
-		},
-		{
-			name:     "doubleHtmlArgEval",
-			template: `<c:arg name="content"><ul><li>Item</li></ul></c:arg>${content}<p>${content}</p>`,
-			output:   `<ul><li>Item</li></ul><p><ul><li>Item</li></ul></p>`,
-			wantErr:  nil,
-		},
 		{
 			name:     "compWithinArg",
 			template: `<c:arg name="data"><c:data-provider key1="newVal" /></c:arg>${data.key1}`,
