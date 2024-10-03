@@ -84,7 +84,7 @@ func (c *chtmlComponent) Render(s Scope) (any, error) {
 	}
 
 	// Copy default values from c.args into a new map.
-	c.env = make(map[string]any)
+	c.env = map[string]any{"_": nil}
 	for _, attr := range c.doc.Attr {
 		v, err := attr.Val.Value(&c.vm, env(c.env))
 		if err != nil {

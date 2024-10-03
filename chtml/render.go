@@ -73,10 +73,8 @@ func (c *chtmlComponent) renderComment(n *Node) *html.Node {
 	return nil
 }
 
-func (c *chtmlComponent) renderDocument(n *Node) *html.Node {
-	doc := &html.Node{
-		Type: html.DocumentNode,
-	}
+func (c *chtmlComponent) renderDocument(n *Node) any {
+	var res any
 
 	for child := n.FirstChild; child != nil; child = child.NextSibling {
 		rr := c.render(child)
@@ -95,10 +93,10 @@ func (c *chtmlComponent) renderDocument(n *Node) *html.Node {
 				}
 			}
 		} else {
-			doc.AppendChild(AnyToHtml(rr))
+			res = AnyPlusAny(res, rr)
 		}
 	}
-	return doc
+	return res
 }
 
 func (c *chtmlComponent) renderElement(n *Node) any {
