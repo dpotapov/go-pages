@@ -933,7 +933,7 @@ func Parse(r io.Reader, imp Importer) (*Node, error) {
 		doc: &Node{
 			Type: html.DocumentNode,
 		},
-		env:      make(map[string]any),
+		env:      map[string]any{"_": new(any)},
 		im:       inBodyIM,
 		importer: imp,
 	}
