@@ -1,12 +1,12 @@
 package chtml
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"golang.org/x/net/html"
 )
 
@@ -14,12 +14,12 @@ func TestRenderSimpleHTML(t *testing.T) {
 	tests := []struct {
 		name string
 		text string
-		want string
+		want any
 	}{
 		{
 			name: "empty",
 			text: "",
-			want: "",
+			want: nil,
 		},
 		{
 			name: "simple",
@@ -46,7 +46,7 @@ func TestRenderCHTML(t *testing.T) {
 	tests := []struct {
 		name string
 		text string
-		want string
+		want any
 		vars map[string]any
 	}{
 		{
@@ -57,32 +57,32 @@ func TestRenderCHTML(t *testing.T) {
 		{
 			name: "eval basic data type - int",
 			text: `${ 123 }`,
-			want: "123",
+			want: 123,
 		},
 		{
 			name: "eval basic data type - bool true",
 			text: `${ true }`,
-			want: "true",
+			want: true,
 		},
 		{
 			name: "eval basic data type - bool false",
 			text: `${ false }`,
-			want: "false",
+			want: false,
 		},
 		{
 			name: "eval basic data type - float",
 			text: `${ 3.14 }`,
-			want: "3.14",
+			want: 3.14,
 		},
 		{
 			name: "eval basic data type - slice of strings",
 			text: `${ ["a", "b", "c"] }`,
-			want: `["a","b","c"]`,
+			want: []any{"a", "b", "c"},
 		},
 		{
 			name: "eval basic data type - slice of numbers",
 			text: `${ [1, 2, 3] }`,
-			want: "[1,2,3]",
+			want: []any{1, 2, 3},
 		},
 		{
 			name: "text node expansion",
@@ -110,7 +110,7 @@ func TestRenderCHTML(t *testing.T) {
 		{
 			name: "render c:if - false",
 			text: `<p c:if="false">foobar</p>`,
-			want: "",
+			want: nil,
 		},
 		{
 			name: "render c:if - empty",
@@ -211,7 +211,7 @@ func TestRenderCHTMLImports(t *testing.T) {
 	tests := []struct {
 		name    string
 		text    string
-		want    string
+		want    any
 		wantErr error
 	}{
 		{
@@ -282,7 +282,7 @@ func TestRenderCHTMLImports(t *testing.T) {
 	}
 }
 
-func testRenderCase(text, want string, vars map[string]any, opts *ComponentOptions) (err error) {
+func testRenderCase(text string, want any, vars map[string]any, opts *ComponentOptions) (err error) {
 	var imp Importer
 	if opts != nil {
 		imp = opts.Importer
@@ -305,24 +305,16 @@ func testRenderCase(text, want string, vars map[string]any, opts *ComponentOptio
 		return fmt.Errorf("render error: %w", err)
 	}
 
-	var buf strings.Builder
-	switch rr := rr.(type) {
-	case *html.Node:
-		if err := html.Render(&buf, rr); err != nil {
+	if ht, ok := rr.(*html.Node); ok {
+		var buf strings.Builder
+		if err := html.Render(&buf, ht); err != nil {
 			return fmt.Errorf("html render error: %w", err)
 		}
-	case string:
-		buf.WriteString(rr)
-	default:
-		if err := json.NewEncoder(&buf).Encode(rr); err != nil {
-			return fmt.Errorf("json encode error: %w", err)
-		}
+		rr = buf.String()
 	}
 
-	// Compare the parsed tree to the #document section.
-	got := buf.String()
-	if got != want {
-		return fmt.Errorf("got vs want:\n----\n%s\n----\n%s\n----", got, want)
+	if diff := cmp.Diff(rr, want); diff != "" {
+		return fmt.Errorf("got vs want:\n%s", diff)
 	}
 
 	return nil
