@@ -85,6 +85,11 @@ func TestRenderCHTML(t *testing.T) {
 			want: []any{1, 2, 3},
 		},
 		{
+			name: "eval simple object",
+			text: `${ {"a": 123, "b": true, "c": "str"} }`,
+			want: map[string]any{"a": 123, "b": true, "c": "str"},
+		},
+		{
 			name: "text node expansion",
 			text: `<c:attr name="greeting">Hello</c:attr><p>${ greeting }</p>`,
 			want: "<p>Hello</p>",
@@ -99,6 +104,13 @@ func TestRenderCHTML(t *testing.T) {
 			name: "attr expansion",
 			text: `<c:attr name="foo">bar</c:attr><a href="${foo}">Link</a>`,
 			want: `<a href="bar">Link</a>`,
+		},
+		{
+			name: "attr manipulation",
+			text: `<c:attr name="data">${ { num: 123 } }</c:attr>` +
+				`<c:attr name="data2">${ data.num }</c:attr>` +
+				`${data2 * 2}`,
+			want: 246,
 		},
 
 		// Testing conditionals (c:if, c:else-if, c:else)

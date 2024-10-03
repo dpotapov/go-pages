@@ -1,4 +1,4 @@
-<c:arg name="title"></c:arg>
+<c:attr name="title"></c:attr>
 <html>
   <head>
     <title c:if="title != nil">${title} - To-Do App Example</title>

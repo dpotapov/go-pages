@@ -94,19 +94,19 @@ with `c:` namespace:
   Any attributes on the element are passed to the component as arguments as well.
   Typically, the component is a `.chtml` file, but it can also be a virtual component defined in Go code.
 
-- `<c:arg name="ARG_NAME">...</c:arg>`, where ARG_NAME is an argument name - passes the body of the element
+- `<c:attr name="ARG_NAME">...</c:attr>`, where ARG_NAME is an argument name - passes the body of the element
   to the parent component as an argument. The body can be interpolated with `${...}` syntax.
   Arg elements can be nested to form complex argument structures. Example:
 
   ```html
-  <c:arg name="obj">
-    <c:arg name="field1">foobar</c:arg>
-  </c:arg>
+  <c:attr name="obj">
+    <c:attr name="field1">foobar</c:attr>
+  </c:attr>
   ```
 
-  The `<c:arg>` element can be used in two contexts: as a child element of a component, or as a
+  The `<c:attr>` element can be used in two contexts: as a child element of a component, or as a
   top-level element in a `.chtml` file. In the first case, the argument is passed to the parent
-  component. In the second case, the `<c:arg>` definition declares possible inputs for the component
+  component. In the second case, the `<c:attr>` definition declares possible inputs for the component
   (serves as a documentation and type checking) and default values.
 
 - `c:var` attribute is valid only for the `<c:NAME>` import element. It defines a variable name

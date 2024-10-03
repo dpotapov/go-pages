@@ -1,9 +1,9 @@
-<c:arg name="todo">${""}</c:arg>
-<c:arg name="todo_done_id">${0}</c:arg>
+<c:attr name="todo">${""}</c:attr>
+<c:attr name="todo_done_id">${0}</c:attr>
 
-<c:arg name="todos">
+<c:attr name="todos">
   <c:todos-store add="${todo}" del="${todo_done_id}" />
-</c:arg>
+</c:attr>
 
 <div id="todo-list">
   <ol c:if="len(todos) > 0">
