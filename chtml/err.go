@@ -129,6 +129,8 @@ func (b errorContextBuilder) addNode(src *Node, children bool) {
 		for c := src.LastChild; nonTextNode != nil && c != nonTextNode; c = c.PrevSibling {
 			if c.Type == html.TextNode {
 				n.AppendChild(&html.Node{Type: html.TextNode, Data: c.Data.RawString()})
+			} else {
+				break
 			}
 		}
 	}
@@ -153,6 +155,22 @@ func (b errorContextBuilder) wrapParent(src *Node) {
 	}
 }
 
+// remove first and last whitespace nodes from the children of the given node.
+func (b errorContextBuilder) stripWhitespace() {
+	if b.html.FirstChild == nil {
+		return
+	}
+	if b.html.FirstChild.Type == html.TextNode && strings.TrimSpace(b.html.FirstChild.Data) == "" {
+		b.html.RemoveChild(b.html.FirstChild)
+	}
+	if b.html.LastChild == nil {
+		return
+	}
+	if b.html.LastChild.Type == html.TextNode && strings.TrimSpace(b.html.LastChild.Data) == "" {
+		b.html.RemoveChild(b.html.LastChild)
+	}
+}
+
 // buildErrorContext creates an XML tree around the token t to provide context for an error.
 func buildErrorContext(n *Node) *html.Node {
 	b := errorContextBuilder{
@@ -162,5 +180,6 @@ func buildErrorContext(n *Node) *html.Node {
 	b.addNode(n, true)
 	b.addNextSiblings(n)
 	b.wrapParent(n)
+	b.stripWhitespace()
 	return b.html
 }

@@ -49,7 +49,7 @@ func Test_buildErrorContext(t *testing.T) {
 		{
 			name: "topElement",
 			t:    findElement(doc, "html"),
-			want: "<html>\n\t\t\t...\n\t\t\t</html>",
+			want: "<html>\n\t\t\t...\n\t\t</html>",
 		},
 		{
 			name: "textElement",
