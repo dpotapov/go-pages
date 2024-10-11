@@ -53,10 +53,11 @@ func (t *todos) Render(s chtml.Scope) (any, error) {
 	return todos, nil
 }
 
-func (t *todos) Dispose() {
+func (t *todos) Dispose() error {
 	if t.sub != nil {
 		t.db.Unsubscribe(t.sub)
 	}
+	return nil
 }
 
 type todoDB struct {
@@ -131,18 +132,11 @@ func main() {
 		Level: slog.LevelDebug,
 	}))
 
-	db := newTodoDB()
-
 	ph := &pages.Handler{
 		FileSystem: os.DirFS("./example/pages"),
-		CustomImporter: chtml.ImporterFunc(func(name string) (chtml.Component, error) {
-			if name == "todos-store" {
-				return &todos{
-					db: db,
-				}, nil
-			}
-			return nil, chtml.ErrComponentNotFound
-		}),
+		CustomImporter: &todoStoreImporter{
+			db: newTodoDB(),
+		},
 		OnError: nil,
 		Logger:  logger,
 	}
@@ -152,4 +146,19 @@ func main() {
 	err := http.ListenAndServe(":8080", LoggerMiddleware(ph, logger))
 
 	logger.Error("HTTP server error", "error", err)
+}
+
+type todoStoreImporter struct {
+	db *todoDB
+}
+
+var _ chtml.Importer = (*todoStoreImporter)(nil)
+
+func (i *todoStoreImporter) Import(name string) (chtml.Component, error) {
+	if name == "todos-store" {
+		return &todos{
+			db: i.db,
+		}, nil
+	}
+	return nil, chtml.ErrComponentNotFound
 }

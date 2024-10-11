@@ -206,6 +206,11 @@ func (h *Handler) servePage(
 				for k, v := range vars {
 					wsvars[k] = v
 				}
+
+				// remove HTMX specific vars
+				// TODO: process HEADERS to make them available in the request's data
+				delete(wsvars, "HEADERS")
+
 				s = mainScope.Spawn(wsvars).(*scope)
 				s.Touch()
 			case <-mainScope.Touched():
