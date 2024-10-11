@@ -88,7 +88,7 @@ func (c *chtmlComponent) renderDocument(n *Node) any {
 				continue
 			}
 			if n == c.doc {
-				if _, ok := c.env[attr.Key]; !ok {
+				if !c.scopeHasVar(attr.Key) {
 					c.env[attr.Key] = v
 				}
 			}
@@ -365,4 +365,9 @@ func (c *chtmlComponent) evalFor(n *Node) iter.Seq[*chtmlComponent] {
 			yield(loopComp)
 		}
 	}
+}
+
+func (c *chtmlComponent) scopeHasVar(v string) bool {
+	_, ok := c.scope.Vars()[v]
+	return ok
 }

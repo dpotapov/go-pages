@@ -2,15 +2,15 @@
 <c:attr name="todo_done_id">${0}</c:attr>
 
 <c:attr name="todos">
-  <c:todos-store add="${todo}" del="${todo_done_id}" />
+  <c:todos-store add="${todo}" del="${todo_done_id}"></c:todos-store>
 </c:attr>
 
 <div id="todo-list">
   <ol c:if="len(todos) > 0">
     <li c:for="i, n in todos">${i}
       <form ws-send style="display: inline; margin-left: 15px">
-        <input name="todo_done_id" type="hidden" value="${string(n+1)}" />
-        <input type="submit" value="Done" style="font-size: 0.7rem; border: none; background-color: aquamarine;"/>
+        <input name="todo_done_id" type="hidden" value="${string(n+1)}">
+        <input type="submit" value="Done" style="font-size: 0.7rem; border: none; background-color: aquamarine;">
       </form>
     </li>
   </ol>
