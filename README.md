@@ -82,8 +82,7 @@ Check out the [example](./example) directory for a more complete example.
 
 ## CHTML Tags and Attributes
 
-Components are defined in `.chtml` files, which have HTML syntax parseable
-by the `encoding/xml` Go library.
+Components are defined in `.chtml` files in HTML5-like syntax.
 
 On-top of a standard HTML, `go-pages` adds the following elements and attributes prefixed
 with `c:` namespace:
@@ -94,23 +93,8 @@ with `c:` namespace:
   Any attributes on the element are passed to the component as arguments as well.
   Typically, the component is a `.chtml` file, but it can also be a virtual component defined in Go code.
 
-- `<c:attr name="ARG_NAME">...</c:attr>`, where ARG_NAME is an argument name - passes the body of the element
-  to the parent component as an argument. The body can be interpolated with `${...}` syntax.
-  Arg elements can be nested to form complex argument structures. Example:
-
-  ```html
-  <c:attr name="obj">
-    <c:attr name="field1">foobar</c:attr>
-  </c:attr>
-  ```
-
-  The `<c:attr>` element can be used in two contexts: as a child element of a component, or as a
-  top-level element in a `.chtml` file. In the first case, the argument is passed to the parent
-  component. In the second case, the `<c:attr>` definition declares possible inputs for the component
-  (serves as a documentation and type checking) and default values.
-
-- `c:var` attribute is valid only for the `<c:NAME>` import element. It defines a variable name
-  where the component result will be stored. The variable can be referenced in the parent component.
+- `<c:attr name="ATTR_NAME">...</c:attr>` - is a builtin component that adds an attribute
+  named `ATTR_NAME` to the parent element.
 
 - `c:if`, `c:else-if`, `c:else` attribute for conditional rendering.
 
