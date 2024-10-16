@@ -38,9 +38,8 @@ type chtmlParser struct {
 	env map[string]any
 	// shadowed is the stack of variables shadowed by the elements that introduce new scopes.
 	shadowed []map[string]any
-	// The stack of open elements (section 12.2.4.2) and active formatting
-	// elements (section 12.2.4.3).
-	oe, afe nodeStack
+	// The stack of open elements (section 12.2.4.2).
+	oe nodeStack
 	// im is the current insertion mode.
 	im insertionMode
 	// originalIM is the insertion mode to go back to after completing a text
@@ -422,91 +421,6 @@ func (p *chtmlParser) findPrevCond(n *Node) *Node {
 	return nil
 }
 
-// Section 12.2.4.3.
-func (p *chtmlParser) addFormattingElement() {
-	tagAtom, attr := p.tok.DataAtom, p.tok.Attr
-	p.addElement()
-
-	// Implement the Noah's Ark clause, but with three per family instead of two.
-	identicalElements := 0
-findIdenticalElements:
-	for i := len(p.afe) - 1; i >= 0; i-- {
-		n := p.afe[i]
-		if n.Type == scopeMarkerNode {
-			break
-		}
-		if n.Type != html.ElementNode {
-			continue
-		}
-		if n.Namespace != "" {
-			continue
-		}
-		if n.DataAtom != tagAtom {
-			continue
-		}
-		if len(n.Attr) != len(attr) {
-			continue
-		}
-	compareAttributes:
-		for _, t0 := range n.Attr {
-			for _, t1 := range attr {
-				if t0.Key == t1.Key && t0.Namespace == t1.Namespace && t0.Val.RawString() == t1.Val { // TODO: enable interpolation
-					// Found a match for this attribute, continue with the next attribute.
-					continue compareAttributes
-				}
-			}
-			// If we get here, there is no attribute that matches a.
-			// Therefore the element is not identical to the new one.
-			continue findIdenticalElements
-		}
-
-		identicalElements++
-		if identicalElements >= 3 {
-			p.afe.remove(n)
-		}
-	}
-
-	p.afe = append(p.afe, p.top())
-}
-
-// Section 12.2.4.3.
-func (p *chtmlParser) clearActiveFormattingElements() {
-	for {
-		if n := p.afe.pop(); len(p.afe) == 0 || n.Type == scopeMarkerNode {
-			return
-		}
-	}
-}
-
-// Section 12.2.4.3.
-func (p *chtmlParser) reconstructActiveFormattingElements() {
-	n := p.afe.top()
-	if n == nil {
-		return
-	}
-	if n.Type == scopeMarkerNode || p.oe.index(n) != -1 {
-		return
-	}
-	i := len(p.afe) - 1
-	for n.Type != scopeMarkerNode && p.oe.index(n) == -1 {
-		if i == 0 {
-			i = -1
-			break
-		}
-		i--
-		n = p.afe[i]
-	}
-	for {
-		i++
-		clone := cloneNode(p.afe[i])
-		p.addChild(clone)
-		p.afe[i] = clone
-		if i == len(p.afe)-1 {
-			break
-		}
-	}
-}
-
 // Section 12.2.5.
 func (p *chtmlParser) acknowledgeSelfClosingTag() {
 	p.hasSelfClosingToken = false
@@ -553,10 +467,14 @@ func inBodyIM(p *chtmlParser) bool {
 		if d == "" {
 			return true
 		}
-		p.reconstructActiveFormattingElements()
 		p.addText(d)
 	case html.StartTagToken:
 		switch p.tok.DataAtom {
+		case a.Base, a.Basefont, a.Bgsound, a.Link, a.Meta:
+			p.addElement()
+			p.popElement()
+			p.acknowledgeSelfClosingTag()
+			return true
 		case a.Address, a.Article, a.Aside, a.Blockquote, a.Center, a.Details, a.Dialog, a.Dir, a.Div, a.Dl, a.Fieldset, a.Figcaption, a.Figure, a.Footer, a.Header, a.Hgroup, a.Main, a.Menu, a.Nav, a.Ol, a.P, a.Section, a.Summary, a.Ul:
 			p.popUntil(buttonScope, a.P)
 			p.addElement()
@@ -612,38 +530,19 @@ func inBodyIM(p *chtmlParser) bool {
 			p.addElement()
 		case a.Button:
 			p.popUntil(defaultScope, a.Button)
-			p.reconstructActiveFormattingElements()
 			p.addElement()
 		case a.A:
-			for i := len(p.afe) - 1; i >= 0 && p.afe[i].Type != scopeMarkerNode; i-- {
-				if n := p.afe[i]; n.Type == html.ElementNode && n.DataAtom == a.A {
-					// p.inBodyEndTagFormatting(a.A, "a")
-					p.oe.remove(n)
-					p.afe.remove(n)
-					break
-				}
-			}
-			p.reconstructActiveFormattingElements()
-			p.addFormattingElement()
-		case a.B, a.Big, a.Code, a.Em, a.Font, a.I, a.S, a.Small, a.Strike, a.Strong, a.Tt, a.U:
-			p.reconstructActiveFormattingElements()
-			p.addFormattingElement()
-		case a.Nobr:
-			p.reconstructActiveFormattingElements()
-			if p.elementInScope(defaultScope, a.Nobr) {
-				// p.inBodyEndTagFormatting(a.Nobr, "nobr")
-				p.reconstructActiveFormattingElements()
-			}
-			p.addFormattingElement()
-		case a.Applet, a.Marquee, a.Object:
-			p.reconstructActiveFormattingElements()
 			p.addElement()
-			p.afe = append(p.afe, &scopeMarker)
+		case a.B, a.Big, a.Code, a.Em, a.Font, a.I, a.S, a.Small, a.Strike, a.Strong, a.Tt, a.U:
+			p.addElement()
+		case a.Nobr:
+			p.addElement()
+		case a.Applet, a.Marquee, a.Object:
+			p.addElement()
 		case a.Table:
 			p.popUntil(buttonScope, a.P)
 			p.addElement()
 		case a.Area, a.Br, a.Embed, a.Img, a.Input, a.Keygen, a.Wbr:
-			p.reconstructActiveFormattingElements()
 			p.addElement()
 			p.popElement()
 			p.acknowledgeSelfClosingTag()
@@ -676,14 +575,12 @@ func inBodyIM(p *chtmlParser) bool {
 			p.im = textIM
 		case a.Xmp:
 			p.popUntil(buttonScope, a.P)
-			p.reconstructActiveFormattingElements()
 			p.parseGenericRawTextElement()
 		case a.Iframe:
 			p.parseGenericRawTextElement()
 		case a.Noembed:
 			p.parseGenericRawTextElement()
 		case a.Noscript:
-			p.reconstructActiveFormattingElements()
 			p.addElement()
 			// Don't let the tokenizer go into raw text mode when for <noscript> tag and Parse
 			// its content as regular HTML.
@@ -692,7 +589,6 @@ func inBodyIM(p *chtmlParser) bool {
 			if p.top().DataAtom == a.Option {
 				p.popElement()
 			}
-			p.reconstructActiveFormattingElements()
 			p.addElement()
 		case a.Rb, a.Rtc:
 			if p.elementInScope(defaultScope, a.Ruby) {
@@ -705,7 +601,6 @@ func inBodyIM(p *chtmlParser) bool {
 			}
 			p.addElement()
 		case a.Math, a.Svg:
-			p.reconstructActiveFormattingElements()
 			p.addElement()
 			p.top().Namespace = p.tok.Data
 			if p.hasSelfClosingToken {
@@ -714,8 +609,11 @@ func inBodyIM(p *chtmlParser) bool {
 			}
 			return true
 		default:
-			p.reconstructActiveFormattingElements()
 			p.addElement()
+			if p.hasSelfClosingToken {
+				p.popElement()
+				p.acknowledgeSelfClosingTag()
+			}
 		}
 	case html.EndTagToken:
 		switch p.tok.DataAtom {
@@ -756,11 +654,9 @@ func inBodyIM(p *chtmlParser) bool {
 		case a.H1, a.H2, a.H3, a.H4, a.H5, a.H6:
 			p.popUntil(defaultScope, a.H1, a.H2, a.H3, a.H4, a.H5, a.H6)
 		// case a.A, a.B, a.Big, a.Code, a.Em, a.Font, a.I, a.Nobr, a.S, a.Small, a.Strike, a.Strong, a.Tt, a.U:
-		// p.inBodyEndTagFormatting(p.tok.DataAtom, p.tok.Data)
+		//	p.inBodyEndTagFormatting(p.tok.DataAtom, p.tok.Data)
 		case a.Applet, a.Marquee, a.Object:
-			if p.popUntil(defaultScope, p.tok.DataAtom) {
-				p.clearActiveFormattingElements()
-			}
+			p.popUntil(defaultScope, p.tok.DataAtom)
 		case a.Br:
 			p.tok.Type = html.StartTagToken
 			return false

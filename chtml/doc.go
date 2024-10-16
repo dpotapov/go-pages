@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 /*
-Package html implements an HTML parser to be used by the `chtml` package.
+Package chtml implements an HTML parser to be used by the `chtml` package.
 
 The parser is based on golang.org/x/net/html with following modifications:
 
@@ -17,6 +17,7 @@ The parser is based on golang.org/x/net/html with following modifications:
   - Foreign content is not handled per spec. Nested elements of <svg> and <math> tags are parsed as
     regular HTML nodes.
   - Foster parenting is disabled.
+  - Active Formatting Elements algorithm is removed for simplicity and performance.
 
 Tokenization is done by creating a Tokenizer for an io.Reader r. It is the
 caller's responsibility to ensure that r provides UTF-8 encoded HTML.

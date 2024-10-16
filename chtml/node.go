@@ -51,16 +51,7 @@ type Attribute struct {
 	Val       Expr
 }
 
-const (
-	scopeMarkerNode html.NodeType = 7
-	importNode      html.NodeType = 100
-)
-
-// Section 12.2.4.3 says "The markers are inserted when entering applet,
-// object, marquee, template, td, th, and caption elements, and are used
-// to prevent formatting from "leaking" into applet, object, marquee,
-// template, td, th, and caption elements".
-var scopeMarker = Node{Type: scopeMarkerNode}
+const importNode html.NodeType = 100
 
 func (n *Node) IsWhitespace() bool {
 	return strings.TrimLeft(n.Data.RawString(), whitespace) == ""
@@ -156,48 +147,4 @@ func (s *nodeStack) top() *Node {
 		return (*s)[i-1]
 	}
 	return nil
-}
-
-// index returns the index of the top-most occurrence of n in the stack, or -1
-// if n is not present.
-func (s *nodeStack) index(n *Node) int {
-	for i := len(*s) - 1; i >= 0; i-- {
-		if (*s)[i] == n {
-			return i
-		}
-	}
-	return -1
-}
-
-// remove removes a node from the stack. It is a no-op if n is not present.
-func (s *nodeStack) remove(n *Node) {
-	i := s.index(n)
-	if i == -1 {
-		return
-	}
-	copy((*s)[i:], (*s)[i+1:])
-	j := len(*s) - 1
-	(*s)[j] = nil
-	*s = (*s)[:j]
-}
-
-// cloneNode returns a new node with the same type, data and attributes.
-// The clone has no parent, no siblings and no children.
-// PrevCond and NextCond are not copied.
-func cloneNode(n *Node) *Node {
-	m := &Node{
-		Type:     n.Type,
-		DataAtom: n.DataAtom,
-		Data:     n.Data,
-		Attr:     make([]Attribute, len(n.Attr)),
-
-		Cond:     n.Cond,
-		PrevCond: nil,
-		NextCond: nil,
-		Loop:     n.Loop,
-		LoopVar:  n.LoopVar,
-		LoopIdx:  n.LoopIdx,
-	}
-	copy(m.Attr, n.Attr)
-	return m
 }

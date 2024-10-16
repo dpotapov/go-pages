@@ -119,8 +119,6 @@ func dumpLevel(w io.Writer, n *Node, level int) error {
 			}
 		}
 		_, _ = io.WriteString(w, ">")
-	case scopeMarkerNode:
-		return errors.New("unexpected scopeMarkerNode")
 	default:
 		return errors.New("unknown node type")
 	}
@@ -208,6 +206,49 @@ func TestParserHTML(t *testing.T) {
 			|   "Lorem ipsum"
 			| <h2>
 			|   "dolor sit amet"
+			`,
+		},
+		{
+			name: "parse head elements",
+			text: `<head>` +
+				`<title>Test</title>` +
+				`<meta charset="utf-8" />` +
+				`<link rel="stylesheet" href="style.css">` +
+				`<script src="script.js"></script>` +
+				`</head>`,
+			want: `
+			| <head>
+			|   <title>
+			|     "Test"
+			|   <meta>
+			|     charset="utf-8"
+			|   <link>
+			|     href="style.css"
+			|     rel="stylesheet"
+			|   <script>
+			|     src="script.js"
+			`,
+		},
+		{
+			name: "implicit li tag closure",
+			text: `<ul><li>Item 1<li>Item 2<li>Item 3</ul>`,
+			want: `
+			| <ul>
+			|   <li>
+			|     "Item 1"
+			|   <li>
+			|     "Item 2"
+			|   <li>
+			|     "Item 3"
+			`,
+		},
+		{
+			name: "parse a element",
+			text: `<a href="https://url">https://url</a>`,
+			want: `
+			| <a>
+			|   href="https://url"
+			|   "https://url"
 			`,
 		},
 	}
