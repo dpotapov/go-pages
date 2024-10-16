@@ -72,7 +72,8 @@ func TestComponentReuse(t *testing.T) {
 	// Dispose the component
 	events = nil
 	if d, ok := comp.(Disposable); ok {
-		d.Dispose()
+		err = d.Dispose()
+		require.NoError(t, err)
 	}
 	require.Equal(t, 1, len(events))
 	require.True(t, events[0].disposed)

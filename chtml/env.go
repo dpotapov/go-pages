@@ -36,6 +36,12 @@ func (e env) AnyPlusHtml(a any, b *html.Node) *html.Node {
 }
 
 func (e env) TextPlusHtml(a string, b *html.Node) *html.Node {
+	if b == nil {
+		return &html.Node{
+			Type: html.TextNode,
+			Data: a,
+		}
+	}
 	if b.Type == html.TextNode {
 		b.Data = a + b.Data
 		return b
@@ -91,6 +97,9 @@ func AnyPlusAny(a any, b any) any {
 		return env{}.HtmlPlusAny(va, b)
 	}
 	if vb, ok := b.(*html.Node); ok {
+		if vb == nil {
+			return a
+		}
 		return env{}.AnyPlusHtml(a, vb)
 	}
 
