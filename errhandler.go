@@ -61,11 +61,13 @@ func (eh *errorHandlerComponent) Render(s chtml.Scope) (any, error) {
 	return eh.fallback.Render(ss)
 }
 
-func (eh *errorHandlerComponent) Dispose() {
+func (eh *errorHandlerComponent) Dispose() error {
+	var errs []error
 	if d, ok := eh.comp.(chtml.Disposable); ok {
-		d.Dispose()
+		errs = append(errs, d.Dispose())
 	}
 	if d, ok := eh.fallback.(chtml.Disposable); ok {
-		d.Dispose()
+		errs = append(errs, d.Dispose())
 	}
+	return errors.Join(errs...)
 }

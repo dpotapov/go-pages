@@ -57,7 +57,7 @@ func TestHttpCallComponent_Render(t *testing.T) {
 			s := chtml.NewBaseScope(tt.vars)
 
 			comp := NewHttpCallComponent(mux)
-			defer comp.Dispose()
+			defer func() { _ = comp.Dispose() }()
 
 			rr, err := comp.Render(s)
 			if err != nil {
@@ -133,7 +133,7 @@ func TestHttpCallComponent_WithInterval(t *testing.T) {
 	})
 
 	comp := NewHttpCallComponent(mux)
-	defer comp.Dispose()
+	defer func() { _ = comp.Dispose() }()
 
 	if _, err := comp.Render(s); err != nil {
 		t.Errorf("Render() error = %v", err)
