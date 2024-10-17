@@ -246,7 +246,13 @@ func (h *Handler) render(w io.Writer, comp chtml.Component, scope *scope) error 
 	rr, err := comp.Render(scope)
 	if err != nil {
 		scope.globals.statusCode = http.StatusInternalServerError
-		h.logger.Error("Render component", "error", err)
+		// unwrap err into []error if it's a multierr
+		if multierr, ok := err.(interface{ Unwrap() []error }); ok {
+			for _, e := range multierr.Unwrap() {
+				h.logger.Error("Render component", "error", e)
+			}
+		}
+
 		// w.WriteHeader(http.StatusInternalServerError)
 		// return fmt.Errorf("render component: %w", err)
 	}
@@ -629,6 +635,9 @@ func (imp *pagesImporter) Import(name string) (chtml.Component, error) {
 				})
 				if err == chtml.ErrComponentNotFound {
 					continue
+				}
+				if err != nil {
+					return nil, err
 				}
 				imp.parsed[p] = parsed
 			}

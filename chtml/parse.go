@@ -12,6 +12,7 @@
 package chtml
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -49,8 +50,8 @@ type chtmlParser struct {
 	importer Importer
 	// vm is the virtual machine for evaluating expressions.
 	vm vm.VM
-	// err captures the first error that occurred during parsing.
-	err error
+	// errs captures all errors encountered during parsing.
+	errs []error
 }
 
 func (p *chtmlParser) top() *Node {
@@ -219,12 +220,22 @@ func (p *chtmlParser) addText(text string) {
 
 	t := p.top()
 	if n := t.LastChild; n != nil && n.Type == html.TextNode {
-		n.Data = p.parseExpr(n.Data.RawString() + text)
+		expr, err := NewExprInterpol(n.Data.RawString()+text, p.env)
+		if err != nil {
+			p.error(t, err)
+		}
+		n.Data = expr
 		return
 	}
+
+	expr, err := NewExprInterpol(text, p.env)
+	if err != nil {
+		p.error(t, err)
+	}
+
 	p.addChild(&Node{
 		Type: html.TextNode,
-		Data: p.parseExpr(text),
+		Data: expr,
 	})
 }
 
@@ -246,10 +257,16 @@ func (p *chtmlParser) addElement() {
 			continue
 		}
 
+		expr, err := NewExprInterpol(t.Val, p.env)
+		if err != nil {
+			p.error(n, err)
+			continue
+		}
+
 		n.Attr = append(n.Attr, Attribute{
 			Namespace: t.Namespace,
 			Key:       t.Key,
-			Val:       p.parseExpr(t.Val),
+			Val:       expr,
 		})
 	}
 
@@ -295,19 +312,19 @@ func (p *chtmlParser) parseImportElement(n *Node) {
 	}
 
 	if imp == nil {
-		p.error(ErrImportNotAllowed)
+		p.error(n, ErrImportNotAllowed)
 		return
 	}
 
 	comp, err := imp.Import(compName)
 	if err != nil {
-		p.error(fmt.Errorf("import %q: %w", n.Data.RawString(), err))
+		p.error(n, fmt.Errorf("import %q: %w", n.Data.RawString(), err))
 		return
 	}
 	defer func() {
 		if d, ok := comp.(Disposable); ok {
 			if err := d.Dispose(); err != nil {
-				p.error(fmt.Errorf("dispose import %s: %w", compName, err))
+				p.error(n, fmt.Errorf("dispose import %s: %w", compName, err))
 			}
 		}
 	}()
@@ -317,7 +334,7 @@ func (p *chtmlParser) parseImportElement(n *Node) {
 	for _, attr := range n.Attr {
 		v, err := attr.Val.Value(&p.vm, env(p.env))
 		if err != nil {
-			p.error(fmt.Errorf("eval attr %q: %w", attr.Key, err))
+			p.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
 			return
 		}
 		vars[attr.Key] = v
@@ -340,7 +357,7 @@ func (p *chtmlParser) parseImportElement(n *Node) {
 		}
 		rr, err := c.Render(s)
 		if err != nil {
-			p.error(fmt.Errorf("render import %s: %w", compName, err))
+			p.error(n, fmt.Errorf("render import %s: %w", compName, err))
 			return
 		}
 
@@ -349,14 +366,14 @@ func (p *chtmlParser) parseImportElement(n *Node) {
 
 	rr, err := comp.Render(s)
 	if err != nil {
-		p.error(fmt.Errorf("eval import %s: %w", compName, err))
+		p.error(n, fmt.Errorf("eval import %s: %w", compName, err))
 		return
 	}
 	if attr, ok := rr.(Attribute); ok && n.Parent != nil {
 		if n.Parent == p.doc {
 			v, err := attr.Val.Value(&p.vm, env(p.env))
 			if err != nil {
-				p.error(fmt.Errorf("eval attr %q: %w", attr.Key, err))
+				p.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
 				return
 			}
 			n.Parent.Attr = append(n.Parent.Attr, Attribute{
@@ -378,7 +395,7 @@ func (p *chtmlParser) parseSpecialAttrs(n *Node, t *html.Attribute) bool {
 		}
 		cond, err := NewExpr(scond, p.env)
 		if err != nil {
-			p.error(fmt.Errorf("parse condition: %w", err))
+			p.error(n, fmt.Errorf("parse condition: %w", err))
 			return true
 		}
 		if fk != "c:if" {
@@ -386,7 +403,7 @@ func (p *chtmlParser) parseSpecialAttrs(n *Node, t *html.Attribute) bool {
 				n.PrevCond = prev
 				prev.NextCond = n
 			} else {
-				p.error(fmt.Errorf("%s without c:if", fk))
+				p.error(n, fmt.Errorf("%s without c:if", fk))
 				return true
 			}
 		}
@@ -395,12 +412,12 @@ func (p *chtmlParser) parseSpecialAttrs(n *Node, t *html.Attribute) bool {
 	case "c:for":
 		v, k, expr, err := parseLoopExpr(t.Val)
 		if err != nil {
-			p.error(fmt.Errorf("parse loop expression: %w", err))
+			p.error(n, fmt.Errorf("parse loop expression: %w", err))
 			return true
 		}
 		loop, err := NewExpr(expr, p.env)
 		if err != nil {
-			p.error(fmt.Errorf("parse loop expression: %w", err))
+			p.error(n, fmt.Errorf("parse loop expression: %w", err))
 			return true
 		}
 		n.Loop = loop
@@ -664,10 +681,16 @@ func inBodyIM(p *chtmlParser) bool {
 			p.inBodyEndTagOther(p.tok.DataAtom, p.tok.Data)
 		}
 	case html.CommentToken:
-		p.addChild(&Node{
+		expr, err := NewExprInterpol(p.tok.Data, p.env)
+		n := &Node{
 			Type: html.CommentNode,
-			Data: p.parseExpr(p.tok.Data),
-		})
+			Data: expr,
+		}
+		if err != nil {
+			p.error(n, err)
+		} else {
+			p.addChild(n)
+		}
 	case html.ErrorToken:
 		// TODO: remove this divergence from the HTML5 spec.
 		return true
@@ -762,20 +785,8 @@ func (p *chtmlParser) parseCurrentToken() {
 	}
 }
 
-// parseExpr parses a given string as an expression.
-func (p *chtmlParser) parseExpr(s string) Expr {
-	expr, err := NewExprInterpol(s, p.env)
-	if err != nil {
-		p.error(err)
-	}
-	return expr
-}
-
-func (p *chtmlParser) error(err error) {
-	if p.err != nil {
-		return
-	}
-	p.err = err
+func (p *chtmlParser) error(n *Node, err error) {
+	p.errs = append(p.errs, newComponentError(n, err))
 }
 
 // pushEnv adds variables to the parsing env while preserving the previous values in the shadowed
@@ -844,5 +855,5 @@ func Parse(r io.Reader, imp Importer) (*Node, error) {
 	if err := p.parse(); err != nil {
 		return nil, err
 	}
-	return p.doc, p.err
+	return p.doc, errors.Join(p.errs...)
 }

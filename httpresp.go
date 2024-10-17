@@ -21,7 +21,7 @@ func (hc HttpResponseComponent) Render(s chtml.Scope) (any, error) {
 
 	ss, ok := s.(*scope)
 	if !ok {
-		return nil, fmt.Errorf("invalid scope type")
+		return nil, nil
 	}
 
 	if args.Status != 0 {

@@ -146,7 +146,7 @@ func (c *chtmlComponent) closeChildren(n *Node, idx int) {
 
 // error appends a new error to the errs list.
 func (c *chtmlComponent) error(n *Node, err error) {
-	c.errs = append(c.errs, newComponentError("", n, err))
+	c.errs = append(c.errs, newComponentError(n, err))
 }
 
 func NewComponent(n *Node, opts *ComponentOptions) Component {

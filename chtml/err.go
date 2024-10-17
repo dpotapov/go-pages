@@ -33,26 +33,24 @@ func (e *UnrecognizedArgumentError) Is(target error) bool {
 }
 
 type ComponentError struct {
-	name string
 	err  error
 	path string
 	html *html.Node
 }
 
-func newComponentError(compName string, n *Node, err error) *ComponentError {
+func newComponentError(n *Node, err error) *ComponentError {
 	return &ComponentError{
-		name: compName,
 		err:  err,
-		path: "",
+		path: buildErrorPath(n),
 		html: buildErrorContext(n),
 	}
 }
 
 func (e *ComponentError) Error() string {
-	if e.name == "" {
-		return e.path + ": " + e.err.Error()
+	if e.path == "" {
+		return e.err.Error()
 	}
-	return e.name + " " + e.path + ": " + e.err.Error()
+	return e.path + ": " + e.err.Error()
 }
 
 func (e *ComponentError) Unwrap() error {
@@ -113,6 +111,9 @@ func (b errorContextBuilder) addNode(src *Node, children bool) {
 		for i, a := range src.Attr {
 			n.Attr[i] = html.Attribute{Key: a.Key, Val: a.Val.RawString()}
 		}
+	}
+	if n.Type == importNode {
+		n.Type = html.ElementNode
 	}
 
 	if children && src.FirstChild != nil {
@@ -182,4 +183,19 @@ func buildErrorContext(n *Node) *html.Node {
 	b.wrapParent(n)
 	b.stripWhitespace()
 	return b.html
+}
+
+func buildErrorPath(n *Node) string {
+	// recursively build path to the node n from the root
+	var path []string
+	for n != nil {
+		if n.Type == html.ElementNode {
+			path = append(path, n.Data.RawString())
+		}
+		n = n.Parent
+	}
+	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
+		path[i], path[j] = path[j], path[i]
+	}
+	return strings.Join(path, "/")
 }
