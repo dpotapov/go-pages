@@ -78,7 +78,7 @@ func TestCookieComponent(t *testing.T) {
 			vars: map[string]any{
 				"name":   "jwt",
 				"value":  "1234567890",
-				"secure": "ttt",
+				"secure": true,
 			},
 			wantCookie: &http.Cookie{
 				Name:   "jwt",

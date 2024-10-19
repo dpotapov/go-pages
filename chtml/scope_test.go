@@ -136,8 +136,8 @@ func TestUnmarshalScope(t *testing.T) {
 			scope: NewBaseScope(map[string]any{
 				"int":        "30",
 				"float":      "12.3",
-				"bool_true":  "T",
-				"bool_false": "",
+				"bool_true":  "",
+				"bool_false": false, // string conversion for false is not supported
 				"duration":   "1h30s",
 				"reader":     "data",
 			}),
@@ -170,16 +170,16 @@ func TestUnmarshalScope(t *testing.T) {
 			scope: NewBaseScope(map[string]any{
 				"int":        "30",
 				"float":      "12.3",
-				"bool_true":  "foobar",
-				"bool_false": "",
+				"bool_true":  "",
+				"bool_false": false, // string conversion for false is not supported
 				"duration":   "1h30s",
 				"reader":     strings.NewReader("data"),
 			}),
 			target: &map[string]any{
 				"int":        0,
 				"float":      0.0,
-				"bool_true":  false,
-				"bool_false": true,
+				"bool_true":  true,
+				"bool_false": false,
 				"duration":   time.Duration(0),
 				"reader":     strings.NewReader(""),
 			},
@@ -301,7 +301,22 @@ func TestToSnakeCase(t *testing.T) {
 		{
 			name:       "String Starts with Underscore",
 			input:      "_privateVar",
-			wantResult: "private_var",
+			wantResult: "_private_var",
+		},
+		{
+			name:       "String Starts with Number",
+			input:      "1privateVar",
+			wantResult: "1_private_var",
+		},
+		{
+			name:       "String Ends with Number",
+			input:      "var1",
+			wantResult: "var1",
+		},
+		{
+			name:       "String Ends with Underscore and Number",
+			input:      "var_1",
+			wantResult: "var_1",
 		},
 	}
 

@@ -170,7 +170,6 @@ func TestRenderCHTML(t *testing.T) {
 			want: `<p>OK</p>`,
 		},
 
-
 		// Testing loops (c:for)
 		{
 			name: "render c:for - empty",
@@ -274,6 +273,31 @@ func TestRenderCHTMLImports(t *testing.T) {
 			text: `<c:attr name="content"><p>Lorem ipsum</p></c:attr>${content}${content}`,
 			want: `<p>Lorem ipsum</p><p>Lorem ipsum</p>`,
 		},
+		{
+			name: "bool kebab-flag attr - unset",
+			text: `<c:comp3 />`,
+			want: `false`,
+		},
+		{
+			name: "bool kebab-flag attr with implied true value",
+			text: `<c:comp3 with-flag />`,
+			want: `true`,
+		},
+		{
+			name: "bool kebab-flag attr with false value",
+			text: `<c:comp3 with-flag="${false}" />`,
+			want: `false`,
+		},
+		{
+			name: "bool kebab-flag attr with true value",
+			text: `<c:comp3 with-flag="${true}" />`,
+			want: `true`,
+		},
+		{
+			name:    "bool kebab-flag attr with string value",
+			text:    `<c:comp3 with-flag="true" />`,
+			wantErr: &DecodeError{Key: "with_flag"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -348,6 +372,7 @@ func (t *testImporter) init() {
 		"comp2": `<c:attr name="text">Hello</c:attr><p>${text}</p>`,
 		"simple-page": `<c:attr name="title">Website</c:attr>` +
 			`<html><head><title>${title}</title></head><body>${_}</body></html>`,
+		"comp3": `<c:attr name="with-flag">${false}</c:attr>${with_flag ? "true" : "false"}`,
 	}
 
 	t.parsedComps = make(map[string]*Node)

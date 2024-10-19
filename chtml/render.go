@@ -88,8 +88,9 @@ func (c *chtmlComponent) renderDocument(n *Node) any {
 				continue
 			}
 			if n == c.doc {
-				if !c.scopeHasVar(attr.Key) {
-					c.env[attr.Key] = v
+				snake := toSnakeCase(attr.Key)
+				if !c.scopeHasVar(snake) {
+					c.env[snake] = v
 				}
 			}
 		} else {
@@ -148,7 +149,8 @@ func (c *chtmlComponent) renderImport(n *Node) any {
 			c.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
 			return nil
 		}
-		vars[attr.Key] = res
+		snake := toSnakeCase(attr.Key)
+		vars[snake] = res
 	}
 
 	if n.FirstChild != nil {

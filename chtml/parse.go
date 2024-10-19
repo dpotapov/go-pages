@@ -256,7 +256,6 @@ func (p *chtmlParser) addElement() {
 		if ok := p.parseSpecialAttrs(n, &t); ok {
 			continue
 		}
-
 		expr, err := NewExprInterpol(t.Val, p.env)
 		if err != nil {
 			p.error(n, err)
@@ -337,7 +336,8 @@ func (p *chtmlParser) parseImportElement(n *Node) {
 			p.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
 			return
 		}
-		vars[attr.Key] = v
+		snake := toSnakeCase(attr.Key)
+		vars[snake] = v
 	}
 
 	s := NewBaseScope(vars)
@@ -381,7 +381,8 @@ func (p *chtmlParser) parseImportElement(n *Node) {
 				Key:       attr.Key,
 				Val:       NewExprConst(v),
 			})
-			p.env[attr.Key] = v
+			snake := toSnakeCase(attr.Key)
+			p.env[snake] = v
 		}
 	}
 }

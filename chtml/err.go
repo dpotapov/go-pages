@@ -32,6 +32,27 @@ func (e *UnrecognizedArgumentError) Is(target error) bool {
 	return false
 }
 
+type DecodeError struct {
+	Key string
+	Err error
+}
+
+func (e *DecodeError) Error() string {
+	return fmt.Sprintf("could not decode %s", e.Key)
+}
+
+func (e *DecodeError) Unwrap() error {
+	return e.Err
+}
+
+func (e *DecodeError) Is(target error) bool {
+	var de *DecodeError
+	if errors.As(target, &de) {
+		return e.Key == de.Key
+	}
+	return false
+}
+
 type ComponentError struct {
 	err  error
 	path string

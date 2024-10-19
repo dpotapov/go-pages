@@ -79,7 +79,8 @@ func (c *chtmlComponent) Render(s Scope) (any, error) {
 	// Check inputs: scope.Vars() keys should be a subset of c.doc.Attr keys.
 	attrMap := make(map[string]any, len(c.doc.Attr))
 	for _, attr := range c.doc.Attr {
-		attrMap[attr.Key] = attr.Val // TODO: should we evaluate chtml.Expr here?
+		snake := toSnakeCase(attr.Key)
+		attrMap[snake] = attr.Val // TODO: should we evaluate chtml.Expr here?
 	}
 
 	for k := range s.Vars() {
@@ -102,11 +103,13 @@ func (c *chtmlComponent) Render(s Scope) (any, error) {
 			return nil, fmt.Errorf("eval attr %q: %w", attr.Key, err)
 		}
 
+		snake := toSnakeCase(attr.Key)
+
 		// Default args could be unrendered nodes, so we need to evaluate them first.
 		if n, ok := v.(*Node); ok {
-			c.env[attr.Key] = c.render(n)
+			c.env[snake] = c.render(n)
 		} else {
-			c.env[attr.Key] = v
+			c.env[snake] = v
 		}
 	}
 

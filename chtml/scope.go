@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/fatih/camelcase"
 )
@@ -116,7 +117,10 @@ func UnmarshalScope(s Scope, target any) error {
 				}
 
 				if d, err := decodeHook(val, fieldValue); err != nil {
-					return fmt.Errorf("cannot decode value of field %s: %w", field.Name, err)
+					return &DecodeError{
+						Key: field.Name,
+						Err: err,
+					}
 				} else {
 					val = reflect.ValueOf(d)
 				}
@@ -155,7 +159,10 @@ func UnmarshalScope(s Scope, target any) error {
 				}
 				decodedVal, err := decodeHook(val, mapValue)
 				if err != nil {
-					return fmt.Errorf("cannot decode value for map entry %q: %w", k, err)
+					return &DecodeError{
+						Key: k,
+						Err: err,
+					}
 				}
 
 				targetElem.SetMapIndex(key, reflect.ValueOf(decodedVal))
@@ -202,19 +209,63 @@ func MarshalScope(s Scope, src any) error {
 	return nil
 }
 
+func isDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if !unicode.IsDigit(r) {
+			return false
+		}
+	}
+	return true
+}
+
 func toSnakeCase(s string) string {
 	if s == "_" {
 		return s
 	}
-	s = strings.ReplaceAll(s, "-", "_") // convert from kebab-case to snake_case
-	words := camelcase.Split(s)         // split camelCase words
-	elems := make([]string, 0, len(words))
-	for _, w := range words {
-		if w != "" && w != "_" {
-			elems = append(elems, strings.ToLower(w))
+
+	// Convert from kebab-case to snake_case
+	s = strings.ReplaceAll(s, "-", "_")
+
+	// Split by underscores to preserve them in the output
+	underscoreBlocks := strings.Split(s, "_")
+	processedBlocks := make([]string, 0, len(underscoreBlocks))
+
+	for _, block := range underscoreBlocks {
+		if block == "" {
+			// Preserve empty blocks (consecutive underscores)
+			processedBlocks = append(processedBlocks, "")
+			continue
 		}
+
+		// Split camelCase words
+		words := camelcase.Split(block)
+		elems := make([]string, 0, len(words))
+
+		for _, w := range words {
+			if w != "" {
+				if isDigits(w) {
+					// If the word is digits-only, append it to the previous word
+					if len(elems) > 0 {
+						lastIndex := len(elems) - 1
+						elems[lastIndex] = elems[lastIndex] + w
+					} else {
+						elems = append(elems, w)
+					}
+				} else {
+					elems = append(elems, strings.ToLower(w))
+				}
+			}
+		}
+		// Join the processed words without underscores
+		processedBlock := strings.Join(elems, "_")
+		processedBlocks = append(processedBlocks, processedBlock)
 	}
-	return strings.Join(elems, "_")
+
+	// Rejoin the blocks with underscores
+	return strings.Join(processedBlocks, "_")
 }
 
 type decodeHookFunc func(from reflect.Value, to reflect.Value) (any, error)
@@ -275,7 +326,11 @@ func decodeStrToBool(from reflect.Value, to reflect.Value) (any, error) {
 	if from.Kind() != reflect.String || to.Kind() != reflect.Bool {
 		return from.Interface(), nil
 	}
-	return from.String() != "", nil
+	if from.String() != "" {
+		return nil, fmt.Errorf("string value %q cannot be converted to bool, use ${true|false} "+
+			"syntax instead", from.String())
+	}
+	return true, nil
 }
 
 func decodeStrToDuration(from reflect.Value, to reflect.Value) (any, error) {

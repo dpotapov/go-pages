@@ -43,6 +43,9 @@ func NewExpr(s string, args map[string]any) (Expr, error) {
 }
 
 func NewExprInterpol(s string, args map[string]any) (Expr, error) {
+	if s == "" {
+		return Expr{}, nil
+	}
 	expr, err := interpol(s, args)
 	return Expr{
 		raw:  s,
