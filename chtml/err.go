@@ -38,7 +38,10 @@ type DecodeError struct {
 }
 
 func (e *DecodeError) Error() string {
-	return fmt.Sprintf("could not decode %s", e.Key)
+	if e.Err == nil {
+		return fmt.Sprintf("could not decode %s", e.Key)
+	}
+	return fmt.Sprintf("could not decode %s: %s", e.Key, e.Err.Error())
 }
 
 func (e *DecodeError) Unwrap() error {
