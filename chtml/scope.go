@@ -100,36 +100,42 @@ func UnmarshalScope(s Scope, target any) error {
 		for i := 0; i < targetElem.NumField(); i++ {
 			field := targetElem.Type().Field(i)
 			fieldName := toSnakeCase(field.Name)
-			if val, ok := snakeCaseVars[fieldName]; ok {
-				if val == nil {
+			val, ok := snakeCaseVars[fieldName]
+			if !ok {
+				if i == targetElem.NumField()-1 {
+					val = snakeCaseVars["_"]
+				} else {
 					continue
 				}
-				fieldValue := targetElem.Field(i)
-				val := reflect.ValueOf(val)
+			}
+			if val == nil {
+				continue
+			}
+			fieldValue := targetElem.Field(i)
+			rval := reflect.ValueOf(val)
 
-				// Check if val is zero and if fieldValue can accept nil
-				if !val.IsValid() || (val.Kind() == reflect.Ptr && val.IsNil()) {
-					// Check if fieldValue can accept nil
-					if !fieldValue.CanSet() || (fieldValue.Kind() != reflect.Ptr && !fieldValue.CanAddr()) {
-						return fmt.Errorf("cannot set nil value to field %s", field.Name)
-					}
-					val = reflect.Zero(fieldValue.Type())
+			// Check if val is zero and if fieldValue can accept nil
+			if !rval.IsValid() || (rval.Kind() == reflect.Ptr && rval.IsNil()) {
+				// Check if fieldValue can accept nil
+				if !fieldValue.CanSet() || (fieldValue.Kind() != reflect.Ptr && !fieldValue.CanAddr()) {
+					return fmt.Errorf("cannot set nil value to field %s", field.Name)
 				}
+				rval = reflect.Zero(fieldValue.Type())
+			}
 
-				if d, err := decodeHook(val, fieldValue); err != nil {
-					return &DecodeError{
-						Key: field.Name,
-						Err: err,
-					}
-				} else {
-					val = reflect.ValueOf(d)
+			if d, err := decodeHook(rval, fieldValue); err != nil {
+				return &DecodeError{
+					Key: field.Name,
+					Err: err,
 				}
+			} else {
+				rval = reflect.ValueOf(d)
+			}
 
-				if val.Type().ConvertibleTo(fieldValue.Type()) {
-					fieldValue.Set(val.Convert(fieldValue.Type()))
-				} else {
-					return fmt.Errorf("cannot convert value of field %s", field.Name)
-				}
+			if rval.Type().ConvertibleTo(fieldValue.Type()) {
+				fieldValue.Set(rval.Convert(fieldValue.Type()))
+			} else {
+				return fmt.Errorf("cannot convert value of field %s", field.Name)
 			}
 		}
 	case reflect.Map:

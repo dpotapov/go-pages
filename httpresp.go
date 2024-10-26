@@ -14,6 +14,7 @@ func (hc HttpResponseComponent) Render(s chtml.Scope) (any, error) {
 		Status   int
 		Location string
 		Cookies  []*http.Cookie
+		Extra    any
 	}
 	if err := chtml.UnmarshalScope(s, &args); err != nil {
 		return nil, fmt.Errorf("unmarshal scope: %w", err)
