@@ -35,9 +35,10 @@ type chtmlParser struct {
 	hasSelfClosingToken bool
 	// doc is the document root element.
 	doc *Node
-	// env is the environment for evaluating expressions.
+	// env is the environment for evaluating expressions in the attributes and text nodes.
 	env map[string]any
 	// shadowed is the stack of variables shadowed by the elements that introduce new scopes.
+	// When new variables are introduced (like in loops), the old values are preserved in the stack.
 	shadowed []map[string]any
 	// The stack of open elements (section 12.2.4.2).
 	oe nodeStack
@@ -225,6 +226,12 @@ func (p *chtmlParser) addText(text string) {
 			p.error(t, err)
 		}
 		n.Data = expr
+
+		// Try to evaluate the expression to determine RenderShape
+		if result, evalErr := expr.Value(&p.vm, env(p.env)); evalErr == nil {
+			n.RenderShape = result
+		}
+
 		return
 	}
 
@@ -233,10 +240,17 @@ func (p *chtmlParser) addText(text string) {
 		p.error(t, err)
 	}
 
-	p.addChild(&Node{
+	textNode := &Node{
 		Type: html.TextNode,
 		Data: expr,
-	})
+	}
+
+	// Try to evaluate the expression to determine RenderShape
+	if result, evalErr := expr.Value(&p.vm, env(p.env)); evalErr == nil {
+		textNode.RenderShape = result
+	}
+
+	p.addChild(textNode)
 }
 
 // addElement adds a child element based on the current token.
@@ -247,6 +261,7 @@ func (p *chtmlParser) addElement() {
 		Data:     NewExprRaw(p.tok.Data),
 		Attr:     make([]Attribute, 0, len(p.tok.Attr)),
 	}
+	n.RenderShape = n
 
 	if strings.HasPrefix(strings.ToLower(p.tok.Data), "c:") {
 		n.Type = importNode
@@ -340,14 +355,16 @@ func (p *chtmlParser) parseImportElement(n *Node) {
 		vars[snake] = v
 	}
 
-	s := NewBaseScope(vars)
-
+	// Render the child content of the import element
+	// Purpose: Renders child content and passes it as the "_" variable to the component.
+	//
+	// Example: <c:layout><p>This content</p></c:layout>
+	//          The "<p>This content</p>" is rendered and passed to the layout component.
 	if n.FirstChild != nil {
 		c := &chtmlComponent{
 			doc: &Node{
 				Type:       html.DocumentNode,
 				FirstChild: n.FirstChild,
-				Attr:       n.Attr,
 			},
 			env:            p.env,
 			renderComments: true,
@@ -355,6 +372,7 @@ func (p *chtmlParser) parseImportElement(n *Node) {
 			hidden:         make(map[*Node]struct{}),
 			children:       make(map[*Node][]Component),
 		}
+		s := NewDryRunScope(nil)
 		rr, err := c.Render(s)
 		if err != nil {
 			p.error(n, fmt.Errorf("render import %s: %w", compName, err))
@@ -364,12 +382,19 @@ func (p *chtmlParser) parseImportElement(n *Node) {
 		vars["_"] = rr
 	}
 
+	// Create a dry run scope for validation and rendering
+	s := NewDryRunScope(vars)
 	rr, err := comp.Render(s)
 	if err != nil {
 		p.error(n, fmt.Errorf("eval import %s: %w", compName, err))
 		return
 	}
+
+	// Store the dry run result as the node's RenderShape for future reference
+	n.RenderShape = rr
+
 	if attr, ok := rr.(Attribute); ok && n.Parent != nil {
+		// TODO: should we allow changing the attrribute of any element?
 		if n.Parent == p.doc {
 			v, err := attr.Val.Value(&p.vm, env(p.env))
 			if err != nil {

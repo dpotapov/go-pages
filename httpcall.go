@@ -72,7 +72,7 @@ func (c *HttpCallComponent) Render(s chtml.Scope) (any, error) {
 		return nil, fmt.Errorf("unmarshal scope: %w", err)
 	}
 
-	if args.URL == "" {
+	if s.DryRun() || args.URL == "" {
 		return &HttpCallResponse{}, nil
 	}
 

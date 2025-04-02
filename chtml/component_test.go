@@ -1,6 +1,7 @@
 package chtml
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -90,5 +91,63 @@ func (imp *lifecycleImporter) Import(name string) (Component, error) {
 		return &testComponent{imp.events}, nil
 	default:
 		return nil, fmt.Errorf("unknown component %q", name)
+	}
+}
+
+// TestDryRunValidation tests that components properly validate inputs even in dry run mode
+func TestDryRunValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		text    string
+		vars    map[string]any
+		wantErr bool
+	}{
+		{
+			name:    "valid input",
+			text:    `<c:attr name="foo">bar</c:attr><div class="${foo}">Content</div>`,
+			vars:    map[string]any{"foo": "custom-class"},
+			wantErr: false,
+		},
+		{
+			name:    "invalid input - unknown parameter",
+			text:    `<c:attr name="foo">bar</c:attr><div class="${foo}">Content</div>`,
+			vars:    map[string]any{"unknown": "value"},
+			wantErr: true,
+		},
+		{
+			name:    "valid with underscore",
+			text:    `<c:attr name="content">Hello</c:attr>${content}`,
+			vars:    map[string]any{"_": "child content", "content": "Override"},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			doc, err := Parse(strings.NewReader(tt.text), nil)
+			if err != nil {
+				t.Fatalf("Parse error: %v", err)
+			}
+
+			comp := NewComponent(doc, nil)
+
+			// Create dry run scope with test variables
+			s := NewDryRunScope(tt.vars)
+
+			// Test rendering in dry run mode
+			_, err = comp.Render(s)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DryRun validation error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.wantErr && err != nil {
+				// If we expect an error, verify it's an UnrecognizedArgumentError
+				var argErr *UnrecognizedArgumentError
+				if !errors.As(err, &argErr) {
+					t.Errorf("Expected UnrecognizedArgumentError, got %T: %v", err, err)
+				}
+			}
+		})
 	}
 }

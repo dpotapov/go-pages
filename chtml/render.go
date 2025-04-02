@@ -55,6 +55,8 @@ func (c *chtmlComponent) renderText(n *Node) any {
 		c.error(n, fmt.Errorf("eval text: %w", err))
 		return nil
 	}
+	// Store the result as the node's RenderShape for future reference
+	n.RenderShape = res
 	return res
 }
 
@@ -136,6 +138,8 @@ func (c *chtmlComponent) renderElement(n *Node) any {
 		}
 	}
 
+	// Store the clone as the node's RenderShape for future reference
+	n.RenderShape = clone
 	return clone
 }
 

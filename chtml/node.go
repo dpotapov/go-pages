@@ -43,6 +43,10 @@ type Node struct {
 
 	// LoopVar is the value variable name for c:for loops.
 	LoopVar string
+
+	// RenderShape holds information about the expected output shape of this node
+	// This is used to optimize component composition and validation
+	RenderShape any
 }
 
 type Attribute struct {

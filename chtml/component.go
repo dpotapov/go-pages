@@ -118,7 +118,12 @@ func (c *chtmlComponent) Render(s Scope) (any, error) {
 		return nil, err
 	}
 
-	// Evaluate the component's expressions
+	// If we're in dry run mode, return shape inference after input validation
+	if s.DryRun() {
+		return c.inferNodeShape(c.doc), nil
+	}
+
+	// Evaluate the component's expressions for actual rendering
 	return c.render(c.doc), errors.Join(c.errs...)
 }
 
@@ -165,4 +170,24 @@ func NewComponent(n *Node, opts *ComponentOptions) Component {
 		c.renderComments = opts.RenderComments
 	}
 	return c
+}
+
+// inferNodeShape walks only the immediate children of a node, and
+// combines their RenderShapes to determine the final output shape.
+// This method is used in dry run mode to optimize component composition.
+func (c *chtmlComponent) inferNodeShape(n *Node) any {
+	if n == nil {
+		return nil
+	}
+
+	// If the node has a direct RenderShape assigned, return it
+	if n.RenderShape != nil {
+		return n.RenderShape
+	}
+
+	var shape any
+	for child := n.FirstChild; child != nil; child = child.NextSibling {
+		shape = AnyPlusAny(shape, child.RenderShape)
+	}
+	return shape
 }

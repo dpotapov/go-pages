@@ -376,6 +376,7 @@ func (t *testImporter) init() {
 	}
 
 	t.parsedComps = make(map[string]*Node)
+
 	for name, text := range comps {
 		doc, err := Parse(strings.NewReader(text), nil)
 		if err != nil {
