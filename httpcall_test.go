@@ -13,8 +13,7 @@ import (
 func TestHttpCallComponent_Render(t *testing.T) {
 	type wantVars struct {
 		Code  int
-		Body  string
-		Json  any
+		Body  any
 		Error string
 	}
 
@@ -36,7 +35,7 @@ func TestHttpCallComponent_Render(t *testing.T) {
 		{
 			name:     "noURL",
 			vars:     map[string]any{},
-			wantVars: &wantVars{},
+			wantVars: nil,
 		},
 		{
 			name: "getData",
@@ -45,8 +44,7 @@ func TestHttpCallComponent_Render(t *testing.T) {
 			},
 			wantVars: &wantVars{
 				Code: 200,
-				Body: `{"data": "hello"}`,
-				Json: map[string]any{
+				Body: map[string]any{
 					"data": "hello",
 				},
 			},
@@ -69,11 +67,8 @@ func TestHttpCallComponent_Render(t *testing.T) {
 					if got.Code != tt.wantVars.Code {
 						t.Errorf("Render() got.Code = %v, want %v", got.Code, tt.wantVars.Code)
 					}
-					if got.Body != tt.wantVars.Body {
+					if !reflect.DeepEqual(got.Body, tt.wantVars.Body) {
 						t.Errorf("Render() got.Body = %v, want %v", got.Body, tt.wantVars.Body)
-					}
-					if !reflect.DeepEqual(got.Json, tt.wantVars.Json) {
-						t.Errorf("Render() got.Json = %v, want %v", got.Json, tt.wantVars.Json)
 					}
 					if got.Error != tt.wantVars.Error {
 						t.Errorf("Render() got.Error = %v, want %v", got.Error, tt.wantVars.Error)

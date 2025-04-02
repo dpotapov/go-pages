@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"sync"
 	"time"
 
@@ -50,8 +51,7 @@ type HttpCallArgs struct {
 
 type HttpCallResponse struct {
 	Code  int    `expr:"code"`
-	Body  string `expr:"body"`
-	Json  any    `expr:"json"`
+	Body  any    `expr:"body"`
 	Error string `expr:"error"`
 }
 
@@ -137,7 +137,7 @@ func (c *HttpCallComponent) hasResponseChanged(newResponse *HttpCallResponse) bo
 		return true
 	}
 	return c.lastResponse.Code != newResponse.Code ||
-		c.lastResponse.Body != newResponse.Body ||
+		!reflect.DeepEqual(c.lastResponse.Body, newResponse.Body) ||
 		c.lastResponse.Error != newResponse.Error
 }
 
@@ -179,15 +179,25 @@ func (c *HttpCallComponent) makeResponse(res *http.Response, err error) *HttpCal
 		body, err2 := io.ReadAll(res.Body)
 		if err2 != nil && err != nil {
 			err = fmt.Errorf("read body: %v", err2)
-		} else if err2 == nil {
-			r.Body = string(body)
 		}
 
-		if res.Header.Get("Content-Type") == "application/json" && r.Body != "" {
-			err2 := json.Unmarshal([]byte(r.Body), &r.Json)
+		jsonContentTypes := false
+		for _, ct := range []string{"application/json", "application/problem+json"} {
+			if res.Header.Get("Content-Type") == ct {
+				jsonContentTypes = true
+				break
+			}
+		}
+
+		if jsonContentTypes && r.Body != "" {
+			err2 := json.Unmarshal(body, &r.Body)
 			if err2 != nil && err != nil {
 				err = fmt.Errorf("unmarshal json: %w", err)
 			}
+		} else if res.Header.Get("Content-Type") == "text/plain" {
+			r.Body = string(body)
+		} else {
+			r.Body = body
 		}
 	}
 
