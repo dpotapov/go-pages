@@ -125,10 +125,51 @@ func AnyPlusAny(a any, b any) any {
 		}
 	}
 
-	return repr(a) + " " + repr(b)
+	return repr(a) + repr(b)
 }
 
 func repr(v any) string {
+	// If nil, return empty string
+	if v == nil {
+		return ""
+	}
+
+	// If string, return it directly
+	if s, ok := v.(string); ok {
+		return s
+	}
+
+	// Handle numeric types with proper formatting
+	switch n := v.(type) {
+	case int:
+		return fmt.Sprintf("%d", n)
+	case int8:
+		return fmt.Sprintf("%d", n)
+	case int16:
+		return fmt.Sprintf("%d", n)
+	case int32:
+		return fmt.Sprintf("%d", n)
+	case int64:
+		return fmt.Sprintf("%d", n)
+	case uint:
+		return fmt.Sprintf("%d", n)
+	case uint8:
+		return fmt.Sprintf("%d", n)
+	case uint16:
+		return fmt.Sprintf("%d", n)
+	case uint32:
+		return fmt.Sprintf("%d", n)
+	case uint64:
+		return fmt.Sprintf("%d", n)
+	case float32:
+		return fmt.Sprintf("%g", n)
+	case float64:
+		return fmt.Sprintf("%g", n)
+	case complex64, complex128:
+		return fmt.Sprintf("%g", n)
+	}
+
+	// Check for text marshaler interface
 	if tm, ok := v.(encoding.TextMarshaler); ok {
 		b, err := tm.MarshalText()
 		if err == nil {
@@ -136,11 +177,18 @@ func repr(v any) string {
 		}
 	}
 
+	// If []byte, return as string
+	if b, ok := v.([]byte); ok {
+		return string(b)
+	}
+
+	// Try using JSON marshaling for complex types
 	b, err := json.Marshal(v)
 	if err == nil {
 		return string(b)
 	}
 
+	// Fallback to fmt.Sprint
 	return fmt.Sprint(v)
 }
 
