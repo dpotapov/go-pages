@@ -1,6 +1,7 @@
 package chtml
 
 import (
+	"encoding"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -124,7 +125,23 @@ func AnyPlusAny(a any, b any) any {
 		}
 	}
 
-	return fmt.Sprint(a) + fmt.Sprint(b)
+	return repr(a) + " " + repr(b)
+}
+
+func repr(v any) string {
+	if tm, ok := v.(encoding.TextMarshaler); ok {
+		b, err := tm.MarshalText()
+		if err == nil {
+			return string(b)
+		}
+	}
+
+	b, err := json.Marshal(v)
+	if err == nil {
+		return string(b)
+	}
+
+	return fmt.Sprint(v)
 }
 
 func isEquivalentToNewAny(v any) bool {
