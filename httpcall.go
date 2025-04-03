@@ -50,9 +50,10 @@ type HttpCallArgs struct {
 }
 
 type HttpCallResponse struct {
-	Code  int    `expr:"code"`
-	Body  any    `expr:"body"`
-	Error string `expr:"error"`
+	Code    int    `expr:"code"`
+	Body    any    `expr:"body"`
+	Error   string `expr:"error"`
+	Success bool   `expr:"success"`
 }
 
 func NewHttpCallComponent(router http.Handler) *HttpCallComponent {
@@ -176,6 +177,7 @@ func (c *HttpCallComponent) makeResponse(res *http.Response, err error) *HttpCal
 
 	if res != nil {
 		r.Code = res.StatusCode
+		r.Success = res.StatusCode >= 200 && res.StatusCode < 300
 		body, err2 := io.ReadAll(res.Body)
 		if err2 != nil && err != nil {
 			err = fmt.Errorf("read body: %v", err2)
@@ -203,6 +205,7 @@ func (c *HttpCallComponent) makeResponse(res *http.Response, err error) *HttpCal
 
 	if err != nil {
 		r.Error = err.Error()
+		r.Success = false
 	}
 
 	return &r
