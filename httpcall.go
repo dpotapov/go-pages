@@ -50,10 +50,10 @@ type HttpCallArgs struct {
 }
 
 type HttpCallResponse struct {
-	Code    int    `expr:"code"`
-	Body    any    `expr:"body"`
-	Error   string `expr:"error"`
-	Success bool   `expr:"success"`
+	Code    int  `expr:"code"`
+	Data    any  `expr:"body"`
+	Error   any  `expr:"error"`
+	Success bool `expr:"success"`
 }
 
 func NewHttpCallComponent(router http.Handler) *HttpCallComponent {
@@ -98,7 +98,7 @@ func (c *HttpCallComponent) Render(s chtml.Scope) (any, error) {
 		go c.startPolling(s, c.pollingStop)
 	}
 
-	return c.render(&args), nil
+	return c.render(&args)
 }
 
 func (c *HttpCallComponent) Dispose() error {
@@ -121,7 +121,12 @@ func (c *HttpCallComponent) startPolling(s chtml.Scope, stopChan chan struct{}) 
 		select {
 		case <-ticker.C:
 			c.mu.Lock()
-			newResponse := c.render(c.lastArgs)
+			newResponse, err := c.render(c.lastArgs)
+			if err != nil {
+				// TODO: If rendering fails, log the error and stop the polling
+				s.Touch()
+				return
+			}
 			if c.hasResponseChanged(newResponse) {
 				c.lastResponse = newResponse
 				s.Touch()
@@ -138,19 +143,19 @@ func (c *HttpCallComponent) hasResponseChanged(newResponse *HttpCallResponse) bo
 		return true
 	}
 	return c.lastResponse.Code != newResponse.Code ||
-		!reflect.DeepEqual(c.lastResponse.Body, newResponse.Body) ||
-		c.lastResponse.Error != newResponse.Error
+		!reflect.DeepEqual(c.lastResponse.Data, newResponse.Data) ||
+		!reflect.DeepEqual(c.lastResponse.Error, newResponse.Error)
 }
 
 // render makes an HTTP call
-func (c *HttpCallComponent) render(args *HttpCallArgs) *HttpCallResponse {
+func (c *HttpCallComponent) render(args *HttpCallArgs) (*HttpCallResponse, error) {
 	if args.Method == "" {
 		args.Method = "GET"
 	}
 
 	req, err := http.NewRequest(args.Method, args.URL, args.Body)
 	if err != nil {
-		return c.makeResponse(nil, fmt.Errorf("create request: %w", err))
+		return nil, err
 	}
 	req.RequestURI = args.URL
 
@@ -169,44 +174,33 @@ func (c *HttpCallComponent) render(args *HttpCallArgs) *HttpCallResponse {
 	rr := httptest.NewRecorder()
 	c.router.ServeHTTP(rr, req)
 
-	return c.makeResponse(rr.Result(), nil)
+	return c.makeResponse(rr.Result())
 }
 
-func (c *HttpCallComponent) makeResponse(res *http.Response, err error) *HttpCallResponse {
+func (c *HttpCallComponent) makeResponse(res *http.Response) (*HttpCallResponse, error) {
 	var r HttpCallResponse
 
-	if res != nil {
-		r.Code = res.StatusCode
-		r.Success = res.StatusCode >= 200 && res.StatusCode < 300
-		body, err2 := io.ReadAll(res.Body)
-		if err2 != nil && err != nil {
-			err = fmt.Errorf("read body: %v", err2)
-		}
-
-		jsonContentTypes := false
-		for _, ct := range []string{"application/json", "application/problem+json"} {
-			if res.Header.Get("Content-Type") == ct {
-				jsonContentTypes = true
-				break
-			}
-		}
-
-		if jsonContentTypes && r.Body != "" {
-			err2 := json.Unmarshal(body, &r.Body)
-			if err2 != nil && err != nil {
-				err = fmt.Errorf("unmarshal json: %w", err)
-			}
-		} else if res.Header.Get("Content-Type") == "text/plain" {
-			r.Body = string(body)
-		} else {
-			r.Body = body
-		}
-	}
-
+	r.Code = res.StatusCode
+	r.Success = res.StatusCode >= 200 && res.StatusCode < 300
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		r.Error = err.Error()
-		r.Success = false
+		return nil, fmt.Errorf("read body: %v", err)
 	}
 
-	return &r
+	switch res.Header.Get("Content-Type") {
+	case "application/json":
+		if err := json.Unmarshal(body, &r.Data); err != nil {
+			return nil, fmt.Errorf("unmarshal json: %w", err)
+		}
+	case "application/problem+json":
+		if err := json.Unmarshal(body, &r.Error); err != nil {
+			return nil, fmt.Errorf("unmarshal json: %w", err)
+		}
+	case "text/plain":
+		r.Data = string(body)
+	default:
+		r.Data = body
+	}
+
+	return &r, nil
 }
