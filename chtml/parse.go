@@ -396,18 +396,17 @@ func (p *chtmlParser) parseImportElement(n *Node) {
 	if attr, ok := rr.(Attribute); ok && n.Parent != nil {
 		// TODO: should we allow changing the attrribute of any element?
 		if n.Parent == p.doc {
+			n.Parent.Attr = append(n.Parent.Attr, attr)
+
 			v, err := attr.Val.Value(&p.vm, env(p.env))
 			if err != nil {
 				p.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
 				return
 			}
-			n.Parent.Attr = append(n.Parent.Attr, Attribute{
-				Namespace: attr.Namespace,
-				Key:       attr.Key,
-				Val:       NewExprConst(v),
-			})
+
 			snake := toSnakeCase(attr.Key)
 			p.env[snake] = v
+			n.RenderShape = nil // the attribute does not render to anything
 		}
 	}
 }
@@ -422,6 +421,7 @@ func (p *chtmlParser) parseSpecialAttrs(n *Node, t *html.Attribute) bool {
 		cond, err := NewExpr(scond, p.env)
 		if err != nil {
 			p.error(n, fmt.Errorf("parse condition: %w", err))
+			n.Cond = NewExprConst(false) // fallback to false to prevent further errors
 			return true
 		}
 		if fk != "c:if" {
