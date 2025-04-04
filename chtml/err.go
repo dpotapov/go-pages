@@ -3,6 +3,7 @@ package chtml
 import (
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -57,16 +58,18 @@ func (e *DecodeError) Is(target error) bool {
 }
 
 type ComponentError struct {
-	err  error
-	path string
-	html *html.Node
+	err   error
+	path  string
+	html  *html.Node
+	stack []byte
 }
 
 func newComponentError(n *Node, err error) *ComponentError {
 	return &ComponentError{
-		err:  err,
-		path: buildErrorPath(n),
-		html: buildErrorContext(n),
+		err:   err,
+		path:  buildErrorPath(n),
+		html:  buildErrorContext(n),
+		stack: debug.Stack(),
 	}
 }
 
@@ -86,6 +89,11 @@ func (e *ComponentError) HTMLContext() string {
 	_ = html.Render(&buf, e.html)
 
 	return buf.String()
+}
+
+// StackTrace returns the captured stack trace from when the error was created
+func (e *ComponentError) StackTrace() string {
+	return string(e.stack)
 }
 
 // errorContextBuilder is a type to organize helper functions for building error context trees.
