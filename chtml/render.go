@@ -205,7 +205,7 @@ func (c *chtmlComponent) renderImport(n *Node) any {
 
 	rr, err := comp.Render(s)
 	if err != nil {
-		c.error(n, fmt.Errorf("render import: %w", err))
+		c.error(n, fmt.Errorf("render import %s: %w", n.Data.RawString(), err))
 		return nil
 	}
 	return rr

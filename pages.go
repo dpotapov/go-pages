@@ -533,25 +533,25 @@ func findCatchAllFile(entries []fs.DirEntry) (string, error) {
 
 // RequestArg is a simplified model for http.Request suitable for expressions in templates.
 type RequestArg struct {
-	Method     string              `expr:"method"`
-	URL        string              `expr:"url"`
-	Host       string              `expr:"host"`
-	Port       string              `expr:"port"`
-	Scheme     string              `expr:"scheme"`
-	Path       string              `expr:"path"`
-	Query      map[string][]string `expr:"query"`
-	RemoteAddr string              `expr:"remote_addr"`
+	Method     string              `expr:"method" json:"method"`
+	URL        string              `expr:"url" json:"url"`
+	Host       string              `expr:"host" json:"host"`
+	Port       string              `expr:"port" json:"port"`
+	Scheme     string              `expr:"scheme" json:"scheme"`
+	Path       string              `expr:"path" json:"path"`
+	Query      map[string][]string `expr:"query" json:"query"`
+	RemoteAddr string              `expr:"remote_addr" json:"remote_addr"`
 
-	Headers map[string][]string `expr:"headers"`
-	Cookies []*http.Cookie      `expr:"cookies"`
+	Headers map[string][]string `expr:"headers" json:"headers"`
+	Cookies []*http.Cookie      `expr:"cookies" json:"cookies"`
 
 	// Body is available only when the content type is either application/json or
 	// application/x-www-form-urlencoded.
-	Body map[string]any `expr:"body"`
+	Body map[string]any `expr:"body" json:"body"`
 
 	// RawBody is the Body field of the http.Request. If the content type is parseable as JSON or
 	// form data, the RawBody will be closed.
-	RawBody io.ReadCloser `expr:"raw_body"`
+	RawBody io.ReadCloser `expr:"raw_body" json:"raw_body"`
 }
 
 func NewRequestArg(r *http.Request) *RequestArg {

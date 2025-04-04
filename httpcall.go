@@ -46,14 +46,17 @@ type HttpCallArgs struct {
 	BasicAuthPassword string
 	Cookies           []*http.Cookie
 	Header            http.Header
-	Body              io.Reader
+	DataShape         string    // JSON string defining the shape of Data in dry run mode
+	ErrorShape        string    // JSON string defining the shape of Error in dry run mode
+	Body              io.Reader // must be at the end
 }
 
 type HttpCallResponse struct {
-	Code    int  `expr:"code"`
-	Data    any  `expr:"body"`
-	Error   any  `expr:"error"`
-	Success bool `expr:"success"`
+	Code      int      `expr:"code" json:"code"`
+	Data      any      `expr:"data" json:"data"`
+	Error     any      `expr:"error" json:"error"`
+	Success   bool     `expr:"success" json:"success"`
+	SetCookie []string `expr:"set_cookie" json:"set_cookie"`
 }
 
 func NewHttpCallComponent(router http.Handler) *HttpCallComponent {
@@ -74,7 +77,34 @@ func (c *HttpCallComponent) Render(s chtml.Scope) (any, error) {
 	}
 
 	if s.DryRun() || args.URL == "" {
-		return &HttpCallResponse{}, nil
+		// In dry run mode, use the data and error shapes if provided
+		resp := &HttpCallResponse{Success: true}
+
+		if args.DataShape != "" {
+			var data any
+			if err := json.Unmarshal([]byte(args.DataShape), &data); err != nil {
+				return nil, fmt.Errorf("unmarshal data shape: %w", err)
+			}
+			resp.Data = data
+		}
+
+		if args.ErrorShape != "" {
+			var errData any
+			if err := json.Unmarshal([]byte(args.ErrorShape), &errData); err != nil {
+				return nil, fmt.Errorf("unmarshal error shape: %w", err)
+			}
+			resp.Error = errData
+		}
+
+		return resp, nil
+	}
+
+	// Get cookies from the original request in scope globals if available
+	if sc, ok := s.(*scope); ok && sc.globals != nil && sc.globals.req != nil {
+		// Only copy cookies if none were explicitly specified in args
+		if len(args.Cookies) == 0 {
+			args.Cookies = sc.globals.req.Cookies()
+		}
 	}
 
 	c.mu.Lock()
@@ -98,7 +128,20 @@ func (c *HttpCallComponent) Render(s chtml.Scope) (any, error) {
 		go c.startPolling(s, c.pollingStop)
 	}
 
-	return c.render(&args)
+	resp, err := c.render(&args)
+	if err != nil {
+		return nil, err
+	}
+
+	// If we have Set-Cookie headers and scope globals, add them to the headers
+	// Only add cookies to globals if not in polling mode
+	if sc, ok := s.(*scope); ok && sc.globals != nil && len(resp.SetCookie) > 0 && args.Interval == 0 {
+		for _, cookie := range resp.SetCookie {
+			sc.globals.header.Add("Set-Cookie", cookie)
+		}
+	}
+
+	return resp, nil
 }
 
 func (c *HttpCallComponent) Dispose() error {
@@ -200,6 +243,11 @@ func (c *HttpCallComponent) makeResponse(res *http.Response) (*HttpCallResponse,
 		r.Data = string(body)
 	default:
 		r.Data = body
+	}
+
+	// Extract Set-Cookie headers from the response
+	if cookies := res.Header["Set-Cookie"]; len(cookies) > 0 {
+		r.SetCookie = cookies
 	}
 
 	return &r, nil
