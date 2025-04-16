@@ -539,7 +539,8 @@ type RequestArg struct {
 	Port       string              `expr:"port" json:"port"`
 	Scheme     string              `expr:"scheme" json:"scheme"`
 	Path       string              `expr:"path" json:"path"`
-	Query      map[string][]string `expr:"query" json:"query"`
+	Query      map[string]string   `expr:"query" json:"query"`         // first value for each key
+	QueryAll   map[string][]string `expr:"query_all" json:"query_all"` // all values for each key
 	RemoteAddr string              `expr:"remote_addr" json:"remote_addr"`
 
 	Headers map[string][]string `expr:"headers" json:"headers"`
@@ -555,6 +556,16 @@ type RequestArg struct {
 }
 
 func NewRequestArg(r *http.Request) *RequestArg {
+	queryAll := r.URL.Query()
+	query := make(map[string]string, len(queryAll))
+	for k, v := range queryAll {
+		if len(v) > 0 {
+			query[k] = v[0]
+		} else {
+			query[k] = ""
+		}
+	}
+
 	model := &RequestArg{
 		Method:     r.Method,
 		URL:        r.RequestURI,
@@ -562,7 +573,8 @@ func NewRequestArg(r *http.Request) *RequestArg {
 		Port:       r.URL.Port(),
 		Scheme:     r.URL.Scheme,
 		Path:       r.URL.Path,
-		Query:      r.URL.Query(),
+		Query:      query,
+		QueryAll:   queryAll,
 		RemoteAddr: r.RemoteAddr,
 		Headers:    r.Header,
 		Cookies:    r.Cookies(),
