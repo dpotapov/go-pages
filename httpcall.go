@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"sync"
 	"time"
@@ -46,6 +47,7 @@ type HttpCallArgs struct {
 	BasicAuthPassword string
 	Cookies           []*http.Cookie
 	Header            http.Header
+	Query             map[string]any
 	DataShape         string    // JSON string defining the shape of Data in dry run mode
 	ErrorShape        string    // JSON string defining the shape of Error in dry run mode
 	Body              io.Reader // must be at the end
@@ -196,11 +198,38 @@ func (c *HttpCallComponent) render(args *HttpCallArgs) (*HttpCallResponse, error
 		args.Method = "GET"
 	}
 
-	req, err := http.NewRequest(args.Method, args.URL, args.Body)
+	urlStr := args.URL
+	if len(args.Query) > 0 {
+		u, err := url.Parse(urlStr)
+		if err != nil {
+			return nil, fmt.Errorf("parse url: %w", err)
+		}
+		q := u.Query()
+		for k, v := range args.Query {
+			switch vv := v.(type) {
+			case string:
+				q.Add(k, vv)
+			case []string:
+				for _, s := range vv {
+					q.Add(k, s)
+				}
+			default:
+				jsonVal, err := json.Marshal(vv)
+				if err != nil {
+					return nil, fmt.Errorf("marshal query value for key %q: %w", k, err)
+				}
+				q.Add(k, string(jsonVal))
+			}
+		}
+		u.RawQuery = q.Encode()
+		urlStr = u.String()
+	}
+
+	req, err := http.NewRequest(args.Method, urlStr, args.Body)
 	if err != nil {
 		return nil, err
 	}
-	req.RequestURI = args.URL
+	req.RequestURI = urlStr
 
 	if args.BasicAuthUsername != "" || args.BasicAuthPassword != "" {
 		req.SetBasicAuth(args.BasicAuthUsername, args.BasicAuthPassword)

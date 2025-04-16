@@ -317,3 +317,55 @@ func TestHttpCallComponent_SetCookieHeaders(t *testing.T) {
 			len(sPolling.globals.header.Values("Set-Cookie")))
 	}
 }
+
+func TestHttpCallComponent_QueryMerging(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/query", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = r.ParseForm()
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"query": r.Form,
+		})
+	})
+
+	// URL already has ?foo=bar, Query adds foo=baz and x=1,x=2
+	vars := map[string]any{
+		"url":   "/api/query?foo=bar",
+		"query": map[string]any{"foo": "baz", "x": []string{"1", "2"}},
+	}
+	s := chtml.NewBaseScope(vars)
+	comp := NewHttpCallComponent(mux)
+	defer func() { _ = comp.Dispose() }()
+
+	rr, err := comp.Render(s)
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	resp, ok := rr.(*HttpCallResponse)
+	if !ok {
+		t.Fatalf("expected HttpCallResponse, got %T", rr)
+	}
+	data, ok := resp.Data.(map[string]any)
+	if !ok {
+		t.Fatalf("expected map[string]any in response data, got %T", resp.Data)
+	}
+	query, ok := data["query"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected map[string]any for query, got %T", data["query"])
+	}
+	want := map[string][]string{"foo": {"bar", "baz"}, "x": {"1", "2"}}
+	for k, wantVals := range want {
+		gotValsIface, ok := query[k]
+		if !ok {
+			t.Errorf("missing key %q in query", k)
+			continue
+		}
+		gotVals := make([]string, 0)
+		for _, v := range gotValsIface.([]any) {
+			gotVals = append(gotVals, v.(string))
+		}
+		if !reflect.DeepEqual(gotVals, wantVals) {
+			t.Errorf("for key %q: got %v, want %v", k, gotVals, wantVals)
+		}
+	}
+}
