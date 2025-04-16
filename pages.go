@@ -153,7 +153,7 @@ func (h *Handler) servePage(
 		}
 	}()
 
-	mainScope := newScope(nil, r, route)
+	mainScope := newScope(stringMapToAnyMap(route), r)
 
 	if websocket.IsWebSocketUpgrade(r) {
 		ws, err := wsUpgrader.Upgrade(w, r, nil)
@@ -676,4 +676,12 @@ func parseFile(fsys fs.FS, fname string, imp chtml.Importer) (*chtml.Node, error
 	defer func() { _ = f.Close() }()
 
 	return chtml.Parse(f, imp)
+}
+
+func stringMapToAnyMap(m map[string]string) map[string]any {
+	out := make(map[string]any, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
 }

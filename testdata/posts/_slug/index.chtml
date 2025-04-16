@@ -1,1 +1,2 @@
-view-post
+<c:attr name="slug"></c:attr>
+${slug}

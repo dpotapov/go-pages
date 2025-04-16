@@ -110,7 +110,7 @@ func TestHttpCallComponent_Render(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var s chtml.Scope
 			if tt.req != nil {
-				s = newScope(tt.vars, tt.req, nil)
+				s = newScope(tt.vars, tt.req)
 			} else {
 				s = chtml.NewBaseScope(tt.vars)
 			}
@@ -150,7 +150,7 @@ func TestHttpCallComponent_WithInterval(t *testing.T) {
 	s := newScope(map[string]any{
 		"url":      "/api/data",
 		"interval": "1s",
-	}, nil, nil)
+	}, nil)
 
 	done := make(chan struct{})
 	defer close(done)
@@ -214,7 +214,7 @@ func TestHttpCallComponent_SetCookieHeaders(t *testing.T) {
 
 	// Create a scope with the test URL
 	req := httptest.NewRequest("GET", "/original", nil)
-	s := newScope(map[string]any{"url": "/api/set-cookies"}, req, nil)
+	s := newScope(map[string]any{"url": "/api/set-cookies"}, req)
 
 	// Create the component and render
 	comp := NewHttpCallComponent(mux)
@@ -282,7 +282,7 @@ func TestHttpCallComponent_SetCookieHeaders(t *testing.T) {
 	sPolling := newScope(map[string]any{
 		"url":      "/api/set-cookies",
 		"interval": "1s",
-	}, pollingReq, nil)
+	}, pollingReq)
 
 	// Verify no Set-Cookie headers are already in the scope
 	if len(sPolling.globals.header.Values("Set-Cookie")) > 0 {

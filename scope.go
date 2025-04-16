@@ -14,19 +14,17 @@ type scope struct {
 
 type scopeGlobals struct {
 	req        *http.Request
-	route      map[string]string
 	statusCode int
 	header     http.Header
 }
 
 var _ chtml.Scope = (*scope)(nil)
 
-func newScope(vars map[string]any, req *http.Request, route map[string]string) *scope {
+func newScope(vars map[string]any, req *http.Request) *scope {
 	return &scope{
 		BaseScope: chtml.NewBaseScope(vars),
 		globals: &scopeGlobals{
 			req:        req,
-			route:      route,
 			statusCode: 0,
 			header:     make(http.Header),
 		},

@@ -22,8 +22,8 @@ func TestPages_Handler(t *testing.T) {
 		{"GET /js/", 404, "Not Found\n"},
 		{"GET /js/asset.js", 200, "console.log(1)\n"},
 		{"GET /posts", 404, "Not Found\n"},
-		{"GET /posts/123/", 200, "view-post\n"},
-		{"GET /posts/123/edit", 200, "edit-post\n"},
+		{"GET /posts/123/", 200, "\n123\n"},
+		{"GET /posts/123/edit", 200, "\nedit-post\n"},
 		{"GET /posts/123/asset.txt", 200, "post-content\n"},
 		{"GET /posts/new", 200, "new-post\n"},
 	}
