@@ -328,6 +328,15 @@ func decodeValToSlice(from reflect.Value, to reflect.Value) (any, error) {
 	// Get the element type of the slice "to"
 	elemType := to.Type().Elem()
 
+	// Special case: if 'from' is a slice and 'to' is []any, iterate and append elements
+	if from.Kind() == reflect.Slice && elemType.Kind() == reflect.Interface && elemType.NumMethod() == 0 {
+		newSlice := to
+		for i := 0; i < from.Len(); i++ {
+			newSlice = reflect.Append(newSlice, from.Index(i))
+		}
+		return newSlice.Interface(), nil
+	}
+
 	// Check if "from" can be appended to "to"
 	if !from.Type().AssignableTo(elemType) {
 		return from.Interface(), nil

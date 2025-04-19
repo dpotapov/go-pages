@@ -5,6 +5,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"golang.org/x/net/html"
 )
 
 // Counter is a component that tracks the number of times it's rendered
@@ -170,5 +172,42 @@ func TestNestedImports(t *testing.T) {
 	count = counter.GetCount()
 	if count != 1 {
 		t.Errorf("Counter component was rendered %d times, expected 1", count)
+	}
+}
+
+func TestComponentPassesListToAnotherComponent(t *testing.T) {
+	importer := NewTestImporter()
+
+	importer.RegisterTemplate("listparent", `<c:attr name="data_list">${ { "data": [1,2,3] } }</c:attr><c:listchild list="${data_list.data}" />`)
+	importer.RegisterTemplate("listchild", `<c:attr name="list">${ [] }</c:attr><p c:for="i in list">${i}</p>`)
+
+	doc, err := Parse(strings.NewReader(`<c:listparent />`), importer)
+	if err != nil {
+		t.Fatalf("Failed to parse: %v", err)
+	}
+
+	comp := NewComponent(doc, &ComponentOptions{Importer: importer})
+	out, err := comp.Render(NewBaseScope(nil))
+	if err != nil {
+		t.Fatalf("Failed to render: %v", err)
+	}
+
+	var rendered string
+	switch v := out.(type) {
+	case string:
+		rendered = v
+	case *html.Node:
+		var sb strings.Builder
+		if err := html.Render(&sb, v); err != nil {
+			t.Fatalf("Failed to render HTML node: %v", err)
+		}
+		rendered = sb.String()
+	default:
+		t.Fatalf("Unexpected render output type: %T", out)
+	}
+
+	want := `<p>1</p><p>2</p><p>3</p>`
+	if rendered != want {
+		t.Errorf("got %q, want %q", rendered, want)
 	}
 }
