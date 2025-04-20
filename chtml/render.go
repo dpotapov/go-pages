@@ -37,7 +37,13 @@ func (c *chtmlComponent) render(n *Node) any {
 				c.error(n, fmt.Errorf("unexpected node type: %v", n.Type))
 			}
 
-			res = AnyPlusAny(res, rr)
+			if !c.fragmentSearching() { // if rendering or completed, add to final result
+				res = AnyPlusAny(res, rr)
+			}
+
+			if c.fragmentCompleted() {
+				break // stop the loop if we've found the fragment
+			}
 		}
 
 		return res
@@ -50,6 +56,11 @@ func (c *chtmlComponent) render(n *Node) any {
 // the destination node.
 // If the text node is not an expression, the value is copied as is.
 func (c *chtmlComponent) renderText(n *Node) any {
+	// Skip if we're still searching for a fragment or already completed
+	if c.fragmentSearching() || c.fragmentCompleted() {
+		return nil
+	}
+
 	res, err := n.Data.Value(&c.vm, c.env)
 	if err != nil {
 		c.error(n, fmt.Errorf("eval text: %w", err))
@@ -59,6 +70,11 @@ func (c *chtmlComponent) renderText(n *Node) any {
 }
 
 func (c *chtmlComponent) renderComment(n *Node) *html.Node {
+	// Skip if we're still searching for a fragment or already completed
+	if c.fragmentSearching() || c.fragmentCompleted() {
+		return nil
+	}
+
 	if c.renderComments {
 		data, err := n.Data.Value(&c.vm, c.env)
 		if err != nil {
@@ -78,9 +94,16 @@ func (c *chtmlComponent) renderDocument(n *Node) any {
 
 	for child := n.FirstChild; child != nil; child = child.NextSibling {
 		rr := c.render(child)
+
+		// if we found the fragment within children, pass it up
+		if c.fragmentCompleted() {
+			return rr
+		}
+
 		if rr == nil {
 			continue
 		}
+
 		if attr, ok := rr.(Attribute); ok {
 			v, err := attr.Val.Value(&c.vm, env(c.env))
 			if err != nil {
@@ -113,8 +136,23 @@ func (c *chtmlComponent) renderElement(n *Node) any {
 		return nil
 	}
 
+	// Check if this element has our target fragment ID
+	isTargetFragment := c.isTargetFragment(clone)
+	if isTargetFragment {
+		f, _ := c.scope.(*fragmentScope)
+		f.state.State = FragmentRendering // render all children
+	}
+
+	var res any
+
 	for child := n.FirstChild; child != nil; child = child.NextSibling {
 		rr := c.render(child)
+
+		// if we found the fragment within children, pass it up
+		if c.fragmentCompleted() {
+			return rr
+		}
+
 		if rr == nil {
 			continue
 		}
@@ -130,12 +168,32 @@ func (c *chtmlComponent) renderElement(n *Node) any {
 				Val:       fmt.Sprintf("%v", v),
 			})
 		} else {
-			if c := AnyToHtml(rr); c != nil {
-				clone.AppendChild(cloneHtmlTree(c))
-			}
+			res = AnyPlusAny(res, rr)
 		}
 	}
-	return clone
+
+	// If the current node is the target fragment, mark it as completed, effectively stopping
+	// rendering other nodes.
+	if isTargetFragment {
+		f, _ := c.scope.(*fragmentScope)
+		f.state.State = FragmentCompleted
+		return res
+	} else {
+		// append the result to the clone
+		if c := AnyToHtml(res); c != nil {
+			if c.Type == html.DocumentNode {
+				// iterate over c children and move them to the clone
+				for child := c.FirstChild; child != nil; child = child.NextSibling {
+					clone.AppendChild(cloneHtmlTree(child)) // TODO: avoid cloning
+				}
+			} else {
+				clone.AppendChild(cloneHtmlTree(c)) // TODO: avoid cloning
+			}
+		}
+		res = clone
+	}
+
+	return res
 }
 
 // renderImport renders the imported component (<c:NAME>) and appends the result to the destination.
@@ -200,6 +258,8 @@ func (c *chtmlComponent) renderImport(n *Node) any {
 			c.error(n, fmt.Errorf("import %q: %w", impNameStr, err))
 			return nil
 		}
+
+		// save component for reuse:
 		c.children[n] = append(c.children[n], comp)
 	}
 
@@ -208,6 +268,7 @@ func (c *chtmlComponent) renderImport(n *Node) any {
 		c.error(n, fmt.Errorf("render import %s: %w", n.Data.RawString(), err))
 		return nil
 	}
+
 	return rr
 }
 
@@ -363,7 +424,9 @@ func (c *chtmlComponent) evalFor(n *Node) iter.Seq[*chtmlComponent] {
 				c.children[n] = append(c.children[n], loopComp)
 			}
 
-			yield(loopComp)
+			if !yield(loopComp) {
+				break
+			}
 		}
 	}
 }

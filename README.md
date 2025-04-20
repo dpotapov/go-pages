@@ -16,7 +16,8 @@ router for serving components based on URL paths.
 - [x] Implements file-based routing akin to [NuxtJS](https://v2.nuxt.com/).
 - [ ] Single-file components (combine HTML, CSS, and JS in a single file).
 - [ ] Not tied to Go ecosystem, allowing components to be reused in non-Go projects.
-- [ ] Plays nicely with [HTMX](https://htmx.org/) and [AlpineJS](https://alpinejs.dev/).
+- [x] Plays nicely with [HTMX](https://htmx.org/) and [AlpineJS](https://alpinejs.dev/).
+- [x] Template fragments for partial rendering of components.
 - [ ] Automatic browser refresh during development.
 - [x] Small API surface (both on the template language and the Go API) for quick starts.
 - [x] Ability to embed assets into a single binary.
@@ -39,7 +40,7 @@ go get -u github.com/dpotapov/go-pages
 ## Example Usage
 
 1. Create a directory for your pages and components. For example, `./pages`.
-2. Create a file in the `./pages` directory. For example, `./pages/index.chtml` with the following 
+2. Create a file in the `./pages` directory. For example, `./pages/index.chtml` with the following
    content:
 
    ```html
@@ -47,28 +48,28 @@ go get -u github.com/dpotapov/go-pages
    ```
 
 3. Create a Go program to serve the pages.
-    
+
     ```go
     package main
-    
+
     import (
         "net/http"
         "os"
-    
+
         "github.com/dpotapov/go-pages"
     )
-    
+
     func main() {
         ph := &pages.Handler{
             FileSystem: os.DirFS("./pages"),
         }
-    
+
         http.ListenAndServe(":8080", ph)
     }
     ```
 
 4. Run the program and navigate to `http://localhost:8080`. You should see the text "Hello World".
-5. Create another file in the `./pages` directory. For example, `./pages/about.chtml` with the 
+5. Create another file in the `./pages` directory. For example, `./pages/about.chtml` with the
    following content:
 
    ```html
@@ -110,7 +111,7 @@ underscores as they feel wrong in HTML and URL paths.
 
 You may want to use kebab-case for components, that represent pages (and become part of
 the URL that visible to the user). When referencing a component or an argument in an expression,
-all dashes will be replaced with underscores. 
+all dashes will be replaced with underscores.
 
 Example:
 
@@ -118,7 +119,7 @@ Example:
 <!--
   kebab-style - preferred for URLs and native to HTML.
   The go-pages engine will automatically replace dashes to underscore_case to make easier to use
-  in expressions. E.g. some-arg-1 becomes ${some_arg_1}. 
+  in expressions. E.g. some-arg-1 becomes ${some_arg_1}.
  -->
 
 <c:my-component some-arg-1="...">
@@ -148,6 +149,61 @@ String interpolation is supported using the `${ ... }` syntax. For example:
 ```
 
 All string attributes and text nodes are interpolated.
+
+## Template Fragments
+
+Template fragments allow rendering just a portion of a component's HTML. This is particularly useful for HTMX-based applications where you want to update only specific parts of a page.
+
+To define a fragment in your template, simply add an `id` attribute to the HTML element that you want to use as a fragment:
+
+```html
+<div id="user-profile">
+  <h2>${user.name}</h2>
+  <p>${user.bio}</p>
+</div>
+
+<div id="user-stats">
+  <h3>Stats</h3>
+  <ul>
+    <li>Posts: ${user.posts_count}</li>
+    <li>Followers: ${user.followers_count}</li>
+  </ul>
+</div>
+```
+
+### Fragment Selection
+
+To render only a specific fragment, you can use the `FragmentSelector` option in the `Handler`:
+
+```go
+h := &pages.Handler{
+    FileSystem: os.DirFS("./pages"),
+    FragmentSelector: func(r *http.Request) string {
+        return r.URL.Query().Get("fragment")
+    },
+}
+```
+
+This example renders only the fragment specified in the `fragment` query parameter. For example, requesting `/user?fragment=user-stats` would render only the `user-stats` div.
+
+### HTMX Integration
+
+For HTMX applications, you can use the built-in `HTMXFragmentSelector` function to automatically handle the `HX-Target` header:
+
+```go
+h := &pages.Handler{
+    FileSystem: os.DirFS("./pages"),
+    FragmentSelector: pages.HTMXFragmentSelector,
+}
+```
+
+With this setup, HTMX requests using `hx-target` will automatically render only the targeted fragment:
+
+```html
+<button hx-get="/user" hx-target="#user-stats">Refresh Stats</button>
+```
+
+When this button is clicked, only the `user-stats` fragment will be rendered and returned to the browser, which HTMX will then use to update just that part of the page.
 
 ## File-based Routing
 

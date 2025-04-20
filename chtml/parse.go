@@ -267,10 +267,29 @@ func (p *chtmlParser) addElement() {
 		n.Type = importNode
 	}
 
+	var regularAttrs []html.Attribute
 	for _, t := range p.tok.Attr {
-		if ok := p.parseSpecialAttrs(n, &t); ok {
-			continue
+		if ok := p.parseSpecialAttrs(n, &t); !ok {
+			// Collect regular attributes to process later
+			regularAttrs = append(regularAttrs, t)
 		}
+	}
+
+	// Handle c:for variables *before* processing regular attributes
+	if !n.Loop.IsEmpty() {
+		introducedVars := make(map[string]any)
+		if n.LoopVar != "" {
+			introducedVars[n.LoopVar] = new(any) // TODO: infer type
+		}
+		if n.LoopIdx != "" {
+			introducedVars[n.LoopIdx] = new(any) // TODO: infer type
+		}
+		// Push the new variables into the environment
+		p.pushEnv(introducedVars)
+	}
+
+	// Now process regular attributes, loop variables are in env
+	for _, t := range regularAttrs {
 		expr, err := NewExprInterpol(t.Val, p.env)
 		if err != nil {
 			p.error(n, err)
@@ -282,19 +301,6 @@ func (p *chtmlParser) addElement() {
 			Key:       t.Key,
 			Val:       expr,
 		})
-	}
-
-	// Handle c:for variables
-	if !n.Loop.IsEmpty() {
-		introducedVars := make(map[string]any)
-		if n.LoopVar != "" {
-			introducedVars[n.LoopVar] = new(any) // TODO: infer type
-		}
-		if n.LoopIdx != "" {
-			introducedVars[n.LoopIdx] = new(any) // TODO: infer type
-		}
-		// Push the new variables into the environment
-		p.pushEnv(introducedVars)
 	}
 
 	p.addChild(n)

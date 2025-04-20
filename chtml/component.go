@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/expr-lang/expr/vm"
+	"golang.org/x/net/html"
 )
 
 type Component interface {
@@ -71,6 +72,39 @@ type chtmlComponent struct {
 var _ Component = (*chtmlComponent)(nil)
 var _ Disposable = (*chtmlComponent)(nil)
 
+// Helper methods for fragment state
+func (c *chtmlComponent) fragmentSearching() bool {
+	if f, ok := c.scope.(*fragmentScope); ok && f.state.State == FragmentSearching {
+		return true
+	}
+	return false
+}
+
+func (c *chtmlComponent) fragmentRendering() bool {
+	if f, ok := c.scope.(*fragmentScope); ok {
+		return f.state.State == FragmentRendering
+	}
+	return true // assuming rendering by default
+}
+
+func (c *chtmlComponent) fragmentCompleted() bool {
+	if f, ok := c.scope.(*fragmentScope); ok && f.state.State == FragmentCompleted {
+		return true
+	}
+	return false
+}
+
+func (c *chtmlComponent) isTargetFragment(n *html.Node) bool {
+	if f, ok := c.scope.(*fragmentScope); ok {
+		for _, attr := range n.Attr {
+			if attr.Key == "id" && attr.Val == f.state.Fragment {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // Render evaluates expressions in the CHTML document and returns either a new *html.Node tree with
 // HTML content or a data object if the result of the evaluation is not HTML.
 func (c *chtmlComponent) Render(s Scope) (any, error) {
@@ -134,21 +168,46 @@ func (c *chtmlComponent) Dispose() error {
 	return nil
 }
 
-// closeChildren closes all child components starting from the given index.
+// closeChildren closes and removes child components starting from the given index.
 // This is used to close components in c:for loops and c:if.
 func (c *chtmlComponent) closeChildren(n *Node, idx int) {
-	if comps, ok := c.children[n]; ok {
-		for i := idx; i < len(comps); i++ {
-			if d, ok := comps[i].(Disposable); ok {
-				if err := d.Dispose(); err != nil {
-					c.error(n, fmt.Errorf("dispose child %d: %w", i, err))
-				}
+	comps, ok := c.children[n]
+	if !ok {
+		// Node not found or already cleaned up, nothing to do.
+		return
+	}
+
+	// Dispose components from index idx onwards.
+	// This iterates over the elements that are intended to be removed.
+	for i := idx; i < len(comps); i++ {
+		if d, ok := comps[i].(Disposable); ok {
+			if err := d.Dispose(); err != nil {
+				c.error(n, fmt.Errorf("dispose child %d: %w", i, err))
 			}
 		}
-		c.children[n] = comps[:idx]
 	}
-	if idx == 0 {
+
+	// Determine the final length of the slice.
+	var finalLen int
+	if idx > len(comps) {
+		// This condition is hit if the caller (e.g., evalFor's defer) expected
+		// 'idx' children, but the loop producing them terminated early, resulting
+		// in only 'len(comps)' children being present. This is handled gracefully
+		// by only keeping the existing children.
+		// c.error(n, fmt.Errorf("internal warning: closeChildren called with idx %d > current len %d", idx, len(comps)))
+		finalLen = len(comps)
+	} else {
+		// idx <= len(comps), this is the expected case.
+		// We want to keep the first 'idx' elements.
+		finalLen = idx
+	}
+
+	// Update the map with the truncated slice or remove the entry if empty.
+	if finalLen == 0 {
 		delete(c.children, n)
+	} else {
+		// Slice operation `comps[:finalLen]` is now safe because finalLen <= len(comps).
+		c.children[n] = comps[:finalLen]
 	}
 }
 

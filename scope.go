@@ -16,17 +16,22 @@ type scopeGlobals struct {
 	req        *http.Request
 	statusCode int
 	header     http.Header
+	fragment   *chtml.FragmentState
 }
 
 var _ chtml.Scope = (*scope)(nil)
 
-func newScope(vars map[string]any, req *http.Request) *scope {
+func newScope(vars map[string]any, req *http.Request, fragment string) *scope {
 	return &scope{
 		BaseScope: chtml.NewBaseScope(vars),
 		globals: &scopeGlobals{
 			req:        req,
 			statusCode: 0,
 			header:     make(http.Header),
+			fragment: &chtml.FragmentState{
+				Fragment: fragment,
+				State:    chtml.FragmentSearching,
+			},
 		},
 	}
 }
@@ -36,4 +41,8 @@ func (s *scope) Spawn(vars map[string]any) chtml.Scope {
 		BaseScope: s.BaseScope.Spawn(vars).(*chtml.BaseScope),
 		globals:   s.globals,
 	}
+}
+
+func (s *scope) Fragment() *chtml.FragmentState {
+	return s.globals.fragment
 }

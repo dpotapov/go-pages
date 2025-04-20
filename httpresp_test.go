@@ -38,7 +38,7 @@ func TestHttpResponseComponent_Render(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := newScope(tt.vars, nil)
+			s := newScope(tt.vars, nil, "")
 
 			rr, err := HttpResponseComponent{}.Render(s)
 			if err != nil {
@@ -89,7 +89,7 @@ func TestCookieComponent(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := newScope(tt.vars, nil)
+			s := newScope(tt.vars, nil, "")
 
 			rr, err := CookieComponent{}.Render(s)
 			if err != nil {

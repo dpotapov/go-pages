@@ -80,6 +80,11 @@ type Handler struct {
 
 	// errComp is an imported error component instance if OnErrorComponent is set.
 	errComp chtml.Component
+
+	// FragmentSelector is a function that extracts the fragment name from the request.
+	// If set, it is called for every request to determine which fragment to render.
+	// If not set, the whole template is rendered.
+	FragmentSelector func(*http.Request) string
 }
 
 // ServeHTTP implements the http.Handler interface.
@@ -90,6 +95,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 		if h.Logger != nil {
 			h.logger = h.Logger
+		}
+
+		// initialize the fragment selector:
+		if h.FragmentSelector == nil {
+			h.FragmentSelector = func(r *http.Request) string { return "" }
 		}
 
 		// initialize the error component:
@@ -153,7 +163,7 @@ func (h *Handler) servePage(
 		}
 	}()
 
-	mainScope := newScope(stringMapToAnyMap(route), r)
+	mainScope := newScope(stringMapToAnyMap(route), r, h.FragmentSelector(r))
 
 	if websocket.IsWebSocketUpgrade(r) {
 		ws, err := wsUpgrader.Upgrade(w, r, nil)
@@ -684,4 +694,9 @@ func stringMapToAnyMap(m map[string]string) map[string]any {
 		out[k] = v
 	}
 	return out
+}
+
+// HTMXFragmentSelector returns the value of the HX-Target header, or empty string if not present.
+func HTMXFragmentSelector(r *http.Request) string {
+	return r.Header.Get("HX-Target")
 }

@@ -309,6 +309,17 @@ func TestParserCHTML(t *testing.T) {
 			`,
 		},
 		{
+			name: "loop with variable on the same element",
+			text: `<div id="block-${n}" c:for="n in [1, 2, 3]"><p>${n}</p></div>`,
+			want: `
+			| <div>
+			|   c:for="n, _ in [1, 2, 3]"
+			|   id="block-${n}"
+			|   <p>
+			|     "${n}"
+			`,
+		},
+		{
 			name: "nested loop",
 			text: `<div c:for="n in [1, 2]"><div c:for="n in ['a', 'b']"><p>${n}</p></div><p>${n}</p></div><p>${n}</p>`,
 			errs: []string{"unknown name n"},
@@ -396,14 +407,6 @@ func TestParserCHTML(t *testing.T) {
 			|   "ipsum"
 			`,
 		},
-
-		/*
-			#data
-			<c:attr name="text">Hello</c:attr><p>${text}</p>
-			#document
-
-
-		*/
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
