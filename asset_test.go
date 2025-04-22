@@ -158,7 +158,7 @@ func TestAssetComponent_Render(t *testing.T) {
 		s := chtml.NewBaseScope(map[string]any{"name": "test.js", "type": "js"})
 		rr, err := comp.Render(s)
 		require.NoError(t, err)
-		assertHtmlEqual(t, rr.(*html.Node), `<script src="/js/test.c02ef03acd9bcafb.js" defer=""></script>`)
+		assertHtmlEqual(t, rr.(*html.Node), `<script src="/js/test.c02ef03acd9bcafb.js"></script>`)
 	})
 }
 

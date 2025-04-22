@@ -519,7 +519,6 @@ func (c *AssetComponent) Render(s chtml.Scope) (any, error) {
 			DataAtom: atom.Script,
 			Attr: []html.Attribute{
 				{Key: "src", Val: assetPath},
-				{Key: "defer", Val: ""},
 			},
 		}
 	default:
