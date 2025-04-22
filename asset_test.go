@@ -136,14 +136,14 @@ func TestAssetComponent_Render(t *testing.T) {
 	t.Run("missing css file", func(t *testing.T) {
 		s := chtml.NewBaseScope(map[string]any{"name": "missing.css", "type": "css"})
 		n, err := comp.Render(s)
-		require.ErrorContains(t, err, "asset not found")
+		require.NoError(t, err)
 		require.Nil(t, n)
 	})
 
 	t.Run("missing js file", func(t *testing.T) {
 		s := chtml.NewBaseScope(map[string]any{"name": "missing.js", "type": "js"})
 		n, err := comp.Render(s)
-		require.ErrorContains(t, err, "asset not found")
+		require.NoError(t, err)
 		require.Nil(t, n)
 	})
 

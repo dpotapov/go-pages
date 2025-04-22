@@ -494,7 +494,7 @@ func (c *AssetComponent) Render(s chtml.Scope) (any, error) {
 
 	assetPath := c.assets.AssetPath(args.Name)
 	if assetPath == "" {
-		return nil, fmt.Errorf("asset not found: %s", args.Name)
+		return nil, nil
 	}
 	ext := path.Ext(assetPath)
 
