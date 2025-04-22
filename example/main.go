@@ -132,13 +132,24 @@ func main() {
 		Level: slog.LevelDebug,
 	}))
 
+	assets := pages.NewAssetRegistry("", logger)
+	assets.RegisterCollector("css", pages.NewStylesheetAssetCollector())
+	assets.RegisterCollector("js", pages.NewJavascriptAssetCollector())
+
 	ph := &pages.Handler{
 		FileSystem: os.DirFS("./example/pages"),
+		BuiltinComponents: map[string]chtml.Component{
+			"request": &pages.RequestComponent{},
+			"style":   pages.NewStyleComponent(assets),
+			"script":  pages.NewScriptComponent(assets),
+			"asset":   pages.NewAssetComponent(assets),
+		},
 		CustomImporter: &todoStoreImporter{
 			db: newTodoDB(),
 		},
-		OnError: nil,
-		Logger:  logger,
+		AssetCollector: assets,
+		OnError:        nil,
+		Logger:         logger,
 	}
 
 	logger.Info("Starting HTTP server", "address", "http://localhost:8080")

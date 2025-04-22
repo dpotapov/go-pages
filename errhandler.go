@@ -37,8 +37,8 @@ func (eh *errorHandlerComponent) Render(s chtml.Scope) (any, error) {
 
 	if eh.importErr == nil {
 		rr, err := eh.comp.Render(s)
-		if err == nil || eh.fallback == nil {
-			return rr, err
+		if err == nil {
+			return rr, nil
 		}
 		errs[0] = err
 	}
@@ -57,6 +57,10 @@ func (eh *errorHandlerComponent) Render(s chtml.Scope) (any, error) {
 	ss := s.Spawn(map[string]any{
 		"errors": eh.compErrs,
 	})
+
+	if eh.fallback == nil {
+		return nil, errors.Join(errs...)
+	}
 
 	return eh.fallback.Render(ss)
 }

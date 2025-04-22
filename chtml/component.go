@@ -74,30 +74,30 @@ var _ Disposable = (*chtmlComponent)(nil)
 
 // Helper methods for fragment state
 func (c *chtmlComponent) fragmentSearching() bool {
-	if f, ok := c.scope.(*fragmentScope); ok && f.state.State == FragmentSearching {
+	if f, ok := c.scope.(ScopeFragment); ok && f.Fragment().State == FragmentSearching {
 		return true
 	}
 	return false
 }
 
 func (c *chtmlComponent) fragmentRendering() bool {
-	if f, ok := c.scope.(*fragmentScope); ok {
-		return f.state.State == FragmentRendering
+	if f, ok := c.scope.(ScopeFragment); ok {
+		return f.Fragment().State == FragmentRendering
 	}
 	return true // assuming rendering by default
 }
 
 func (c *chtmlComponent) fragmentCompleted() bool {
-	if f, ok := c.scope.(*fragmentScope); ok && f.state.State == FragmentCompleted {
+	if f, ok := c.scope.(ScopeFragment); ok && f.Fragment().State == FragmentCompleted {
 		return true
 	}
 	return false
 }
 
 func (c *chtmlComponent) isTargetFragment(n *html.Node) bool {
-	if f, ok := c.scope.(*fragmentScope); ok {
+	if f, ok := c.scope.(ScopeFragment); ok {
 		for _, attr := range n.Attr {
-			if attr.Key == "id" && attr.Val == f.state.Fragment {
+			if attr.Key == "id" && attr.Val == f.Fragment().Fragment {
 				return true
 			}
 		}

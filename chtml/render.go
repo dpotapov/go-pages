@@ -139,8 +139,8 @@ func (c *chtmlComponent) renderElement(n *Node) any {
 	// Check if this element has our target fragment ID
 	isTargetFragment := c.isTargetFragment(clone)
 	if isTargetFragment {
-		f, _ := c.scope.(*fragmentScope)
-		f.state.State = FragmentRendering // render all children
+		f, _ := c.scope.(ScopeFragment)
+		f.Fragment().State = FragmentRendering // render all children
 	}
 
 	var res any
@@ -175,8 +175,8 @@ func (c *chtmlComponent) renderElement(n *Node) any {
 	// If the current node is the target fragment, mark it as completed, effectively stopping
 	// rendering other nodes.
 	if isTargetFragment {
-		f, _ := c.scope.(*fragmentScope)
-		f.state.State = FragmentCompleted
+		f, _ := c.scope.(ScopeFragment)
+		f.Fragment().State = FragmentCompleted
 		return res
 	} else {
 		// append the result to the clone
@@ -406,6 +406,7 @@ func (c *chtmlComponent) evalFor(n *Node) iter.Seq[*chtmlComponent] {
 			if i < len(c.children[n]) {
 				if c, ok := c.children[n][i].(*chtmlComponent); ok {
 					loopComp = c
+					loopComp.env = loopEnv
 				} else {
 					c.error(n, fmt.Errorf("unexpected node type: %T", c.children[n][i]))
 					continue

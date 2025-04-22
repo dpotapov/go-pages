@@ -85,6 +85,9 @@ type Handler struct {
 	// If set, it is called for every request to determine which fragment to render.
 	// If not set, the whole template is rendered.
 	FragmentSelector func(*http.Request) string
+
+	// AssetCollector manages static assets like CSS and JS.
+	AssetCollector AssetCollector
 }
 
 // ServeHTTP implements the http.Handler interface.
@@ -126,6 +129,23 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleRequest(w http.ResponseWriter, r *http.Request) error {
 	urlPath := cleanPath(r.URL.EscapedPath())
+
+	// Try serving asset first
+	if h.AssetCollector != nil {
+		handled, err := h.AssetCollector.ServeAsset(w, r)
+		if err != nil {
+			// Asset collector had an error serving the file (e.g., read error)
+			// Log the error but maybe don't expose details to client?
+			h.logger.ErrorContext(r.Context(), "Error serving asset", slog.String("path", r.URL.Path), slog.Any("error", err))
+			// Let the main error handler deal with the response
+			return fmt.Errorf("serve asset %s: %w", r.URL.Path, err)
+		}
+		if handled {
+			// Asset was found and served (or 304 Not Modified), request is done.
+			return nil
+		}
+		// If not handled, it means the path wasn't an asset path, so continue below.
+	}
 
 	params := map[string]string{}
 
@@ -262,9 +282,6 @@ func (h *Handler) render(w io.Writer, comp chtml.Component, scope *scope) error 
 				h.logger.Error("Render component", "error", e)
 			}
 		}
-
-		// w.WriteHeader(http.StatusInternalServerError)
-		// return fmt.Errorf("render component: %w", err)
 	}
 
 	if rw, ok := w.(http.ResponseWriter); ok {
@@ -286,6 +303,12 @@ func (h *Handler) render(w io.Writer, comp chtml.Component, scope *scope) error 
 		if err := html.Render(w, doc); err != nil {
 			return fmt.Errorf("render HTML: %w", err)
 		}
+	} else if rr == nil {
+		if scope.globals.statusCode >= 400 {
+			statusText := http.StatusText(scope.globals.statusCode)
+			w.Write([]byte(statusText))
+		}
+		return nil
 	} else if s, ok := rr.(string); ok {
 		if _, err := io.WriteString(w, s); err != nil {
 			return fmt.Errorf("write string: %w", err)
@@ -698,5 +721,6 @@ func stringMapToAnyMap(m map[string]string) map[string]any {
 
 // HTMXFragmentSelector returns the value of the HX-Target header, or empty string if not present.
 func HTMXFragmentSelector(r *http.Request) string {
-	return r.Header.Get("HX-Target")
+	t := r.Header.Get("HX-Target")
+	return strings.TrimLeft(t, "#")
 }

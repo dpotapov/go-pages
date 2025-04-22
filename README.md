@@ -14,7 +14,7 @@ router for serving components based on URL paths.
 - [x] No JavaScript required.
 - [x] No code generation required, though a Go code generator can be developed for improved performance.
 - [x] Implements file-based routing akin to [NuxtJS](https://v2.nuxt.com/).
-- [ ] Single-file components (combine HTML, CSS, and JS in a single file).
+- [x] Single-file components (combine HTML, CSS, and JS in a single file).
 - [ ] Not tied to Go ecosystem, allowing components to be reused in non-Go projects.
 - [x] Plays nicely with [HTMX](https://htmx.org/) and [AlpineJS](https://alpinejs.dev/).
 - [x] Template fragments for partial rendering of components.

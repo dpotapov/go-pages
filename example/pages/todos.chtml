@@ -10,9 +10,17 @@
     <li c:for="i, n in todos">${i}
       <form ws-send style="display: inline; margin-left: 15px">
         <input name="todo_done_id" type="hidden" value="${string(n+1)}">
-        <input type="submit" value="Done" style="font-size: 0.7rem; border: none; background-color: aquamarine;">
+        <input type="submit" value="Done" class="done-btn">
       </form>
     </li>
   </ol>
   <p c:else>The list is empty.</p>
 </div>
+
+<c:style name="main">
+  .done-btn {
+    font-size: 0.7rem;
+    border: none;
+    background-color: aquamarine;
+  }
+</c:style>

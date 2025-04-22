@@ -22,16 +22,17 @@ type scopeGlobals struct {
 var _ chtml.Scope = (*scope)(nil)
 
 func newScope(vars map[string]any, req *http.Request, fragment string) *scope {
+	frag := &chtml.FragmentState{Fragment: fragment}
+	if fragment != "" {
+		frag.State = chtml.FragmentSearching
+	}
 	return &scope{
 		BaseScope: chtml.NewBaseScope(vars),
 		globals: &scopeGlobals{
 			req:        req,
 			statusCode: 0,
 			header:     make(http.Header),
-			fragment: &chtml.FragmentState{
-				Fragment: fragment,
-				State:    chtml.FragmentSearching,
-			},
+			fragment:   frag,
 		},
 	}
 }

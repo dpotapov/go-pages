@@ -1,9 +1,10 @@
 <c:attr name="path"></c:attr>
-<c:attr name="$req"></c:attr>
-<c:attr name="$rep"></c:attr>
+<c:attr name="req">
+  <c:request />
+</c:attr>
 
 <c:page title="Page Not Found">
   <b>Oops! Page you are looking for does not exist: ${ path }</b>
 
-  <pre>${ toJSON($req) }</pre>
+  <pre>${ toJSON(req) }</pre>
 </c:page>
