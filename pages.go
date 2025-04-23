@@ -625,12 +625,7 @@ func NewRequestArg(r *http.Request) *RequestArg {
 	case "application/x-www-form-urlencoded":
 		err := r.ParseForm() // TODO: log error
 		if err == nil {
-			if len(r.PostForm) > 0 {
-				model.Body = map[string]any{}
-				for k, v := range r.PostForm {
-					model.Body[k] = v
-				}
-			}
+			model.Body = DecodeForm(r.PostForm, nil)
 		}
 	}
 
