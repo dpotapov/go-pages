@@ -41,8 +41,8 @@ func TestScriptComponent_Render(t *testing.T) {
 	// There should be no asset anymore with previous hash
 	assertAssetNotFound(t, assets, "/js/test.c02ef03acd9bcafb.js")
 
-	// There should be no asset with non-hashed name
-	assertAssetNotFound(t, assets, "/js/test.js")
+	// The non-hashed name should work
+	assertAssetContent(t, assets, "/js/test.js", "console.log('Hello, world!');\nconsole.log('Lorem ipsum dolor sit amet');")
 
 	// When rendering the same content again, there will be no changes to the asset
 	s = chtml.NewDryRunScope(map[string]any{"name": "test.js", "_": "console.log('Hello, world!');"})
@@ -91,8 +91,8 @@ func TestStyleComponent_Render(t *testing.T) {
 	// There should be no asset anymore with previous hash
 	assertAssetNotFound(t, assets, assetPath)
 
-	// There should be no asset with non-hashed name
-	assertAssetNotFound(t, assets, "/css/test.css")
+	// The non-hashed name should work
+	assertAssetContent(t, assets, "/css/test.css", "body { color: red; }\np { font-size: 16px; }")
 
 	// When rendering the same content again (the first piece), there will be no changes to the asset
 	// because the content is cumulative.

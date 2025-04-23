@@ -264,6 +264,10 @@ func (c *baseAssetCollector) AddAsset(name string, content []byte) error {
 	// Update the lookup map with the new path
 	c.servePathToName[newServePath] = name
 
+	// Always serve the asset by name
+	baseServePath := c.servePrefix + "/" + name
+	c.servePathToName[baseServePath] = name
+
 	// *** Assign the new path to the asset info struct ***
 	ai.servePath = newServePath
 
@@ -353,7 +357,7 @@ type StylesheetAssetCollector struct {
 // NewStylesheetAssetCollector creates a collector for CSS assets.
 func NewStylesheetAssetCollector() *StylesheetAssetCollector {
 	return &StylesheetAssetCollector{
-		baseAssetCollector: newBaseAssetCollector("/css", "text/css; charset=utf-8"),
+		baseAssetCollector: newBaseAssetCollector("css", "text/css; charset=utf-8"),
 	}
 }
 
