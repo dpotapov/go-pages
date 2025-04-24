@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/expr-lang/expr/vm"
-	"golang.org/x/net/html"
 )
 
 type Component interface {
@@ -71,39 +70,6 @@ type chtmlComponent struct {
 
 var _ Component = (*chtmlComponent)(nil)
 var _ Disposable = (*chtmlComponent)(nil)
-
-// Helper methods for fragment state
-func (c *chtmlComponent) fragmentSearching() bool {
-	if f, ok := c.scope.(ScopeFragment); ok && f.Fragment().State == FragmentSearching {
-		return true
-	}
-	return false
-}
-
-func (c *chtmlComponent) fragmentRendering() bool {
-	if f, ok := c.scope.(ScopeFragment); ok {
-		return f.Fragment().State == FragmentRendering
-	}
-	return true // assuming rendering by default
-}
-
-func (c *chtmlComponent) fragmentCompleted() bool {
-	if f, ok := c.scope.(ScopeFragment); ok && f.Fragment().State == FragmentCompleted {
-		return true
-	}
-	return false
-}
-
-func (c *chtmlComponent) isTargetFragment(n *html.Node) bool {
-	if f, ok := c.scope.(ScopeFragment); ok {
-		for _, attr := range n.Attr {
-			if attr.Key == "id" && attr.Val == f.Fragment().Fragment {
-				return true
-			}
-		}
-	}
-	return false
-}
 
 // Render evaluates expressions in the CHTML document and returns either a new *html.Node tree with
 // HTML content or a data object if the result of the evaluation is not HTML.

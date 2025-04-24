@@ -183,7 +183,7 @@ func (h *Handler) servePage(
 		}
 	}()
 
-	mainScope := newScope(stringMapToAnyMap(route), r, h.FragmentSelector(r))
+	mainScope := newScope(stringMapToAnyMap(route), r)
 
 	if websocket.IsWebSocketUpgrade(r) {
 		ws, err := wsUpgrader.Upgrade(w, r, nil)
@@ -300,6 +300,17 @@ func (h *Handler) render(w io.Writer, comp chtml.Component, scope *scope) error 
 
 	// TODO: check the Accept header and return the appropriate content type
 	if doc, ok := rr.(*html.Node); ok {
+		// if the fragment ID is requested, render a subset of HTML tree or nothing
+		frag := h.FragmentSelector(scope.globals.req)
+		if frag != "" {
+			doc = findTargetFragment(doc, frag)
+			if doc != nil {
+				doc.Type = html.DocumentNode
+			} else {
+				return nil // do not render when fragment is not found
+			}
+		}
+
 		if err := html.Render(w, doc); err != nil {
 			return fmt.Errorf("render HTML: %w", err)
 		}
@@ -712,6 +723,27 @@ func stringMapToAnyMap(m map[string]string) map[string]any {
 		out[k] = v
 	}
 	return out
+}
+
+// findTargetFragment searches for the target fragment in the given HTML tree
+func findTargetFragment(n *html.Node, fragmentID string) *html.Node {
+	// Check the current node
+	if n.Type == html.ElementNode {
+		for _, attr := range n.Attr {
+			if attr.Key == "id" && attr.Val == fragmentID {
+				return n // Found the target node
+			}
+		}
+	}
+
+	// Recursively search children
+	for child := n.FirstChild; child != nil; child = child.NextSibling {
+		if found := findTargetFragment(child, fragmentID); found != nil {
+			return found // Target found in a child node
+		}
+	}
+
+	return nil // Target not found in this subtree
 }
 
 // HTMXFragmentSelector returns the value of the HX-Target header, or empty string if not present.

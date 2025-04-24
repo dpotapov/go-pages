@@ -37,13 +37,7 @@ func (c *chtmlComponent) render(n *Node) any {
 				c.error(n, fmt.Errorf("unexpected node type: %v", n.Type))
 			}
 
-			if !c.fragmentSearching() { // if rendering or completed, add to final result
-				res = AnyPlusAny(res, rr)
-			}
-
-			if c.fragmentCompleted() {
-				break // stop the loop if we've found the fragment
-			}
+			res = AnyPlusAny(res, rr)
 		}
 
 		return res
@@ -56,25 +50,16 @@ func (c *chtmlComponent) render(n *Node) any {
 // the destination node.
 // If the text node is not an expression, the value is copied as is.
 func (c *chtmlComponent) renderText(n *Node) any {
-	// Skip if we're still searching for a fragment or already completed
-	if c.fragmentSearching() || c.fragmentCompleted() {
-		return nil
-	}
-
 	res, err := n.Data.Value(&c.vm, c.env)
 	if err != nil {
 		c.error(n, fmt.Errorf("eval text: %w", err))
 		return nil
 	}
+
 	return res
 }
 
 func (c *chtmlComponent) renderComment(n *Node) *html.Node {
-	// Skip if we're still searching for a fragment or already completed
-	if c.fragmentSearching() || c.fragmentCompleted() {
-		return nil
-	}
-
 	if c.renderComments {
 		data, err := n.Data.Value(&c.vm, c.env)
 		if err != nil {
@@ -94,12 +79,6 @@ func (c *chtmlComponent) renderDocument(n *Node) any {
 
 	for child := n.FirstChild; child != nil; child = child.NextSibling {
 		rr := c.render(child)
-
-		// if we found the fragment within children, pass it up
-		if c.fragmentCompleted() {
-			return rr
-		}
-
 		if rr == nil {
 			continue
 		}
@@ -136,23 +115,10 @@ func (c *chtmlComponent) renderElement(n *Node) any {
 		return nil
 	}
 
-	// Check if this element has our target fragment ID
-	isTargetFragment := c.isTargetFragment(clone)
-	if isTargetFragment {
-		f, _ := c.scope.(ScopeFragment)
-		f.Fragment().State = FragmentRendering // render all children
-	}
-
 	var res any
 
 	for child := n.FirstChild; child != nil; child = child.NextSibling {
 		rr := c.render(child)
-
-		// if we found the fragment within children, pass it up
-		if c.fragmentCompleted() {
-			return rr
-		}
-
 		if rr == nil {
 			continue
 		}
@@ -172,32 +138,28 @@ func (c *chtmlComponent) renderElement(n *Node) any {
 		}
 	}
 
-	// If the current node is the target fragment, mark it as completed, effectively stopping
-	// rendering other nodes.
-	if isTargetFragment {
-		f, _ := c.scope.(ScopeFragment)
-		f.Fragment().State = FragmentCompleted
-		return res
-	} else {
-		// append the result to the clone
-		if c := AnyToHtml(res); c != nil {
-			if c.Type == html.DocumentNode {
-				// iterate over c children and move them to the clone
-				for child := c.FirstChild; child != nil; child = child.NextSibling {
-					clone.AppendChild(cloneHtmlTree(child)) // TODO: avoid cloning
-				}
-			} else {
-				clone.AppendChild(cloneHtmlTree(c)) // TODO: avoid cloning
+	// append the result to the clone
+	if c := AnyToHtml(res); c != nil {
+		if c.Type == html.DocumentNode {
+			// iterate over c children and move them to the clone
+			for child := c.FirstChild; child != nil; child = child.NextSibling {
+				clone.AppendChild(cloneHtmlTree(child)) // TODO: avoid cloning
 			}
+		} else {
+			clone.AppendChild(cloneHtmlTree(c)) // TODO: avoid cloning
 		}
-		res = clone
 	}
 
-	return res
+	return clone
 }
 
 // renderImport renders the imported component (<c:NAME>) and appends the result to the destination.
 func (c *chtmlComponent) renderImport(n *Node) any {
+	// for debugging, remove me:
+	if n.Data.RawString() == "c:project-selector" {
+		fmt.Println("FOUND project-selector component")
+	}
+
 	// Build variables for the imported component
 	vars := make(map[string]any)
 	for _, attr := range n.Attr {
@@ -212,6 +174,7 @@ func (c *chtmlComponent) renderImport(n *Node) any {
 
 	if n.FirstChild != nil {
 		vars["_"] = nil
+
 		for child := n.FirstChild; child != nil; child = child.NextSibling {
 			rr := c.render(child)
 			if attr, ok := rr.(Attribute); ok {
