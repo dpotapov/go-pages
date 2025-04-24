@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"iter"
 	"reflect"
+	"sort"
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
@@ -354,59 +355,114 @@ func (c *chtmlComponent) evalFor(n *Node) iter.Seq[*chtmlComponent] {
 		return func(yield func(*chtmlComponent) bool) {}
 	}
 	v := reflect.ValueOf(res)
-	// TODO: add support for maps, structs, arrays
-	if v.Kind() != reflect.Slice {
-		c.error(n, fmt.Errorf("c:for expression must return slice"))
+
+	if res == nil || !v.IsValid() {
 		c.closeChildren(n, 0)
 		return func(yield func(*chtmlComponent) bool) {}
 	}
 
-	return func(yield func(*chtmlComponent) bool) {
-		defer func() {
-			c.closeChildren(n, v.Len()) // close remaining children
-		}()
+	switch v.Kind() {
+	case reflect.Slice, reflect.Array:
+		return func(yield func(*chtmlComponent) bool) {
+			defer func() {
+				c.closeChildren(n, v.Len()) // close remaining children
+			}()
 
-		for i := 0; i < v.Len(); i++ {
-			el := v.Index(i)
+			for i := 0; i < v.Len(); i++ {
+				el := v.Index(i)
 
-			// make a copy of the current environment with the loop variable
-			loopEnv := make(map[string]any)
-			for k, v := range c.env {
-				loopEnv[k] = v
-			}
-			loopEnv[n.LoopVar] = el.Interface()
+				// make a copy of the current environment with the loop variable
+				loopEnv := make(map[string]any)
+				for k, v := range c.env {
+					loopEnv[k] = v
+				}
+				loopEnv[n.LoopVar] = el.Interface()
 
-			if n.LoopIdx != "" {
-				loopEnv[n.LoopIdx] = i
-			}
+				if n.LoopIdx != "" {
+					loopEnv[n.LoopIdx] = i
+				}
 
-			var loopComp *chtmlComponent
-			if i < len(c.children[n]) {
-				if c, ok := c.children[n][i].(*chtmlComponent); ok {
-					loopComp = c
-					loopComp.env = loopEnv
+				var loopComp *chtmlComponent
+				if i < len(c.children[n]) {
+					if childComp, ok := c.children[n][i].(*chtmlComponent); ok {
+						loopComp = childComp
+						loopComp.env = loopEnv
+					} else {
+						c.error(n, fmt.Errorf("unexpected node type: %T", c.children[n][i]))
+						continue
+					}
 				} else {
-					c.error(n, fmt.Errorf("unexpected node type: %T", c.children[n][i]))
-					continue
+					loopComp = c.newChildComponent(n, loopEnv)
+					c.children[n] = append(c.children[n], loopComp)
 				}
-			} else {
-				loopComp = &chtmlComponent{
-					doc:            n,
-					scope:          c.scope,
-					env:            loopEnv,
-					importer:       c.importer,
-					renderComments: true,
-					hidden:         c.hidden,
-					children:       make(map[*Node][]Component),
-					errs:           nil,
-				}
-				c.children[n] = append(c.children[n], loopComp)
-			}
 
-			if !yield(loopComp) {
-				break
+				if !yield(loopComp) {
+					break
+				}
 			}
 		}
+	case reflect.Map:
+		return func(yield func(*chtmlComponent) bool) {
+			mapKeys := v.MapKeys()
+			defer func() {
+				c.closeChildren(n, len(mapKeys)) // close remaining children
+			}()
+
+			// Note: Map iteration order is not guaranteed.
+			// For deterministic output in tests, sort the keys:
+			sort.Slice(mapKeys, func(i, j int) bool {
+				return mapKeys[i].String() < mapKeys[j].String()
+			})
+			for i, key := range mapKeys {
+				val := v.MapIndex(key)
+
+				// make a copy of the current environment with the loop variables
+				loopEnv := make(map[string]any)
+				for k, envVal := range c.env {
+					loopEnv[k] = envVal
+				}
+				loopEnv[n.LoopVar] = val.Interface()
+				if n.LoopIdx != "" {
+					loopEnv[n.LoopIdx] = key.Interface()
+				}
+
+				var loopComp *chtmlComponent
+				if i < len(c.children[n]) {
+					if childComp, ok := c.children[n][i].(*chtmlComponent); ok {
+						loopComp = childComp
+						loopComp.env = loopEnv
+					} else {
+						c.error(n, fmt.Errorf("unexpected node type: %T", c.children[n][i]))
+						continue
+					}
+				} else {
+					loopComp = c.newChildComponent(n, loopEnv)
+					c.children[n] = append(c.children[n], loopComp)
+				}
+
+				if !yield(loopComp) {
+					break
+				}
+			}
+		}
+	default:
+		c.error(n, fmt.Errorf("c:for expression must return slice, array, or map, got %v", v.Kind()))
+		c.closeChildren(n, 0)
+		return func(yield func(*chtmlComponent) bool) {}
+	}
+}
+
+// newChildComponent creates a new child chtmlComponent instance for loops or imports.
+func (c *chtmlComponent) newChildComponent(doc *Node, env map[string]any) *chtmlComponent {
+	return &chtmlComponent{
+		doc:            doc,
+		scope:          c.scope,
+		env:            env,
+		importer:       c.importer,
+		renderComments: c.renderComments,
+		hidden:         c.hidden,
+		children:       make(map[*Node][]Component),
+		errs:           nil, // child component starts with no errors
 	}
 }
 

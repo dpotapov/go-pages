@@ -209,6 +209,29 @@ func TestRenderCHTML(t *testing.T) {
 			text: `<div c:for="n in [1, 2, 3]" id="block-${n}"><p>${n}</p></div>`,
 			want: `<div id="block-1"><p>1</p></div><div id="block-2"><p>2</p></div><div id="block-3"><p>3</p></div>`,
 		},
+		{
+			name: "for loop over map (string keys, string values)",
+			text: `<c:attr name="my_map">${{}}</c:attr><ol><li c:for="val, key in my_map">${key}: ${val}</li></ol>`,
+			vars: map[string]any{"my_map": map[string]string{"a": "apple", "b": "banana"}},
+			want: `<ol><li>a: apple</li><li>b: banana</li></ol>`,
+		},
+		{
+			name: "for loop over map (string keys, mixed values)",
+			text: `<c:attr name="data">${{}}</c:attr><li c:for="v, k in data">${k}: ${v}</li>`,
+			vars: map[string]any{"data": map[string]any{"name": "Go", "version": 1.22, "stable": true}},
+			want: `<li>name: Go</li><li>stable: true</li><li>version: 1.22</li>`,
+		},
+		{
+			name: "for loop over empty map",
+			text: `<c:attr name="empty_map">${{}}</c:attr><p c:for="v, k in empty_map">${k}-${v}</p>`,
+			vars: map[string]any{"empty_map": map[string]int{}},
+			want: nil,
+		},
+		{
+			name: "for loop over nil map",
+			text: `<c:attr name="nil_map">${nil}</c:attr><span c:for="v, k in nil_map">${k}=${v}</span>`,
+			want: nil,
+		},
 
 		// Testing rendering <input checked> and <option selected>
 		{
