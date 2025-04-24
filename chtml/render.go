@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 )
 
 // render evaluates expressions in the CHTML node tree and returns either a new *html.Node tree or
@@ -245,6 +246,20 @@ func (c *chtmlComponent) renderAttrs(dst *html.Node, n *Node) error {
 		if err != nil {
 			c.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
 			continue
+		}
+
+		// special case for inputs:
+		if dst.Type == html.ElementNode && dst.DataAtom == atom.Input {
+			// don't add the checked attribute if it's false or 0
+			if attr.Key == "checked" && (v == false || v == 0) {
+				continue
+			}
+		}
+		if dst.Type == html.ElementNode && dst.DataAtom == atom.Option {
+			// don't add the selected attribute if it's false or 0
+			if attr.Key == "selected" && (v == false || v == 0) {
+				continue
+			}
 		}
 
 		if _, ok := v.(*Node); ok {

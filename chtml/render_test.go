@@ -209,6 +209,48 @@ func TestRenderCHTML(t *testing.T) {
 			text: `<div c:for="n in [1, 2, 3]" id="block-${n}"><p>${n}</p></div>`,
 			want: `<div id="block-1"><p>1</p></div><div id="block-2"><p>2</p></div><div id="block-3"><p>3</p></div>`,
 		},
+
+		// Testing rendering <input checked> and <option selected>
+		{
+			name: "render input checked with bool",
+			text: `<input type="checkbox" checked="${true}"><input type="checkbox" checked="${false}">`,
+			want: `<input type="checkbox" checked="true"/><input type="checkbox"/>`,
+		},
+		{
+			name: "render input checked with string",
+			text: `<input type="checkbox" checked="${'checked'}"><input type="checkbox" checked="${''}">`,
+			want: `<input type="checkbox" checked="checked"/><input type="checkbox" checked=""/>`,
+		},
+		{
+			name: "render input checked with int",
+			text: `<input type="checkbox" checked="${999}"><input type="checkbox" checked="${0}">`,
+			want: `<input type="checkbox" checked="999"/><input type="checkbox"/>`,
+		},
+		{
+			name: "render option selected with bool",
+			text: `<option selected="${true}"/><option selected="${false}"/>`,
+			want: `<option selected="true"></option><option></option>`,
+		},
+		{
+			name: "render option selected with string",
+			text: `<option selected="${'selected'}"/><option selected="${''}"/>`,
+			want: `<option selected="selected"></option><option selected=""></option>`,
+		},
+		{
+			name: "render option selected with int",
+			text: `<option selected="${999}"/><option selected="${0}"/>`,
+			want: `<option selected="999"></option><option></option>`,
+		},
+		{
+			name: "render checked and selected on non-input/option element",
+			text: `<div checked="${true}" selected="${true}"/>`,
+			want: `<div checked="true" selected="true"></div>`,
+		},
+		{
+			name: "render checked and selected on non-input/option element",
+			text: `<div checked="${false}" selected="${false}"/>`,
+			want: `<div checked="false" selected="false"></div>`, // expect no special handling
+		},
 	}
 
 	for _, tt := range tests {
