@@ -274,6 +274,41 @@ func TestRenderCHTML(t *testing.T) {
 			text: `<div checked="${false}" selected="${false}"/>`,
 			want: `<div checked="false" selected="false"></div>`, // expect no special handling
 		},
+		{
+			name: "render disabled attribute for button",
+			text: `<button disabled="${true}">A</button><button disabled="${false}">B</button><button disabled="${0}">C</button><button disabled="${1}">D</button>`,
+			want: `<button disabled="true">A</button><button>B</button><button>C</button><button disabled="1">D</button>`,
+		},
+		{
+			name: "render disabled attribute for fieldset",
+			text: `<fieldset disabled="${true}">A</fieldset><fieldset disabled="${false}">B</fieldset>`,
+			want: `<fieldset disabled="true">A</fieldset><fieldset>B</fieldset>`,
+		},
+		{
+			name: "render disabled attribute for optgroup",
+			text: `<optgroup disabled="${true}"></optgroup><optgroup disabled="${false}"></optgroup>`,
+			want: `<optgroup disabled="true"></optgroup><optgroup></optgroup>`,
+		},
+		{
+			name: "render disabled attribute for option",
+			text: `<option disabled="${true}"></option><option disabled="${false}"></option>`,
+			want: `<option disabled="true"></option><option></option>`,
+		},
+		{
+			name: "render disabled attribute for select",
+			text: `<select disabled="${true}"></select><select disabled="${false}"></select>`,
+			want: `<select disabled="true"></select><select></select>`,
+		},
+		{
+			name: "render disabled attribute for textarea",
+			text: `<textarea disabled="${true}"></textarea><textarea disabled="${false}"></textarea>`,
+			want: `<textarea disabled="true"></textarea><textarea></textarea>`,
+		},
+		{
+			name: "render disabled attribute for input",
+			text: `<input disabled="${true}"/><input disabled="${false}"/>`,
+			want: `<input disabled="true"/><input/>`,
+		},
 	}
 
 	for _, tt := range tests {

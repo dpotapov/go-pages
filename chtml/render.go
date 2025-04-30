@@ -242,6 +242,7 @@ func (c *chtmlComponent) renderImport(n *Node) any {
 // If the given element is an import, skip the evaluation and return immediately.
 func (c *chtmlComponent) renderAttrs(dst *html.Node, n *Node) error {
 	attrs := make([]html.Attribute, 0, len(n.Attr))
+
 	for _, attr := range n.Attr {
 		v, err := attr.Val.Value(&c.vm, c.env)
 		if err != nil {
@@ -260,6 +261,15 @@ func (c *chtmlComponent) renderAttrs(dst *html.Node, n *Node) error {
 			// don't add the selected attribute if it's false or 0
 			if attr.Key == "selected" && (v == false || v == 0) {
 				continue
+			}
+		}
+		if dst.Type == html.ElementNode {
+			switch dst.DataAtom {
+			case atom.Button, atom.Fieldset, atom.Optgroup, atom.Option, atom.Select, atom.Textarea, atom.Input:
+				// don't add the disabled attribute if it's false or 0
+				if attr.Key == "disabled" && (v == false || v == 0) {
+					continue
+				}
 			}
 		}
 
