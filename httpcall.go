@@ -68,6 +68,13 @@ func NewHttpCallComponent(router http.Handler) *HttpCallComponent {
 	return p
 }
 
+func NewHttpCallComponentFactory(router http.Handler) func() chtml.Component {
+	return func() chtml.Component {
+		return &HttpCallComponent{
+			router: router,
+		}
+	}
+}
 func (c *HttpCallComponent) Render(s chtml.Scope) (any, error) {
 	if c.router == nil {
 		return nil, fmt.Errorf("http router not set")
@@ -128,7 +135,8 @@ func (c *HttpCallComponent) Render(s chtml.Scope) (any, error) {
 		}
 		c.pollingStop = make(chan struct{})
 		c.currentInterval = args.Interval
-		go c.startPolling(s, c.pollingStop)
+		intervalCopy := c.currentInterval // capture to avoid data race
+		go c.startPolling(s, c.pollingStop, intervalCopy)
 	}
 
 	resp, err := c.render(&args)
@@ -160,8 +168,8 @@ func (c *HttpCallComponent) Dispose() error {
 	return nil
 }
 
-func (c *HttpCallComponent) startPolling(s chtml.Scope, stopChan chan struct{}) {
-	ticker := time.NewTicker(c.currentInterval)
+func (c *HttpCallComponent) startPolling(s chtml.Scope, stopChan chan struct{}, interval time.Duration) {
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {

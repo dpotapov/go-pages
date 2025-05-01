@@ -37,9 +37,23 @@ func (hc HttpResponseComponent) Render(s chtml.Scope) (any, error) {
 	return nil, nil
 }
 
+func NewHttpResponseComponentFactory() func() chtml.Component {
+	instance := &HttpResponseComponent{}
+	return func() chtml.Component {
+		return instance
+	}
+}
+
 type CookieComponent struct{}
 
 func (cc CookieComponent) Render(s chtml.Scope) (any, error) {
 	var c http.Cookie
 	return &c, chtml.UnmarshalScope(s, &c)
+}
+
+func NewCookieComponentFactory() func() chtml.Component {
+	instance := &CookieComponent{}
+	return func() chtml.Component {
+		return instance
+	}
 }

@@ -492,14 +492,6 @@ func (t *testImporter) init() {
 
 }
 
-func (t *testImporter) add(name, text string) {
-	doc, err := Parse(strings.NewReader(text), nil)
-	if err != nil {
-		panic(fmt.Sprintf("failed to parse component %q for test: %v", name, err))
-	}
-	t.parsedComps[name] = doc
-}
-
 func (t *testImporter) Import(name string) (Component, error) {
 	if doc, ok := t.parsedComps[name]; ok {
 		return NewComponent(doc, nil), nil

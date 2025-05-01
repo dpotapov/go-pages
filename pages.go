@@ -318,7 +318,7 @@ func (h *Handler) render(w io.Writer, comp chtml.Component, scope *scope) error 
 	} else if rr == nil {
 		if scope.globals.statusCode >= 400 {
 			statusText := http.StatusText(scope.globals.statusCode)
-			w.Write([]byte(statusText))
+			_, _ = w.Write([]byte(statusText))
 		}
 		return nil
 	} else if s, ok := rr.(string); ok {

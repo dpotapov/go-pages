@@ -139,7 +139,7 @@ func main() {
 	ph := &pages.Handler{
 		FileSystem: os.DirFS("./example/pages"),
 		BuiltinComponents: map[string]func() chtml.Component{
-			"request": pages.RequestComponentFactory,
+			"request": pages.NewRequestComponentFactory(),
 			"style":   pages.NewStyleComponentFactory(assets),
 			"script":  pages.NewScriptComponentFactory(assets),
 			"asset":   pages.NewAssetComponentFactory(assets),

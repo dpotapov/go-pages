@@ -15,7 +15,7 @@ import (
 
 func TestScriptComponent_Render(t *testing.T) {
 	assets := NewJavascriptAssetCollector()
-	comp := NewScriptComponent(assets)
+	comp := NewScriptComponentFactory(assets)()
 
 	s := chtml.NewDryRunScope(map[string]any{"name": "test.js", "_": "console.log('Hello, world!');"})
 
@@ -67,7 +67,7 @@ func TestScriptComponent_Render(t *testing.T) {
 
 func TestStyleComponent_Render(t *testing.T) {
 	assets := NewStylesheetAssetCollector()
-	comp := NewStyleComponent(assets)
+	comp := NewStyleComponentFactory(assets)()
 
 	// Initial content
 	s := chtml.NewDryRunScope(map[string]any{"name": "test.css", "_": "body { color: red; }"})
@@ -121,10 +121,12 @@ func TestAssetComponent_Render(t *testing.T) {
 	assets.RegisterCollector("css", NewStylesheetAssetCollector())
 	assets.RegisterCollector("js", NewJavascriptAssetCollector())
 
-	assets.AddAsset("test.css", []byte("body { color: red; }"))
-	assets.AddAsset("test.js", []byte("console.log('Hello, world!');"))
+	err := assets.AddAsset("test.css", []byte("body { color: red; }"))
+	require.NoError(t, err)
+	err = assets.AddAsset("test.js", []byte("console.log('Hello, world!');"))
+	require.NoError(t, err)
 
-	comp := NewAssetComponent(assets)
+	comp := NewAssetComponentFactory(assets)()
 
 	t.Run("DryRun", func(t *testing.T) {
 		ds := chtml.NewDryRunScope(map[string]any{"name": "test.css", "type": "css"})

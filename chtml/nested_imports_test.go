@@ -106,7 +106,7 @@ func TestNestedImports(t *testing.T) {
 	importer.RegisterComponent("counter", counter)
 
 	htmlContent := `<html><body><c:attr name="var1"><c:counter /></c:attr></body></html>`
-	doc, err := Parse(strings.NewReader(htmlContent), importer)
+	_, err := Parse(strings.NewReader(htmlContent), importer)
 	if err != nil {
 		t.Fatalf("Failed to parse HTML: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestNestedImports(t *testing.T) {
 
 	// Parse and render page1
 	htmlContent = `<html><body><c:page1 /></body></html>`
-	doc, err = Parse(strings.NewReader(htmlContent), importer)
+	_, err = Parse(strings.NewReader(htmlContent), importer)
 	if err != nil {
 		t.Fatalf("Failed to parse HTML: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestNestedImports(t *testing.T) {
 	counter.Reset()
 
 	// Let's parse the same template again and check the count again
-	doc, err = Parse(strings.NewReader(htmlContent), importer)
+	doc, err := Parse(strings.NewReader(htmlContent), importer)
 	if err != nil {
 		t.Fatalf("Failed to parse HTML: %v", err)
 	}
