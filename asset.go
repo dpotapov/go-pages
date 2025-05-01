@@ -387,8 +387,11 @@ type ScriptComponent struct {
 	collector AssetCollector
 }
 
-func NewScriptComponent(collector AssetCollector) *ScriptComponent {
-	return &ScriptComponent{collector: collector}
+func NewScriptComponentFactory(collector AssetCollector) func() chtml.Component {
+	instance := &ScriptComponent{collector: collector}
+	return func() chtml.Component {
+		return instance
+	}
 }
 
 func (c *ScriptComponent) Render(s chtml.Scope) (any, error) {
@@ -433,8 +436,11 @@ type StyleComponent struct {
 	assets AssetCollector
 }
 
-func NewStyleComponent(assets AssetCollector) *StyleComponent {
-	return &StyleComponent{assets: assets}
+func NewStyleComponentFactory(assets AssetCollector) func() chtml.Component {
+	instance := &StyleComponent{assets: assets}
+	return func() chtml.Component {
+		return instance
+	}
 }
 
 func (c *StyleComponent) Render(s chtml.Scope) (any, error) {
@@ -478,8 +484,11 @@ type AssetComponent struct {
 	assets AssetCollector
 }
 
-func NewAssetComponent(assets AssetCollector) *AssetComponent {
-	return &AssetComponent{assets: assets}
+func NewAssetComponentFactory(assets AssetCollector) func() chtml.Component {
+	instance := &AssetComponent{assets: assets}
+	return func() chtml.Component {
+		return instance
+	}
 }
 
 func (c *AssetComponent) Render(s chtml.Scope) (any, error) {

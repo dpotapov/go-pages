@@ -56,8 +56,8 @@ type Handler struct {
 	// If CustomImporter returns chtml.ErrComponentNotFound, the default import process is used.
 	CustomImporter chtml.Importer
 
-	// BuiltinComponents is a map of built-in components that can be used in CHTML files.
-	BuiltinComponents map[string]chtml.Component
+	// BuiltinComponents is a map of components constructors that can be used in CHTML files.
+	BuiltinComponents map[string]func() chtml.Component
 
 	// OnError is a callback that is called when an error occurs while serving a page.
 	OnError func(*http.Request, error)
@@ -232,6 +232,7 @@ func (h *Handler) servePage(
 		// print address of chan:
 
 		s := mainScope.Spawn(vars).(*scope) // create a new isolated scope for rendering
+		s.Touch()                           // trigger the first render
 
 		for {
 			select {
@@ -659,7 +660,7 @@ func (imp *pagesImporter) Import(name string) (chtml.Component, error) {
 	}
 
 	if cf, ok := imp.h.BuiltinComponents[name]; ok {
-		return cf, nil
+		return cf(), nil
 	}
 
 	searchNames := []string{name + chtmlExt, "." + name + chtmlExt}
@@ -746,8 +747,13 @@ func findTargetFragment(n *html.Node, fragmentID string) *html.Node {
 	return nil // Target not found in this subtree
 }
 
-// HTMXFragmentSelector returns the value of the HX-Target header, or empty string if not present.
+// HTMXFragmentSelector returns the value of the HX-Target header, or hx-target query parameter.
+// If both are empty, it returns an empty string.
+// The value is trimmed of the leading "#" character.
 func HTMXFragmentSelector(r *http.Request) string {
 	t := r.Header.Get("HX-Target")
+	if t == "" {
+		t = r.URL.Query().Get("hx-target")
+	}
 	return strings.TrimLeft(t, "#")
 }

@@ -11,3 +11,11 @@ func (rc RequestComponent) Render(s chtml.Scope) (any, error) {
 	}
 	return rr, nil
 }
+
+// requestComponentInstance is a singleton instance of the RequestComponent.
+// The instance is used to avoid allocating a new one for each request.
+var requestComponentInstance = &RequestComponent{}
+
+func RequestComponentFactory() chtml.Component {
+	return requestComponentInstance
+}

@@ -138,18 +138,19 @@ func main() {
 
 	ph := &pages.Handler{
 		FileSystem: os.DirFS("./example/pages"),
-		BuiltinComponents: map[string]chtml.Component{
-			"request": &pages.RequestComponent{},
-			"style":   pages.NewStyleComponent(assets),
-			"script":  pages.NewScriptComponent(assets),
-			"asset":   pages.NewAssetComponent(assets),
+		BuiltinComponents: map[string]func() chtml.Component{
+			"request": pages.RequestComponentFactory,
+			"style":   pages.NewStyleComponentFactory(assets),
+			"script":  pages.NewScriptComponentFactory(assets),
+			"asset":   pages.NewAssetComponentFactory(assets),
 		},
 		CustomImporter: &todoStoreImporter{
 			db: newTodoDB(),
 		},
-		AssetCollector: assets,
-		OnError:        nil,
-		Logger:         logger,
+		FragmentSelector: pages.HTMXFragmentSelector,
+		AssetCollector:   assets,
+		OnError:          nil,
+		Logger:           logger,
 	}
 
 	logger.Info("Starting HTTP server", "address", "http://localhost:8080")

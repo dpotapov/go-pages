@@ -119,6 +119,7 @@ func (c *HttpCallComponent) Render(s chtml.Scope) (any, error) {
 		if c.pollingStop != nil {
 			close(c.pollingStop)
 			c.pollingStop = nil
+			c.currentInterval = 0
 		}
 	} else if args.Interval != c.currentInterval {
 		// Stop the existing poller and start a new one if the interval has changed
@@ -154,6 +155,7 @@ func (c *HttpCallComponent) Dispose() error {
 	if c.pollingStop != nil {
 		close(c.pollingStop)
 		c.pollingStop = nil
+		c.currentInterval = 0
 	}
 	return nil
 }
