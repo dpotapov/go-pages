@@ -98,7 +98,7 @@ func (c *chtmlComponent) Render(s Scope) (any, error) {
 		c.env = map[string]any{"_": nil}
 	}
 	for _, attr := range c.doc.Attr {
-		v, err := attr.Val.Value(&c.vm, env(c.env))
+		v, err := attr.Val.Value(&c.vm, c.env)
 		if err != nil {
 			return nil, fmt.Errorf("eval attr %q: %w", attr.Key, err)
 		}

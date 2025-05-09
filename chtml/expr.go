@@ -3,7 +3,6 @@ package chtml
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -32,7 +31,7 @@ func NewExpr(s string, args map[string]any) (Expr, error) {
 	if s == "" {
 		return Expr{}, nil
 	}
-	x, err := expr.Compile(s, expr.Env(env(args)))
+	x, err := expr.Compile(s, expr.Env(args))
 	if err != nil {
 		return Expr{}, err
 	}
@@ -107,12 +106,6 @@ func interpol(s string, args map[string]any) (*vm.Program, error) {
 
 	in := make([]ast.Node, 0, len(l.items))
 
-	t := reflect.TypeOf(env(args))
-	fns := make([]string, t.NumMethod())
-	for i := 0; i < t.NumMethod(); i++ {
-		fns[i] = t.Method(i).Name
-	}
-
 loop:
 	for _, item := range l.items {
 		switch item.typ {
@@ -123,9 +116,7 @@ loop:
 		case itemText:
 			in = append(in, &ast.StringNode{Value: item.val})
 		case itemExpr:
-			p, err := expr.Compile(item.val,
-				expr.Env(env(args)),
-				expr.Operator("+", fns...))
+			p, err := expr.Compile(item.val, expr.Env(args), allowAny)
 			if err != nil {
 				return nil, err
 			}
@@ -145,8 +136,7 @@ loop:
 	c := conf.CreateNew()
 
 	opts := []expr.Option{
-		expr.Env(env(args)),
-		expr.Operator("+", fns...),
+		expr.Env(args),
 		expr.Function("combine", func(args ...any) (any, error) {
 			var acc any
 			for _, arg := range args {
@@ -397,4 +387,15 @@ func isSpace(r rune) bool {
 // isAlphaNumeric reports whether r is an alphabetic, digit, or underscore.
 func isAlphaNumeric(r rune) bool {
 	return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)
+}
+
+// converts all nil fields to unknown type, effectively disable type checking
+func allowAny(c *conf.Config) {
+	for k, v := range c.Env.Fields {
+		if v.Type == nil {
+			v.Nil = false
+			v.Type = nil
+			c.Env.Fields[k] = v
+		}
+	}
 }

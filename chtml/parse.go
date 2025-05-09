@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 
 	"github.com/expr-lang/expr/vm"
@@ -228,8 +229,10 @@ func (p *chtmlParser) addText(text string) {
 		n.Data = expr
 
 		// Try to evaluate the expression to determine RenderShape
-		if result, evalErr := expr.Value(&p.vm, env(p.env)); evalErr == nil {
-			n.RenderShape = result
+		if result, evalErr := expr.Value(&p.vm, p.env); evalErr == nil {
+			setRenderShape(n, result)
+		} else {
+			p.error(t, evalErr)
 		}
 
 		return
@@ -246,8 +249,10 @@ func (p *chtmlParser) addText(text string) {
 	}
 
 	// Try to evaluate the expression to determine RenderShape
-	if result, evalErr := expr.Value(&p.vm, env(p.env)); evalErr == nil {
-		textNode.RenderShape = result
+	if result, evalErr := expr.Value(&p.vm, p.env); evalErr == nil {
+		setRenderShape(textNode, result)
+	} else {
+		p.error(t, evalErr)
 	}
 
 	p.addChild(textNode)
@@ -261,7 +266,7 @@ func (p *chtmlParser) addElement() {
 		Data:     NewExprRaw(p.tok.Data),
 		Attr:     make([]Attribute, 0, len(p.tok.Attr)),
 	}
-	n.RenderShape = n
+	setRenderShape(n, (*html.Node)(nil))
 
 	if strings.HasPrefix(strings.ToLower(p.tok.Data), "c:") {
 		n.Type = importNode
@@ -276,14 +281,41 @@ func (p *chtmlParser) addElement() {
 	}
 
 	// Handle c:for variables *before* processing regular attributes
-	if !n.Loop.IsEmpty() {
+	if !n.Loop.IsEmpty() && (n.LoopVar != "" || n.LoopIdx != "") {
+		// eval the loop expression to determine the shape of the loop variable
+		loopResult, evalErr := n.Loop.Value(&p.vm, p.env)
+		if evalErr != nil {
+			p.error(n, fmt.Errorf("eval loop expression: %w", evalErr))
+		}
+
 		introducedVars := make(map[string]any)
+		var (
+			varType any = nil
+			idxType any = nil
+		)
+		if loopResult != nil {
+			rt := reflect.TypeOf(loopResult)
+			rv := reflect.ValueOf(loopResult)
+			switch rt.Kind() {
+			case reflect.Slice, reflect.Array:
+				if rv.Len() > 0 {
+					varType = rv.Index(0).Interface()
+				} else {
+					varType = reflect.Zero(rt.Elem()).Interface()
+				}
+				idxType = int(0)
+			case reflect.Map:
+				varType = reflect.Zero(rt.Elem()).Interface()
+				idxType = reflect.Zero(rt.Key()).Interface()
+			}
+		}
 		if n.LoopVar != "" {
-			introducedVars[n.LoopVar] = new(any) // TODO: infer type
+			introducedVars[n.LoopVar] = varType
 		}
 		if n.LoopIdx != "" {
-			introducedVars[n.LoopIdx] = new(any) // TODO: infer type
+			introducedVars[n.LoopIdx] = idxType
 		}
+
 		// Push the new variables into the environment
 		p.pushEnv(introducedVars)
 	}
@@ -352,7 +384,7 @@ func (p *chtmlParser) parseImportElement(n *Node) {
 	// convert n.Attr to a map for the scope
 	vars := make(map[string]any, len(n.Attr))
 	for _, attr := range n.Attr {
-		v, err := attr.Val.Value(&p.vm, env(p.env))
+		v, err := attr.Val.Value(&p.vm, p.env)
 		if err != nil {
 			p.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
 			return
@@ -397,14 +429,14 @@ func (p *chtmlParser) parseImportElement(n *Node) {
 	}
 
 	// Store the dry run result as the node's RenderShape for future reference
-	n.RenderShape = rr
+	setRenderShape(n, rr)
 
 	if attr, ok := rr.(Attribute); ok && n.Parent != nil {
 		// TODO: should we allow changing the attrribute of any element?
 		if n.Parent == p.doc {
 			n.Parent.Attr = append(n.Parent.Attr, attr)
 
-			v, err := attr.Val.Value(&p.vm, env(p.env))
+			v, err := attr.Val.Value(&p.vm, p.env)
 			if err != nil {
 				p.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
 				return
@@ -412,7 +444,7 @@ func (p *chtmlParser) parseImportElement(n *Node) {
 
 			snake := toSnakeCase(attr.Key)
 			p.env[snake] = v
-			n.RenderShape = nil // the attribute does not render to anything
+			setRenderShape(n, nil) // the attribute does not render to anything
 		}
 	}
 }
@@ -868,7 +900,85 @@ func (p *chtmlParser) parse() error {
 		p.parseCurrentToken()
 	}
 
+	// Propagate RenderShape to the document node
+	if p.doc.FirstChild != nil && p.doc.FirstChild == p.doc.LastChild { // Single child
+		setRenderShape(p.doc, p.doc.FirstChild.RenderShape)
+	} else {
+		var shape any
+		for child := p.doc.FirstChild; child != nil; child = child.NextSibling {
+			if child.IsWhitespace() { // Ignore whitespace when determining the shape
+				continue
+			}
+			shape = combineRenderShapes(shape, child.RenderShape)
+		}
+		setRenderShape(p.doc, shape)
+	}
+
 	return nil
+}
+
+func setRenderShape(n *Node, shape any) {
+	n.RenderShape = transformShape(shape)
+}
+
+// combineRenderShapes combines two render shapes into a single shape.
+// If both shapes are of the same type, the first shape returned.
+// If one shape is any(nil), the other shape is returned.
+// If one of the shapes is *html.Node, the (*html.Node)(nil) is returned.
+// Otherwise, string("") is returned.
+func combineRenderShapes(a, b any) any {
+	if a == nil {
+		return b
+	}
+	if b == nil {
+		return a
+	}
+
+	ta := reflect.TypeOf(a)
+	tb := reflect.TypeOf(b)
+
+	// If both shapes are of the same type, return the first shape
+	if ta == tb {
+		return a
+	}
+
+	// If either is *html.Node, return (*html.Node)(nil)
+	htmlNodeType := reflect.TypeOf((*html.Node)(nil))
+	if ta == htmlNodeType || tb == htmlNodeType {
+		return (*html.Node)(nil)
+	}
+
+	// Otherwise, return string("")
+	return ""
+}
+
+// transformShape analyzes the input shape and returns a more specific type representation,
+// particularly for slices, to aid in type checking and template analysis.
+func transformShape(shape any) any {
+	return shape
+
+	// TODO: use more targeted approach:
+	/*
+		if shape == nil {
+			return nil
+		}
+
+		rt := reflect.TypeOf(shape)
+		switch rt.Kind() {
+		case reflect.Slice:
+			return reflect.Zero(rt).Interface()
+		case reflect.Map:
+			m := reflect.ValueOf(shape)
+			newMap := reflect.MakeMapWithSize(rt, m.Len())
+			for _, key := range m.MapKeys() {
+				val := m.MapIndex(key).Interface()
+				transformedVal := transformShape(val)
+				newMap.SetMapIndex(key, reflect.ValueOf(transformedVal))
+			}
+			return newMap.Interface()
+		default:
+			return shape
+		}*/
 }
 
 // Parse returns the parsed *Node tree for the HTML from the given Reader.
@@ -879,7 +989,7 @@ func Parse(r io.Reader, imp Importer) (*Node, error) {
 		doc: &Node{
 			Type: html.DocumentNode,
 		},
-		env:      map[string]any{"_": new(any)},
+		env:      map[string]any{"_": AnyShape},
 		im:       inBodyIM,
 		importer: imp,
 	}
@@ -887,5 +997,6 @@ func Parse(r io.Reader, imp Importer) (*Node, error) {
 	if err := p.parse(); err != nil {
 		return nil, err
 	}
+
 	return p.doc, errors.Join(p.errs...)
 }

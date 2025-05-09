@@ -493,7 +493,7 @@ func NewAssetComponentFactory(assets AssetCollector) func() chtml.Component {
 
 func (c *AssetComponent) Render(s chtml.Scope) (any, error) {
 	if s.DryRun() {
-		return &html.Node{}, nil
+		return &html.Node{Type: html.DocumentNode}, nil
 	}
 
 	var args AssetArgs

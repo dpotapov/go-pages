@@ -20,9 +20,9 @@ import (
 //  3. Render the node and its children, calling the appropriate function based on a node type, and
 //     appending the result to the destination node.
 func (c *chtmlComponent) render(n *Node) any {
-	if c.evalIf(n) {
-		var res, rr any
+	var res, rr any // res is the accumulated result, rr is the result of the current node/operation
 
+	if c.evalIf(n) {
 		for c := range c.evalFor(n) {
 			switch n.Type {
 			case html.ElementNode:
@@ -41,11 +41,18 @@ func (c *chtmlComponent) render(n *Node) any {
 
 			res = AnyPlusAny(res, rr)
 		}
-
-		return res
 	}
 
-	return nil
+	// Apply RenderShape conversion if specified for the node
+	if n.RenderShape != nil {
+		convertedRes, convErr := convertToRenderShape(res, n.RenderShape)
+		if convErr != nil {
+			c.error(n, fmt.Errorf("convert to render shape: %w", convErr))
+		} else {
+			res = convertedRes
+		}
+	}
+	return res
 }
 
 // renderText evaluates the interpolated expression for the given text node and stores the result in
@@ -86,7 +93,7 @@ func (c *chtmlComponent) renderDocument(n *Node) any {
 		}
 
 		if attr, ok := rr.(Attribute); ok {
-			v, err := attr.Val.Value(&c.vm, env(c.env))
+			v, err := attr.Val.Value(&c.vm, c.env)
 			if err != nil {
 				c.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
 				continue
@@ -125,7 +132,7 @@ func (c *chtmlComponent) renderElement(n *Node) any {
 			continue
 		}
 		if attr, ok := rr.(Attribute); ok {
-			v, err := attr.Val.Value(&c.vm, env(c.env))
+			v, err := attr.Val.Value(&c.vm, c.env)
 			if err != nil {
 				c.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
 				continue
@@ -157,15 +164,10 @@ func (c *chtmlComponent) renderElement(n *Node) any {
 
 // renderImport renders the imported component (<c:NAME>) and appends the result to the destination.
 func (c *chtmlComponent) renderImport(n *Node) any {
-	// for debugging, remove me:
-	if n.Data.RawString() == "c:project-selector" {
-		fmt.Println("FOUND project-selector component")
-	}
-
 	// Build variables for the imported component
 	vars := make(map[string]any)
 	for _, attr := range n.Attr {
-		res, err := attr.Val.Value(&c.vm, env(c.env))
+		res, err := attr.Val.Value(&c.vm, c.env)
 		if err != nil {
 			c.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
 			return nil
@@ -180,7 +182,7 @@ func (c *chtmlComponent) renderImport(n *Node) any {
 		for child := n.FirstChild; child != nil; child = child.NextSibling {
 			rr := c.render(child)
 			if attr, ok := rr.(Attribute); ok {
-				v, err := attr.Val.Value(&c.vm, env(c.env))
+				v, err := attr.Val.Value(&c.vm, c.env)
 				if err != nil {
 					c.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
 					return nil
@@ -200,7 +202,7 @@ func (c *chtmlComponent) renderImport(n *Node) any {
 	if len(c.children[n]) == 1 {
 		comp = c.children[n][0]
 	} else {
-		impName, err := n.Data.Value(&c.vm, env(c.env))
+		impName, err := n.Data.Value(&c.vm, c.env)
 		if err != nil {
 			c.error(n, fmt.Errorf("eval import name: %w", err))
 			return nil
@@ -479,4 +481,148 @@ func (c *chtmlComponent) newChildComponent(doc *Node, env map[string]any) *chtml
 func (c *chtmlComponent) scopeHasVar(v string) bool {
 	_, ok := c.scope.Vars()[v]
 	return ok
+}
+
+func convertToRenderShape(v any, shape any) (any, error) {
+	// If no target shape is specified, return the original value.
+	// `shape` is an `any` (interface{}), so `shape == nil` means the interface itself is nil.
+	if shape == nil || shape == AnyShape {
+		return v, nil
+	}
+
+	targetType := reflect.TypeOf(shape)
+	if targetType == nil {
+		// This occurs if `shape` is an untyped nil passed as `any`.
+		// Consistent with `shape == nil` at the top, implies no specific shape to convert to.
+		return v, nil
+	}
+
+	// Handle the case where the input value `v` is nil.
+	if v == nil {
+		// If v is nil, return the zero value for the targetType.
+		// return reflect.Zero(targetType).Interface(), nil
+		return shape, nil
+	}
+
+	sourceValue := reflect.ValueOf(v) // v is not nil at this point
+	sourceType := sourceValue.Type()
+
+	// 1. If the types are already the same, return the value as is.
+	if sourceType == targetType {
+		return v, nil
+	}
+
+	// 2. If the source type is directly convertible to the target type using Go's rules.
+	if sourceType.ConvertibleTo(targetType) {
+		convertedValue := sourceValue.Convert(targetType)
+		return convertedValue.Interface(), nil
+	}
+
+	// 3. Special conversion rules
+	if converted, ok := tryConvertToHtmlNode(v, sourceType, targetType); ok {
+		return converted, nil
+	}
+
+	if converted, ok := trySliceToSliceConversion(v, shape, sourceType, targetType, sourceValue); ok {
+		return converted, nil
+	}
+
+	// 4. If none of the above conversion strategies work, return an error.
+	return nil, fmt.Errorf("cannot convert type %s to type %s", sourceType.String(), targetType.String())
+}
+
+// tryConvertToHtmlNode attempts to convert a value to *html.Node.
+// If the targetType is *html.Node, it converts v to an *html.Node representation using repr().
+func tryConvertToHtmlNode(v any, sourceType, targetType reflect.Type) (any, bool) {
+	htmlNodeType := reflect.TypeOf((*html.Node)(nil))
+	if targetType != htmlNodeType {
+		return nil, false // Not targeting *html.Node
+	}
+
+	if sourceType == htmlNodeType { // Already *html.Node
+		return v, true
+	}
+
+	if v == nil { // Source is nil (untyped), target is *html.Node
+		return (*html.Node)(nil), true
+	}
+
+	// Check for typed nils (e.g., (*SomeStruct)(nil), ([]byte)(nil))
+	val := reflect.ValueOf(v)
+	switch val.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
+		if val.IsNil() {
+			return (*html.Node)(nil), true
+		}
+	}
+
+	return &html.Node{Type: html.TextNode, Data: repr(v)}, true
+}
+
+// trySliceToSliceConversion attempts to convert a slice of interface{} to a slice of a specific type.
+// It returns the converted slice and true if successful, otherwise nil and false.
+func trySliceToSliceConversion(v any, shape any, sourceType, targetType reflect.Type, sourceValue reflect.Value) (any, bool) {
+	if targetType.Kind() == reflect.Slice && sourceType.Kind() == reflect.Slice && sourceType.Elem().Kind() == reflect.Interface {
+		targetElemType := targetType.Elem()
+		// Optimistically assume all elements can be converted.
+		// We will build a new slice of reflect.Value to hold potentially converted elements.
+		convertedElements := make([]reflect.Value, sourceValue.Len())
+
+		for i := 0; i < sourceValue.Len(); i++ {
+			elem := sourceValue.Index(i).Interface() // Get element as any
+
+			if elem == nil { // Handle nil elements in the source slice
+				// If target element type is a pointer, chan, func, interface, map, or slice, its zero value is nil.
+				// Otherwise, we can't assign nil to a non-pointer/interface type.
+				if !isNilCompatible(targetElemType) {
+					return nil, false // Cannot convert, nil is not compatible
+				}
+				// For nil-compatible types, the zero value is appropriate.
+				convertedElements[i] = reflect.Zero(targetElemType)
+				continue
+			}
+
+			elemValue := reflect.ValueOf(elem)
+			if elemValue.Type().ConvertibleTo(targetElemType) {
+				convertedElements[i] = elemValue.Convert(targetElemType)
+			} else {
+				// Try recursive conversion for complex elements
+				// Pass the zero value of the target element type as the shape hint for the recursive call.
+				recursivelyConverted, err := convertToRenderShape(elem, reflect.Zero(targetElemType).Interface())
+				if err == nil {
+					// Ensure the recursively converted value is assignable to the target element type.
+					// This check is important if convertToRenderShape returns a value of a different,
+					// albeit compatible, type.
+					val := reflect.ValueOf(recursivelyConverted)
+					if val.Type().AssignableTo(targetElemType) {
+						convertedElements[i] = val
+					} else if val.Type().ConvertibleTo(targetElemType) {
+						convertedElements[i] = val.Convert(targetElemType)
+					} else {
+						return nil, false // Recursive conversion returned an incompatible type
+					}
+				} else {
+					return nil, false // Recursive conversion failed
+				}
+			}
+		}
+
+		// If we've reached here, all elements were convertible (or were nil and compatible).
+		// Create the new slice and copy converted elements.
+		newSlice := reflect.MakeSlice(targetType, sourceValue.Len(), sourceValue.Len())
+		for i := 0; i < sourceValue.Len(); i++ {
+			newSlice.Index(i).Set(convertedElements[i])
+		}
+		return newSlice.Interface(), true
+	}
+	return nil, false
+}
+
+func isNilCompatible(t reflect.Type) bool {
+	switch t.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
+		return true
+	default:
+		return false
+	}
 }

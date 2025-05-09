@@ -10,33 +10,38 @@ import (
 	"golang.org/x/net/html"
 )
 
-type env map[string]any
+// AnyShape is a special value indicating that the variable represents any data and
+// should be rendered appropriately.
+// It is used by the parser to build RenderShape.
+type anyShape struct{}
 
-func (e env) HtmlPlusAny(a *html.Node, b any) *html.Node {
+var AnyShape = anyShape{}
+
+func HtmlPlusAny(a *html.Node, b any) *html.Node {
 	switch v := b.(type) {
 	case *html.Node:
-		return e.HtmlPlusHtml(a, v)
+		return HtmlPlusHtml(a, v)
 	default:
 		if b == nil {
 			return a
 		}
-		return e.HtmlPlusText(a, fmt.Sprint(v))
+		return HtmlPlusText(a, fmt.Sprint(v))
 	}
 }
 
-func (e env) AnyPlusHtml(a any, b *html.Node) *html.Node {
+func AnyPlusHtml(a any, b *html.Node) *html.Node {
 	switch v := a.(type) {
 	case *html.Node:
-		return e.HtmlPlusHtml(v, b)
+		return HtmlPlusHtml(v, b)
 	default:
 		if a == nil {
 			return b
 		}
-		return e.TextPlusHtml(fmt.Sprint(v), b)
+		return TextPlusHtml(fmt.Sprint(v), b)
 	}
 }
 
-func (e env) TextPlusHtml(a string, b *html.Node) *html.Node {
+func TextPlusHtml(a string, b *html.Node) *html.Node {
 	if b == nil {
 		return &html.Node{
 			Type: html.TextNode,
@@ -58,7 +63,7 @@ func (e env) TextPlusHtml(a string, b *html.Node) *html.Node {
 	return n
 }
 
-func (e env) HtmlPlusText(a *html.Node, b string) *html.Node {
+func HtmlPlusText(a *html.Node, b string) *html.Node {
 	if a.Type == html.TextNode {
 		a.Data += b
 		return a
@@ -74,7 +79,7 @@ func (e env) HtmlPlusText(a *html.Node, b string) *html.Node {
 	return n
 }
 
-func (e env) HtmlPlusHtml(a, b *html.Node) *html.Node {
+func HtmlPlusHtml(a, b *html.Node) *html.Node {
 	if a.Type == html.TextNode && b.Type == html.TextNode {
 		a.Data += b.Data
 		return a
@@ -95,19 +100,19 @@ func (e env) HtmlPlusHtml(a, b *html.Node) *html.Node {
 
 func AnyPlusAny(a any, b any) any {
 	if va, ok := a.(*html.Node); ok {
-		return env{}.HtmlPlusAny(va, b)
+		return HtmlPlusAny(va, b)
 	}
 	if vb, ok := b.(*html.Node); ok {
 		if vb == nil {
 			return a
 		}
-		return env{}.AnyPlusHtml(a, vb)
+		return AnyPlusHtml(a, vb)
 	}
 
-	if isEquivalentToNewAny(a) {
+	if isEquivalentToAny(a) {
 		return b
 	}
-	if isEquivalentToNewAny(b) {
+	if isEquivalentToAny(b) {
 		return a
 	}
 
@@ -192,24 +197,27 @@ func repr(v any) string {
 	return fmt.Sprint(v)
 }
 
-func isEquivalentToNewAny(v any) bool {
-	// Create a new any using new
-	newAny := new(any) // newAny is of type *any and points to nil
-
+func isEquivalentToAny(v any) bool {
 	// If v is nil, compare directly to the dereferenced newAny
 	if v == nil {
 		return true
 	}
 
-	// Get the reflect.Value of v
-	vValue := reflect.ValueOf(v)
+	// Use reflection to check for typed nil
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		if rv.IsNil() {
+			return true
+		}
+	}
 
-	// If v is a pointer, dereference it
+	// Fallback: compare to a new any (should rarely be needed)
+	newAny := new(any)
+	vValue := rv
 	if vValue.Kind() == reflect.Ptr {
 		vValue = vValue.Elem()
 	}
-
-	// Compare the underlying values using reflect.DeepEqual
 	return reflect.DeepEqual(vValue.Interface(), *newAny)
 }
 
@@ -258,6 +266,9 @@ func AnyToHtml(a any) *html.Node {
 }
 
 func appendChild(p, c *html.Node) {
+	if c == nil {
+		return
+	}
 	if c.Parent != nil {
 		c = cloneHtmlTree(c)
 	}

@@ -3,10 +3,12 @@ package chtml
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/net/html"
 )
 
@@ -90,6 +92,26 @@ func TestRenderCHTML(t *testing.T) {
 			want: map[string]any{"a": 123, "b": true, "c": "str"},
 		},
 		{
+			name: "eval int within whitespace",
+			text: `  ${ 123 }   `,
+			want: 123,
+		},
+		{
+			name: "eval bool within whitespace",
+			text: `  ${ true }   `,
+			want: true,
+		},
+		{
+			name: "eval object within whitespace",
+			text: `  ${ { "a": 123 } }   `,
+			want: map[string]any{"a": 123},
+		},
+		{
+			name: "eval string within whitespace",
+			text: `  ${ "abc" }   `,
+			want: "  abc   ",
+		},
+		{
 			name: "text node expansion",
 			text: `<c:attr name="greeting">Hello</c:attr><p>${ greeting }</p>`,
 			want: "<p>Hello</p>",
@@ -122,7 +144,7 @@ func TestRenderCHTML(t *testing.T) {
 		{
 			name: "render c:if - false",
 			text: `<p c:if="false">foobar</p>`,
-			want: nil,
+			want: (*html.Node)(nil),
 		},
 		{
 			name: "render c:if - empty",
@@ -174,6 +196,7 @@ func TestRenderCHTML(t *testing.T) {
 		{
 			name: "render c:for - empty",
 			text: `<p c:for="x in []">Hello, ${x}!</p>`,
+			want: (*html.Node)(nil),
 		},
 		{
 			name: "render c:for",
@@ -198,6 +221,7 @@ func TestRenderCHTML(t *testing.T) {
 		{
 			name: "render c:for with c:if",
 			text: `<p c:for="x in ['foo']" c:if="false">${x}</p>`,
+			want: (*html.Node)(nil),
 		},
 		{
 			name: "render c:for with c:if",
@@ -225,12 +249,12 @@ func TestRenderCHTML(t *testing.T) {
 			name: "for loop over empty map",
 			text: `<c:attr name="empty_map">${{}}</c:attr><p c:for="v, k in empty_map">${k}-${v}</p>`,
 			vars: map[string]any{"empty_map": map[string]int{}},
-			want: nil,
+			want: (*html.Node)(nil),
 		},
 		{
 			name: "for loop over nil map",
 			text: `<c:attr name="nil_map">${nil}</c:attr><span c:for="v, k in nil_map">${k}=${v}</span>`,
-			want: nil,
+			want: (*html.Node)(nil),
 		},
 
 		// Testing rendering <input checked> and <option selected>
@@ -318,6 +342,14 @@ func TestRenderCHTML(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCHTMLTypeMatching(t *testing.T) {
+	err := testRenderCase(`<c:attr name="v">${true}</c:attr>${v ? 123 : 'text'}`, 123, map[string]any{"v": false}, &ComponentOptions{
+		Importer:       nil,
+		RenderComments: false,
+	})
+	require.ErrorContains(t, err, "cannot convert type string to type int")
 }
 
 func TestRenderCHTMLImports(t *testing.T) {
@@ -446,7 +478,7 @@ func testRenderCase(text string, want any, vars map[string]any, opts *ComponentO
 		return fmt.Errorf("render error: %w", err)
 	}
 
-	if ht, ok := rr.(*html.Node); ok {
+	if ht, ok := rr.(*html.Node); ok && ht != nil {
 		var buf strings.Builder
 		if err := html.Render(&buf, ht); err != nil {
 			return fmt.Errorf("html render error: %w", err)
@@ -498,4 +530,247 @@ func (t *testImporter) Import(name string) (Component, error) {
 	}
 
 	return nil, ErrComponentNotFound
+}
+
+// MyString is a custom string type for testing convertibility.
+type MyString string
+
+type testStruct struct {
+	Name string
+	Age  int
+}
+
+func TestConvertToRenderShape(t *testing.T) {
+	htmlShape := (*html.Node)(nil)
+	stringInstance := ""
+	intInstance := 0
+	int64Instance := int64(0)
+
+	tests := []struct {
+		name        string
+		value       any
+		shape       any
+		wantValue   any
+		wantErr     bool
+		errContains string
+	}{
+		// 1. Shape is nil (No changes needed here)
+		{
+			name:      "shape is nil, value is string",
+			value:     "hello",
+			shape:     nil,
+			wantValue: "hello",
+			wantErr:   false,
+		},
+		{
+			name:      "shape is untyped nil, value is string",
+			value:     "hello",
+			shape:     interface{}(nil),
+			wantValue: "hello",
+			wantErr:   false,
+		},
+
+		// 2. Value is nil (No changes needed for non-*html.Node shapes)
+		{
+			name:      "value is nil, shape is *html.Node", // Changed
+			value:     nil,
+			shape:     htmlShape,
+			wantValue: (*html.Node)(nil), // nil converts to typed nil
+			wantErr:   false,
+		},
+		{
+			name:      "value is nil, shape is string (non-nillable)",
+			value:     nil,
+			shape:     stringInstance,
+			wantValue: stringInstance,
+			wantErr:   false,
+		},
+
+		// 3. Types are the same
+		{
+			name:      "string to string",
+			value:     "hello",
+			shape:     stringInstance,
+			wantValue: "hello",
+			wantErr:   false,
+		},
+		{
+			name:      "*html.Node to *html.Node shape", // Changed
+			value:     &html.Node{Type: html.CommentNode, Data: "comment"},
+			shape:     htmlShape,
+			wantValue: &html.Node{Type: html.CommentNode, Data: "comment"},
+			wantErr:   false,
+		},
+
+		// 4. Convertible types (standard Go convertibility)
+		{
+			name:      "int to int64",
+			value:     123,
+			shape:     int64Instance,
+			wantValue: int64(123),
+			wantErr:   false,
+		},
+		{
+			name:      "MyString to string",
+			value:     MyString("hello"),
+			shape:     stringInstance,
+			wantValue: "hello",
+			wantErr:   false,
+		},
+
+		// 5. Target is *html.Node
+		{
+			name:  "string to *html.Node",
+			value: "text content",
+			shape: htmlShape,
+			wantValue: &html.Node{
+				Type: html.TextNode,
+				Data: "text content",
+			},
+			wantErr: false,
+		},
+		{
+			name:  "bool (true) to *html.Node",
+			value: true,
+			shape: htmlShape,
+			wantValue: &html.Node{
+				Type: html.TextNode,
+				Data: "true",
+			},
+			wantErr: false,
+		},
+		{
+			name:  "int to *html.Node",
+			value: 456,
+			shape: htmlShape,
+			wantValue: &html.Node{
+				Type: html.TextNode,
+				Data: "456",
+			},
+			wantErr: false,
+		},
+		{
+			name:  "float64 to *html.Node",
+			value: 7.89,
+			shape: htmlShape,
+			wantValue: &html.Node{
+				Type: html.TextNode,
+				Data: "7.89",
+			},
+			wantErr: false,
+		},
+		{
+			name:  "[]byte to *html.Node",
+			value: []byte("byte slice content"),
+			shape: htmlShape,
+			wantValue: &html.Node{
+				Type: html.TextNode,
+				Data: "byte slice content",
+			},
+			wantErr: false,
+		},
+		{
+			name:      "nil []byte to *html.Node",
+			value:     ([]byte)(nil),
+			shape:     htmlShape,
+			wantValue: (*html.Node)(nil),
+			wantErr:   false,
+		},
+		{
+			name:  "struct to *html.Node",
+			value: testStruct{Name: "Go", Age: 15},
+			shape: htmlShape,
+			wantValue: &html.Node{
+				Type: html.TextNode,
+				Data: "{\"Name\":\"Go\",\"Age\":15}",
+			},
+			wantErr: false,
+		},
+		{
+			name:  "slice of ints to *html.Node",
+			value: []int{10, 20, 30},
+			shape: htmlShape,
+			wantValue: &html.Node{
+				Type: html.TextNode,
+				Data: "[10,20,30]",
+			},
+			wantErr: false,
+		},
+		{
+			name:      "nil slice of ints to *html.Node",
+			value:     ([]int)(nil),
+			shape:     htmlShape,
+			wantValue: (*html.Node)(nil),
+			wantErr:   false,
+		},
+		{
+			name:  "map[string]any to *html.Node",
+			value: map[string]any{"key": "val", "num": 123.0, "active": true},
+			shape: htmlShape,
+			wantValue: &html.Node{
+				Type: html.TextNode,
+				Data: `{"active":true,"key":"val","num":123}`,
+			},
+			wantErr: false,
+		},
+		{
+			name:      "nil map[string]any to *html.Node",
+			value:     (map[string]any)(nil),
+			shape:     htmlShape,
+			wantValue: (*html.Node)(nil),
+			wantErr:   false,
+		},
+
+		// 6. Non-convertible types (general error cases - these remain the same)
+		{
+			name:        "string to int",
+			value:       "not-an-int",
+			shape:       intInstance,
+			wantValue:   nil,
+			wantErr:     true,
+			errContains: "cannot convert type string to type int",
+		},
+		{
+			name:        "struct to string",
+			value:       testStruct{Name: "Test", Age: 1},
+			shape:       stringInstance,
+			wantValue:   nil,
+			wantErr:     true,
+			errContains: "cannot convert type chtml.testStruct to type string",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotValue, err := convertToRenderShape(tt.value, tt.shape)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("convertToRenderShape() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantErr {
+				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("convertToRenderShape() error = %q, want error containing %q", err.Error(), tt.errContains)
+				}
+				// If an error was expected and its content matches (or no specific content check),
+				// and we indeed got an error, then the value check is skipped.
+				if err != nil { // Ensure we actually got an error if wantErr is true
+					return
+				}
+				// If wantErr is true but err is nil, the first check (err != nil) != tt.wantErr would have caught it.
+			}
+
+			// If no error was expected, but we got one
+			if err != nil {
+				t.Errorf("convertToRenderShape() unexpected error = %v", err)
+				return
+			}
+
+			// General reflect.DeepEqual for other types or if one is *Node and other isn't
+			if !reflect.DeepEqual(gotValue, tt.wantValue) {
+				t.Errorf("DeepEqual mismatch.\nGot:      %#v (type %T)\nWant:     %#v (type %T)", gotValue, gotValue, tt.wantValue, tt.wantValue)
+			}
+		})
+	}
 }

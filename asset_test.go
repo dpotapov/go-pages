@@ -132,7 +132,7 @@ func TestAssetComponent_Render(t *testing.T) {
 		ds := chtml.NewDryRunScope(map[string]any{"name": "test.css", "type": "css"})
 		n, err := comp.Render(ds)
 		require.NoError(t, err)
-		require.Equal(t, &html.Node{}, n) // DryRun mode should return empty html node
+		require.Equal(t, &html.Node{Type: html.DocumentNode}, n) // DryRun mode should return empty html node
 	})
 
 	t.Run("missing css file", func(t *testing.T) {

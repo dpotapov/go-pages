@@ -3,7 +3,7 @@ module github.com/dpotapov/go-pages
 go 1.23
 
 require (
-	github.com/expr-lang/expr v1.16.9
+	github.com/expr-lang/expr v1.17.2
 	github.com/fatih/camelcase v1.0.0
 	github.com/google/go-cmp v0.6.0
 	github.com/gorilla/websocket v1.5.3
