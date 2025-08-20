@@ -123,8 +123,8 @@ func TestDecodeForm(t *testing.T) {
 				"key[1a]":  {"value3"},
 			},
 			expected: map[string]any{
+				"key":      []any{"value2"},
 				"key[abc]": "value",
-				"key[]":    "value2",
 				"key[1a]":  "value3",
 			},
 		},

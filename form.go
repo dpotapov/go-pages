@@ -19,7 +19,25 @@ func DecodeForm(values url.Values, logger *slog.Logger) map[string]any {
 		if len(vals) == 0 {
 			continue
 		}
-		// We typically only care about the first value for form decoding
+		// Support unindexed array notation like "apps[].name" by expanding
+		// to numbered keys in the order values appear in the payload.
+		if strings.Contains(key, "[]") {
+			for i, v := range vals {
+				expanded := strings.Replace(key, "[]", "["+strconv.Itoa(i)+"]", 1)
+				if err := assignValue(result, expanded, v); err != nil {
+					if logger != nil {
+						logger.Warn("Failed to assign form value",
+							slog.String("key", expanded),
+							slog.Any("value", v),
+							slog.Any("error", err),
+						)
+					}
+				}
+			}
+			continue
+		}
+
+		// Standard behavior: use the first value for this key
 		value := vals[0]
 		if err := assignValue(result, key, value); err != nil {
 			if logger != nil {
