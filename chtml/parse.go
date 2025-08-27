@@ -15,10 +15,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"reflect"
 	"strings"
 
-	"github.com/expr-lang/expr/vm"
 	"golang.org/x/net/html"
 	a "golang.org/x/net/html/atom"
 )
@@ -36,8 +34,8 @@ type chtmlParser struct {
 	hasSelfClosingToken bool
 	// doc is the document root element.
 	doc *Node
-	// env is the environment for evaluating expressions in the attributes and text nodes.
-	env map[string]any
+	// symbols holds variable shapes for static expression checking during parsing.
+	symbols map[string]*Shape
 	// shadowed is the stack of variables shadowed by the elements that introduce new scopes.
 	// When new variables are introduced (like in loops), the old values are preserved in the stack.
 	shadowed []map[string]any
@@ -50,8 +48,6 @@ type chtmlParser struct {
 	originalIM insertionMode
 	// importer resolves component imports in <c:IMPORT ...> tags.
 	importer Importer
-	// vm is the virtual machine for evaluating expressions.
-	vm vm.VM
 	// errs captures all errors encountered during parsing.
 	errs []error
 }
@@ -208,7 +204,7 @@ loop:
 func (p *chtmlParser) addChild(n *Node) {
 	p.top().AppendChild(n)
 
-	if n.Type == html.ElementNode || n.Type == importNode {
+	if n.Type == html.ElementNode || n.Type == importNode || n.Type == cNode {
 		p.oe = append(p.oe, n)
 	}
 }
@@ -222,23 +218,16 @@ func (p *chtmlParser) addText(text string) {
 
 	t := p.top()
 	if n := t.LastChild; n != nil && n.Type == html.TextNode {
-		expr, err := NewExprInterpol(n.Data.RawString()+text, p.env)
+		expr, err := NewExprInterpol(n.Data.RawString()+text, p.symbols)
 		if err != nil {
 			p.error(t, err)
 		}
 		n.Data = expr
-
-		// Try to evaluate the expression to determine RenderShape
-		if result, evalErr := expr.Value(&p.vm, p.env); evalErr == nil {
-			setRenderShape(n, result)
-		} else {
-			p.error(t, evalErr)
-		}
-
+		n.RenderShape = expr.Shape()
 		return
 	}
 
-	expr, err := NewExprInterpol(text, p.env)
+	expr, err := NewExprInterpol(text, p.symbols)
 	if err != nil {
 		p.error(t, err)
 	}
@@ -248,12 +237,8 @@ func (p *chtmlParser) addText(text string) {
 		Data: expr,
 	}
 
-	// Try to evaluate the expression to determine RenderShape
-	if result, evalErr := expr.Value(&p.vm, p.env); evalErr == nil {
-		setRenderShape(textNode, result)
-	} else {
-		p.error(t, evalErr)
-	}
+	// Use statically derived shape from expression
+	textNode.RenderShape = expr.Shape()
 
 	p.addChild(textNode)
 }
@@ -266,63 +251,52 @@ func (p *chtmlParser) addElement() {
 		Data:     NewExprRaw(p.tok.Data),
 		Attr:     make([]Attribute, 0, len(p.tok.Attr)),
 	}
-	setRenderShape(n, (*html.Node)(nil))
 
 	if strings.HasPrefix(strings.ToLower(p.tok.Data), "c:") {
 		n.Type = importNode
+		// Don't set RenderShape here - will be computed in parseImportElement
+	} else if p.tok.Data == "c" {
+		n.Type = cNode
+		// Don't set RenderShape here - will be computed in finalizeCElement
+	} else {
+		n.RenderShape = Html // Regular elements get Html shape
 	}
 
 	var regularAttrs []html.Attribute
 	for _, t := range p.tok.Attr {
-		if ok := p.parseSpecialAttrs(n, &t); !ok {
-			// Collect regular attributes to process later
-			regularAttrs = append(regularAttrs, t)
+		if n.Type == cNode {
+			// For <c> elements, handle special attributes differently
+			if ok := p.parseCElementAttrs(n, &t); !ok {
+				// Collect regular attributes to process later
+				regularAttrs = append(regularAttrs, t)
+			}
+		} else {
+			if ok := p.parseSpecialAttrs(n, &t); !ok {
+				// Collect regular attributes to process later
+				regularAttrs = append(regularAttrs, t)
+			}
 		}
 	}
 
 	// Handle c:for variables *before* processing regular attributes
 	if !n.Loop.IsEmpty() && (n.LoopVar != "" || n.LoopIdx != "") {
-		// eval the loop expression to determine the shape of the loop variable
-		loopResult, evalErr := n.Loop.Value(&p.vm, p.env)
-		if evalErr != nil {
-			p.error(n, fmt.Errorf("eval loop expression: %w", evalErr))
-		}
+		// derive shapes from the loop expression shape
+		loopShape := n.Loop.Shape()
+		varShape, idxShape := deriveLoopIterShapes(loopShape)
 
-		introducedVars := make(map[string]any)
-		var (
-			varType any = nil
-			idxType any = nil
-		)
-		if loopResult != nil {
-			rt := reflect.TypeOf(loopResult)
-			rv := reflect.ValueOf(loopResult)
-			switch rt.Kind() {
-			case reflect.Slice, reflect.Array:
-				if rv.Len() > 0 {
-					varType = rv.Index(0).Interface()
-				} else {
-					varType = reflect.Zero(rt.Elem()).Interface()
-				}
-				idxType = int(0)
-			case reflect.Map:
-				varType = reflect.Zero(rt.Elem()).Interface()
-				idxType = reflect.Zero(rt.Key()).Interface()
-			}
-		}
+		introduced := make(map[string]*Shape)
 		if n.LoopVar != "" {
-			introducedVars[n.LoopVar] = varType
+			introduced[n.LoopVar] = varShape
 		}
 		if n.LoopIdx != "" {
-			introducedVars[n.LoopIdx] = idxType
+			introduced[n.LoopIdx] = idxShape
 		}
-
-		// Push the new variables into the environment
-		p.pushEnv(introducedVars)
+		p.pushSymbols(introduced)
 	}
 
 	// Now process regular attributes, loop variables are in env
 	for _, t := range regularAttrs {
-		expr, err := NewExprInterpol(t.Val, p.env)
+		expr, err := NewExprInterpol(t.Val, p.symbols)
 		if err != nil {
 			p.error(n, err)
 			continue
@@ -338,15 +312,42 @@ func (p *chtmlParser) addElement() {
 	p.addChild(n)
 }
 
+// deriveLoopIterShapes returns (varShape, idxShape) for a loop given the overall collection shape.
+// Rules:
+// - Array: var = elem shape (or Any), idx = Number
+// - Object (map-like): var = Any, idx = String
+// - Fallback: (Any, Any)
+func deriveLoopIterShapes(s *Shape) (*Shape, *Shape) {
+	if s == nil {
+		return Any, Any
+	}
+	switch s.Kind {
+	case ShapeArray:
+		elem := s.Elem
+		if elem == nil {
+			elem = Any
+		}
+		return elem, Number
+	case ShapeObject:
+		// For map/object iteration, the index is always a string key,
+		// and the value shape is considered unknown (Any) for safety.
+		return Any, String
+	default:
+		return Any, Any
+	}
+}
+
 // popElement will panic if the stack is empty.
 func (p *chtmlParser) popElement() *Node {
 	n := p.oe.pop()
-	// If the element introduced variables, pop the environment
+	// If the element introduced variables, pop the symbols
 	if n.Type == html.ElementNode && !n.Loop.IsEmpty() {
-		p.popEnv()
+		p.popSymbols()
 	}
 	if n.Type == importNode {
 		p.parseImportElement(n)
+	} else if n.Type == cNode {
+		p.finalizeCElement(n)
 	}
 	return n
 }
@@ -357,18 +358,12 @@ func (p *chtmlParser) parseImportElement(n *Node) {
 		return
 	}
 
-	imp := p.importer
-
-	if compName == "attr" {
-		imp = &builtinImporter{}
-	}
-
-	if imp == nil {
+	if p.importer == nil {
 		p.error(n, ErrImportNotAllowed)
 		return
 	}
 
-	comp, err := imp.Import(compName)
+	comp, err := p.importer.Import(compName)
 	if err != nil {
 		p.error(n, fmt.Errorf("import %q: %w", n.Data.RawString(), err))
 		return
@@ -384,69 +379,62 @@ func (p *chtmlParser) parseImportElement(n *Node) {
 	// convert n.Attr to a map for the scope
 	vars := make(map[string]any, len(n.Attr))
 	for _, attr := range n.Attr {
-		v, err := attr.Val.Value(&p.vm, p.env)
-		if err != nil {
-			p.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
-			return
-		}
 		snake := toSnakeCase(attr.Key)
-		vars[snake] = v
+		// Do not evaluate attribute values at parse-time to avoid dependency on env
+		vars[snake] = nil
 	}
 
-	// Render the child content of the import element
-	// Purpose: Renders child content and passes it as the "_" variable to the component.
-	//
-	// Example: <c:layout><p>This content</p></c:layout>
-	//          The "<p>This content</p>" is rendered and passed to the layout component.
-	if n.FirstChild != nil {
-		c := &chtmlComponent{
-			doc: &Node{
-				Type:       html.DocumentNode,
-				FirstChild: n.FirstChild,
-			},
-			env:            p.env,
-			renderComments: true,
-			importer:       p.importer,
-			hidden:         make(map[*Node]struct{}),
-			children:       make(map[*Node][]Component),
-		}
-		s := NewDryRunScope(nil)
-		rr, err := c.Render(s)
-		if err != nil {
-			p.error(n, fmt.Errorf("render import %s: %w", compName, err))
+	// Validate attribute names against the component's InputShape, if provided.
+	if ish := comp.InputShape(); ish != nil {
+		if ish.Kind != ShapeObject {
+			p.error(n, fmt.Errorf("component input shape must be an object"))
 			return
 		}
-
-		vars["_"] = rr
+		for k := range vars {
+			if k == "_" {
+				continue
+			}
+			if _, ok := ish.Fields[k]; !ok {
+				p.error(n, &UnrecognizedArgumentError{Name: k})
+			}
+		}
 	}
 
-	// Create a dry run scope for validation and rendering
-	s := NewDryRunScope(vars)
-	rr, err := comp.Render(s)
-	if err != nil {
-		p.error(n, fmt.Errorf("eval import %s: %w", compName, err))
+	n.RenderShape = comp.OutputShape()
+}
+
+// finalizeCElement validates <c> element constraints and computes its RenderShape
+func (p *chtmlParser) finalizeCElement(n *Node) {
+	// Check for invalid mixing of for with conditionals
+	if !n.Loop.IsEmpty() && !n.Cond.IsEmpty() {
+		p.error(n, fmt.Errorf("cannot mix 'for' with conditional attributes on <c> element"))
 		return
 	}
 
-	// Store the dry run result as the node's RenderShape for future reference
-	setRenderShape(n, rr)
+	// Compute RenderShape for <c> nodes by inferring from children
+	// This follows the same logic as document shape computation
+	var shape *Shape
+	for child := n.FirstChild; child != nil; child = child.NextSibling {
+		if child.IsWhitespace() { // Ignore whitespace when determining the shape
+			continue
+		}
+		shape = shape.Merge(child.RenderShape)
+	}
 
-	if attr, ok := rr.(Attribute); ok && n.Parent != nil {
-		// TODO: should we allow changing the attrribute of any element?
-		if n.Parent == p.doc {
-			n.Parent.Attr = append(n.Parent.Attr, attr)
-
-			v, err := attr.Val.Value(&p.vm, p.env)
-			if err != nil {
-				p.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
-				return
+	// If <c> defines a variable, it should not emit output itself, but we should
+	// record its shape (especially for top-level vars) into the parser symbols.
+	for _, a := range n.Attr {
+		if strings.EqualFold(a.Key, "var") {
+			varName := a.Val.RawString()
+			if n.Parent != nil && n.Parent == p.doc && varName != "" {
+				p.symbols[varName] = shape
 			}
-
-			snake := toSnakeCase(attr.Key)
-			p.env[snake] = v
-			setRenderShape(n, nil) // the attribute does not render to anything
+			n.RenderShape = nil
+			return
 		}
 	}
+
+	n.RenderShape = shape // Will be nil if no non-whitespace children
 }
 
 func (p *chtmlParser) parseSpecialAttrs(n *Node, t *html.Attribute) bool {
@@ -456,7 +444,7 @@ func (p *chtmlParser) parseSpecialAttrs(n *Node, t *html.Attribute) bool {
 		if fk == "c:else" {
 			scond = "true"
 		}
-		cond, err := NewExpr(scond, p.env)
+		cond, err := NewExpr(scond, p.symbols)
 		if err != nil {
 			p.error(n, fmt.Errorf("parse condition: %w", err))
 			n.Cond = NewExprConst(false) // fallback to false to prevent further errors
@@ -479,7 +467,7 @@ func (p *chtmlParser) parseSpecialAttrs(n *Node, t *html.Attribute) bool {
 			p.error(n, fmt.Errorf("parse loop expression: %w", err))
 			return true
 		}
-		loop, err := NewExpr(expr, p.env)
+		loop, err := NewExpr(expr, p.symbols)
 		if err != nil {
 			p.error(n, fmt.Errorf("parse loop expression: %w", err))
 			return true
@@ -493,6 +481,69 @@ func (p *chtmlParser) parseSpecialAttrs(n *Node, t *html.Attribute) bool {
 	}
 }
 
+// parseCElementAttrs handles special attributes for <c> elements
+func (p *chtmlParser) parseCElementAttrs(n *Node, t *html.Attribute) bool {
+	switch fk := strings.ToLower(t.Key); fk {
+	case "var":
+		// Validate that var is a valid identifier
+		if !isValidIdentifier(t.Val) {
+			p.error(n, fmt.Errorf("var attribute must be a valid identifier, got %q", t.Val))
+			return true
+		}
+		// Store as regular attribute - will be used during rendering
+		n.Attr = append(n.Attr, Attribute{
+			Namespace: t.Namespace,
+			Key:       t.Key,
+			Val:       NewExprRaw(t.Val),
+		})
+		return true
+	case "if", "else", "else-if":
+		scond := t.Val
+		if fk == "else" {
+			scond = "true"
+		}
+		cond, err := NewExpr(scond, p.symbols)
+		if err != nil {
+			p.error(n, fmt.Errorf("parse condition: %w", err))
+			n.Cond = NewExprConst(false) // fallback to false to prevent further errors
+			return true
+		}
+		if fk != "if" {
+			if prev := p.findPrevCond(p.top().LastChild); prev != nil {
+				n.PrevCond = prev
+				prev.NextCond = n
+			} else {
+				p.error(n, fmt.Errorf("%s without if", fk))
+				return true
+			}
+		}
+		n.Cond = cond
+		return true
+	case "for":
+		v, k, expr, err := parseLoopExpr(t.Val)
+		if err != nil {
+			p.error(n, fmt.Errorf("parse loop expression: %w", err))
+			return true
+		}
+		loop, err := NewExpr(expr, p.symbols)
+		if err != nil {
+			p.error(n, fmt.Errorf("parse loop expression: %w", err))
+			return true
+		}
+		n.Loop = loop
+		n.LoopIdx = k
+		n.LoopVar = v
+		return true
+	default:
+		// Check for invalid c:* attributes on <c> elements
+		if strings.HasPrefix(fk, "c:") {
+			p.error(n, fmt.Errorf("c:* directives not allowed on <c> element, use plain attributes instead (e.g., 'if' instead of 'c:if')"))
+			return true
+		}
+		return false
+	}
+}
+
 func (p *chtmlParser) findPrevCond(n *Node) *Node {
 	for ; n != nil; n = n.PrevSibling {
 		if !n.Cond.IsEmpty() {
@@ -500,6 +551,33 @@ func (p *chtmlParser) findPrevCond(n *Node) *Node {
 		}
 	}
 	return nil
+}
+
+// isValidIdentifier checks if a string is a valid identifier
+func isValidIdentifier(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i, r := range s {
+		if i == 0 {
+			if !isLetter(r) && r != '_' {
+				return false
+			}
+		} else {
+			if !isLetter(r) && !isDigit(r) && r != '_' {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func isLetter(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+}
+
+func isDigit(r rune) bool {
+	return r >= '0' && r <= '9'
 }
 
 // Section 12.2.5.
@@ -745,16 +823,11 @@ func inBodyIM(p *chtmlParser) bool {
 			p.inBodyEndTagOther(p.tok.DataAtom, p.tok.Data)
 		}
 	case html.CommentToken:
-		expr, err := NewExprInterpol(p.tok.Data, p.env)
 		n := &Node{
 			Type: html.CommentNode,
-			Data: expr,
+			Data: NewExprRaw(p.tok.Data),
 		}
-		if err != nil {
-			p.error(n, err)
-		} else {
-			p.addChild(n)
-		}
+		p.addChild(n)
 	case html.ErrorToken:
 		// TODO: remove this divergence from the HTML5 spec.
 		return true
@@ -853,29 +926,33 @@ func (p *chtmlParser) error(n *Node, err error) {
 	p.errs = append(p.errs, newComponentError(n, err))
 }
 
-// pushEnv adds variables to the parsing env while preserving the previous values in the shadowed
-// stack.
-func (p *chtmlParser) pushEnv(vars map[string]any) {
+// pushSymbols adds symbol shapes to the parser while preserving previous values
+// in the shadowed stack.
+func (p *chtmlParser) pushSymbols(vars map[string]*Shape) {
 	m := make(map[string]any)
 	p.shadowed = append(p.shadowed, m)
+	if p.symbols == nil {
+		p.symbols = make(map[string]*Shape)
+	}
 	for k, v := range vars {
-		if oldV, ok := p.env[k]; ok {
+		if oldV, ok := p.symbols[k]; ok {
 			m[k] = oldV
 		} else {
 			m[k] = envNoValue
 		}
-
-		p.env[k] = v
+		p.symbols[k] = v
 	}
 }
 
-// popEnv applies the shadowed variables from the top of the stack to the env.
-func (p *chtmlParser) popEnv() {
+// popSymbols restores previous symbols from the shadowed stack.
+func (p *chtmlParser) popSymbols() {
 	for k, v := range p.shadowed[len(p.shadowed)-1] {
 		if v == envNoValue {
-			delete(p.env, k)
+			delete(p.symbols, k)
 		} else {
-			p.env[k] = v
+			if s, ok := v.(*Shape); ok {
+				p.symbols[k] = s
+			}
 		}
 	}
 	p.shadowed = p.shadowed[:len(p.shadowed)-1]
@@ -901,84 +978,24 @@ func (p *chtmlParser) parse() error {
 	}
 
 	// Propagate RenderShape to the document node
-	if p.doc.FirstChild != nil && p.doc.FirstChild == p.doc.LastChild { // Single child
-		setRenderShape(p.doc, p.doc.FirstChild.RenderShape)
-	} else {
-		var shape any
-		for child := p.doc.FirstChild; child != nil; child = child.NextSibling {
-			if child.IsWhitespace() { // Ignore whitespace when determining the shape
-				continue
-			}
-			shape = combineRenderShapes(shape, child.RenderShape)
+	var shape *Shape
+	for child := p.doc.FirstChild; child != nil; child = child.NextSibling {
+		if child.IsWhitespace() { // Ignore whitespace when determining the shape
+			continue
 		}
-		setRenderShape(p.doc, shape)
+		shape = shape.Merge(child.RenderShape)
+	}
+	p.doc.RenderShape = shape
+
+	// Capture final symbol table onto the root for InputShape derivation later
+	if len(p.symbols) > 0 {
+		p.doc.Symbols = make(map[string]*Shape, len(p.symbols))
+		for k, v := range p.symbols {
+			p.doc.Symbols[k] = v
+		}
 	}
 
 	return nil
-}
-
-func setRenderShape(n *Node, shape any) {
-	n.RenderShape = transformShape(shape)
-}
-
-// combineRenderShapes combines two render shapes into a single shape.
-// If both shapes are of the same type, the first shape returned.
-// If one shape is any(nil), the other shape is returned.
-// If one of the shapes is *html.Node, the (*html.Node)(nil) is returned.
-// Otherwise, string("") is returned.
-func combineRenderShapes(a, b any) any {
-	if a == nil {
-		return b
-	}
-	if b == nil {
-		return a
-	}
-
-	ta := reflect.TypeOf(a)
-	tb := reflect.TypeOf(b)
-
-	// If both shapes are of the same type, return the first shape
-	if ta == tb {
-		return a
-	}
-
-	// If either is *html.Node, return (*html.Node)(nil)
-	htmlNodeType := reflect.TypeOf((*html.Node)(nil))
-	if ta == htmlNodeType || tb == htmlNodeType {
-		return (*html.Node)(nil)
-	}
-
-	// Otherwise, return string("")
-	return ""
-}
-
-// transformShape analyzes the input shape and returns a more specific type representation,
-// particularly for slices, to aid in type checking and template analysis.
-func transformShape(shape any) any {
-	return shape
-
-	// TODO: use more targeted approach:
-	/*
-		if shape == nil {
-			return nil
-		}
-
-		rt := reflect.TypeOf(shape)
-		switch rt.Kind() {
-		case reflect.Slice:
-			return reflect.Zero(rt).Interface()
-		case reflect.Map:
-			m := reflect.ValueOf(shape)
-			newMap := reflect.MakeMapWithSize(rt, m.Len())
-			for _, key := range m.MapKeys() {
-				val := m.MapIndex(key).Interface()
-				transformedVal := transformShape(val)
-				newMap.SetMapIndex(key, reflect.ValueOf(transformedVal))
-			}
-			return newMap.Interface()
-		default:
-			return shape
-		}*/
 }
 
 // Parse returns the parsed *Node tree for the HTML from the given Reader.
@@ -989,9 +1006,9 @@ func Parse(r io.Reader, imp Importer) (*Node, error) {
 		doc: &Node{
 			Type: html.DocumentNode,
 		},
-		env:      map[string]any{"_": AnyShape},
+		symbols:  map[string]*Shape{"_": Any},
 		im:       inBodyIM,
-		importer: imp,
+		importer: &importerWithAttr{base: imp},
 	}
 
 	if err := p.parse(); err != nil {

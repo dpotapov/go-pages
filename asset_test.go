@@ -17,7 +17,7 @@ func TestScriptComponent_Render(t *testing.T) {
 	assets := NewJavascriptAssetCollector()
 	comp := NewScriptComponentFactory(assets)()
 
-	s := chtml.NewDryRunScope(map[string]any{"name": "test.js", "_": "console.log('Hello, world!');"})
+    s := chtml.NewBaseScope(map[string]any{"name": "test.js", "_": "console.log('Hello, world!');"})
 
 	_, err := comp.Render(s)
 	require.NoError(t, err)
@@ -28,7 +28,7 @@ func TestScriptComponent_Render(t *testing.T) {
 	assertAssetContent(t, assets, assetPath, "console.log('Hello, world!');")
 
 	// Add more content to the test.js asset
-	s = chtml.NewDryRunScope(map[string]any{"name": "test.js", "_": "console.log('Lorem ipsum dolor sit amet');"})
+    s = chtml.NewBaseScope(map[string]any{"name": "test.js", "_": "console.log('Lorem ipsum dolor sit amet');"})
 
 	_, err = comp.Render(s)
 	require.NoError(t, err)
@@ -45,7 +45,7 @@ func TestScriptComponent_Render(t *testing.T) {
 	assertAssetContent(t, assets, "/js/test.js", "console.log('Hello, world!');\nconsole.log('Lorem ipsum dolor sit amet');")
 
 	// When rendering the same content again, there will be no changes to the asset
-	s = chtml.NewDryRunScope(map[string]any{"name": "test.js", "_": "console.log('Hello, world!');"})
+    s = chtml.NewBaseScope(map[string]any{"name": "test.js", "_": "console.log('Hello, world!');"})
 	_, err = comp.Render(s)
 	require.NoError(t, err)
 
@@ -70,7 +70,7 @@ func TestStyleComponent_Render(t *testing.T) {
 	comp := NewStyleComponentFactory(assets)()
 
 	// Initial content
-	s := chtml.NewDryRunScope(map[string]any{"name": "test.css", "_": "body { color: red; }"})
+    s := chtml.NewBaseScope(map[string]any{"name": "test.css", "_": "body { color: red; }"})
 	_, err := comp.Render(s)
 	require.NoError(t, err)
 
@@ -79,7 +79,7 @@ func TestStyleComponent_Render(t *testing.T) {
 	assertAssetContent(t, assets, assetPath, "body { color: red; }")
 
 	// Add more content to the test.css asset
-	s = chtml.NewDryRunScope(map[string]any{"name": "test.css", "_": "p { font-size: 16px; }"})
+    s = chtml.NewBaseScope(map[string]any{"name": "test.css", "_": "p { font-size: 16px; }"})
 	_, err = comp.Render(s)
 	require.NoError(t, err)
 
@@ -96,7 +96,7 @@ func TestStyleComponent_Render(t *testing.T) {
 
 	// When rendering the same content again (the first piece), there will be no changes to the asset
 	// because the content is cumulative.
-	s = chtml.NewDryRunScope(map[string]any{"name": "test.css", "_": "body { color: red; }"})
+    s = chtml.NewBaseScope(map[string]any{"name": "test.css", "_": "body { color: red; }"})
 	_, err = comp.Render(s)
 	require.NoError(t, err)
 
@@ -128,12 +128,6 @@ func TestAssetComponent_Render(t *testing.T) {
 
 	comp := NewAssetComponentFactory(assets)()
 
-	t.Run("DryRun", func(t *testing.T) {
-		ds := chtml.NewDryRunScope(map[string]any{"name": "test.css", "type": "css"})
-		n, err := comp.Render(ds)
-		require.NoError(t, err)
-		require.Equal(t, &html.Node{Type: html.DocumentNode}, n) // DryRun mode should return empty html node
-	})
 
 	t.Run("missing css file", func(t *testing.T) {
 		s := chtml.NewBaseScope(map[string]any{"name": "missing.css", "type": "css"})

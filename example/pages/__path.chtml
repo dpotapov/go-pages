@@ -1,7 +1,5 @@
-<c:attr name="path"></c:attr>
-<c:attr name="req">
-  <c:request />
-</c:attr>
+<c var="path"></c>
+<c var="req"><c:request /></c>
 
 <c:page title="Page Not Found">
   <b>Oops! Page you are looking for does not exist: ${ path }</b>

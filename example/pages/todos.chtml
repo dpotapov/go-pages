@@ -1,9 +1,7 @@
-<c:attr name="todo">${""}</c:attr>
-<c:attr name="todo_done_id">${0}</c:attr>
+<c var="todo">${""}</c>
+<c var="todo_done_id">${0}</c>
 
-<c:attr name="todos">
-  <c:todos-store add="${todo}" del="${todo_done_id}"></c:todos-store>
-</c:attr>
+<c var="todos"><c:todos-store add="${todo}" del="${todo_done_id}"></c:todos-store></c>
 
 <div id="todo-list">
   <ol c:if="len(todos) > 0">

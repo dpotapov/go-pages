@@ -96,7 +96,10 @@ func TestUnmarshalScope(t *testing.T) {
 			name:   "Empty map target",
 			scope:  NewBaseScope(map[string]any{"name": "John", "age": 30}),
 			target: &map[string]any{},
-			want:   &map[string]any{},
+			want: &map[string]any{
+				"age":  30,
+				"name": "John",
+			},
 		},
 		{
 			name:   "Map target",

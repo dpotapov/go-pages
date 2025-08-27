@@ -1,2 +1,2 @@
-<c:attr name="slug"></c:attr>
+<c var="slug"></c>
 edit-post

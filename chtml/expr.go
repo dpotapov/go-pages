@@ -23,39 +23,60 @@ const (
 
 // Expr is a struct to hold interpolated string data for the CHTML nodes.
 type Expr struct {
-	raw  string
-	expr *vm.Program
+	raw   string
+	expr  *vm.Program
+	shape *Shape
 }
 
-func NewExpr(s string, args map[string]any) (Expr, error) {
+func NewExpr(s string, syms Symbols) (Expr, error) {
 	if s == "" {
 		return Expr{}, nil
 	}
-	x, err := expr.Compile(s, expr.Env(args))
+	x := Expr{raw: s}
+	// Parse with type-check disabled, then run our checker, then keep the compiled program.
+	prog, err := expr.Compile(s,
+		expr.DisableBuiltin("type"),
+		expr.DisableBuiltin("duration"),
+		expr.Function("cast", CastFunction),
+		expr.Function("type", TypeFunction),
+		expr.Function("duration", DurationFunction))
+	if err != nil {
+		return x, err
+	}
+	x.expr = prog
+	shape, err := Check(prog.Node(), syms)
+	if err != nil {
+		return x, err
+	}
+	x.shape = shape
+	return x, nil
+}
+
+func NewExprInterpol(s string, syms Symbols) (Expr, error) {
+	if s == "" {
+		return Expr{}, nil
+	}
+	prog, err := interpol(s)
 	if err != nil {
 		return Expr{}, err
 	}
-	return Expr{
-		raw:  s,
-		expr: x,
-	}, nil
-}
-
-func NewExprInterpol(s string, args map[string]any) (Expr, error) {
-	if s == "" {
-		return Expr{}, nil
+	var shp *Shape
+	if prog != nil {
+		if shp, err = Check(prog.Node(), syms); err != nil {
+			return Expr{}, err
+		}
+	} else {
+		// No interpolation → plain text
+		shp = String
 	}
-	expr, err := interpol(s, args)
-	return Expr{
-		raw:  s,
-		expr: expr,
-	}, err
+	return Expr{raw: s, expr: prog, shape: shp}, nil
 }
 
 // NewExprRaw creates an Expr with a raw string, no interpolation.
 func NewExprRaw(s string) Expr {
 	return Expr{
-		raw: s,
+		raw:   s,
+		shape: String,
 	}
 }
 
@@ -67,6 +88,7 @@ func NewExprConst(v any) Expr {
 			Bytecode:  []vm.Opcode{vm.OpPush},
 			Arguments: []int{0},
 		},
+		shape: ShapeFrom(v),
 	}
 }
 
@@ -85,10 +107,13 @@ func (e Expr) IsEmpty() bool {
 	return e.expr == nil && e.raw == ""
 }
 
+// Shape returns the statically-derived output shape for this expression.
+func (e Expr) Shape() *Shape { return e.shape }
+
 // interpol converts a string with ${}-style placeholders to meta program.
 // If the string is a simple text with no interpolation, it returns (nil, nil).
 // If args is not nil, the expression engine will do type checking.
-func interpol(s string, args map[string]any) (*vm.Program, error) {
+func interpol(s string) (*vm.Program, error) {
 	l := &exprLexer{
 		input: s,
 		items: make([]item, 0),
@@ -116,7 +141,12 @@ loop:
 		case itemText:
 			in = append(in, &ast.StringNode{Value: item.val})
 		case itemExpr:
-			p, err := expr.Compile(item.val, expr.Env(args), allowAny)
+			p, err := expr.Compile(item.val,
+				expr.DisableBuiltin("type"),
+				expr.DisableBuiltin("duration"),
+				expr.Function("cast", CastFunction),
+				expr.Function("type", TypeFunction),
+				expr.Function("duration", DurationFunction))
 			if err != nil {
 				return nil, err
 			}
@@ -134,9 +164,12 @@ loop:
 	}
 
 	c := conf.CreateNew()
-
 	opts := []expr.Option{
-		expr.Env(args),
+		expr.DisableBuiltin("type"),
+		expr.DisableBuiltin("duration"),
+		expr.Function("cast", CastFunction),
+		expr.Function("type", TypeFunction),
+		expr.Function("duration", DurationFunction),
 		expr.Function("combine", func(args ...any) (any, error) {
 			var acc any
 			for _, arg := range args {
@@ -145,11 +178,9 @@ loop:
 			return acc, nil
 		}),
 	}
-
 	for _, opt := range opts {
 		opt(c)
 	}
-
 	return compiler.Compile(tree, c)
 
 }
@@ -387,15 +418,4 @@ func isSpace(r rune) bool {
 // isAlphaNumeric reports whether r is an alphabetic, digit, or underscore.
 func isAlphaNumeric(r rune) bool {
 	return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)
-}
-
-// converts all nil fields to unknown type, effectively disable type checking
-func allowAny(c *conf.Config) {
-	for k, v := range c.Env.Fields {
-		if v.Type == nil {
-			v.Nil = false
-			v.Type = nil
-			c.Env.Fields[k] = v
-		}
-	}
 }

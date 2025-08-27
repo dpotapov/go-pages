@@ -29,3 +29,6 @@ func (c *CAttr) Render(s Scope) (any, error) {
 		Val:       NewExprConst(vars["_"]),
 	}, nil
 }
+
+func (c *CAttr) InputShape() *Shape  { return Object(map[string]*Shape{"name": String, "_": Any}) }
+func (c *CAttr) OutputShape() *Shape { return HtmlAttr }

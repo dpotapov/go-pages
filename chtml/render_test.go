@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/require"
 	"golang.org/x/net/html"
 )
 
@@ -113,26 +112,24 @@ func TestRenderCHTML(t *testing.T) {
 		},
 		{
 			name: "text node expansion",
-			text: `<c:attr name="greeting">Hello</c:attr><p>${ greeting }</p>`,
+			text: `<c var="greeting">Hello</c><p>${ greeting }</p>`,
 			want: "<p>Hello</p>",
 		},
 		{
-			name: "text node expansion",
-			text: `<c:attr name="greeting">Hello</c:attr><p>${ greeting }</p>`,
+			name: "text node expansion with external var",
+			text: `<c var="greeting">Hello</c><p>${ greeting }</p>`,
 			want: "<p>Hi</p>",
 			vars: map[string]any{"greeting": "Hi"},
 		},
 		{
 			name: "attr expansion",
-			text: `<c:attr name="foo">bar</c:attr><a href="${foo}">Link</a>`,
+			text: `<a><c:attr name="href">bar</c:attr>Link</a>`,
 			want: `<a href="bar">Link</a>`,
 		},
 		{
-			name: "attr manipulation",
-			text: `<c:attr name="data">${ { num: 123 } }</c:attr>` +
-				`<c:attr name="data2">${ data.num }</c:attr>` +
-				`${data2 * 2}`,
-			want: 246,
+			name: "c:attr root usage error",
+			text: `<c:attr name="foo">bar</c:attr><p>ok</p>`,
+			want: `<p>ok</p>`,
 		},
 
 		// Testing conditionals (c:if, c:else-if, c:else)
@@ -205,12 +202,12 @@ func TestRenderCHTML(t *testing.T) {
 		},
 		{
 			name: "render c:for with words var",
-			text: `<c:attr name="words">${['foo', 'bar', 'baz']}</c:attr><ul><li c:for="w in words">${w}</li></ul>`,
+			text: `<c var="words">${['foo', 'bar', 'baz']}</c><ul><li c:for="w in words">${w}</li></ul>`,
 			want: `<ul><li>foo</li><li>bar</li><li>baz</li></ul>`,
 		},
 		{
 			name: "render c:for with numbers var",
-			text: `<c:attr name="numbers">${[1,2,3]}</c:attr><p c:for="i in numbers">${i}</p>`,
+			text: `<c var="numbers">${[1,2,3]}</c><p c:for="i in numbers">${i}</p>`,
 			want: `<p>1</p><p>2</p><p>3</p>`,
 		},
 		{
@@ -235,25 +232,25 @@ func TestRenderCHTML(t *testing.T) {
 		},
 		{
 			name: "for loop over map (string keys, string values)",
-			text: `<c:attr name="my_map">${{}}</c:attr><ol><li c:for="val, key in my_map">${key}: ${val}</li></ol>`,
+			text: `<c var="my_map">${{}}</c><ol><li c:for="val, key in my_map">${key}: ${val}</li></ol>`,
 			vars: map[string]any{"my_map": map[string]string{"a": "apple", "b": "banana"}},
 			want: `<ol><li>a: apple</li><li>b: banana</li></ol>`,
 		},
 		{
 			name: "for loop over map (string keys, mixed values)",
-			text: `<c:attr name="data">${{}}</c:attr><li c:for="v, k in data">${k}: ${v}</li>`,
+			text: `<c var="data">${{}}</c><li c:for="v, k in data">${k}: ${v}</li>`,
 			vars: map[string]any{"data": map[string]any{"name": "Go", "version": 1.22, "stable": true}},
 			want: `<li>name: Go</li><li>stable: true</li><li>version: 1.22</li>`,
 		},
 		{
 			name: "for loop over empty map",
-			text: `<c:attr name="empty_map">${{}}</c:attr><p c:for="v, k in empty_map">${k}-${v}</p>`,
+			text: `<c var="empty_map">${{}}</c><p c:for="v, k in empty_map">${k}-${v}</p>`,
 			vars: map[string]any{"empty_map": map[string]int{}},
 			want: (*html.Node)(nil),
 		},
 		{
 			name: "for loop over nil map",
-			text: `<c:attr name="nil_map">${nil}</c:attr><span c:for="v, k in nil_map">${k}=${v}</span>`,
+			text: `<c var="nil_map">${nil}</c><span c:for="v, k in nil_map">${k}=${v}</span>`,
 			want: (*html.Node)(nil),
 		},
 
@@ -344,12 +341,164 @@ func TestRenderCHTML(t *testing.T) {
 	}
 }
 
-func TestCHTMLTypeMatching(t *testing.T) {
-	err := testRenderCase(`<c:attr name="v">${true}</c:attr>${v ? 123 : 'text'}`, 123, map[string]any{"v": false}, &ComponentOptions{
-		Importer:       nil,
-		RenderComments: false,
-	})
-	require.ErrorContains(t, err, "cannot convert type string to type int")
+func TestRenderCElement(t *testing.T) {
+	tests := []struct {
+		name string
+		text string
+		want any
+		vars map[string]any
+	}{
+		// Passthrough mode tests
+		{
+			name: "c passthrough with single element",
+			text: `<c><p>Hello</p></c>`,
+			want: `<p>Hello</p>`,
+		},
+		{
+			name: "c passthrough with multiple elements",
+			text: `<c><h1>Title</h1><p>Content</p></c>`,
+			want: `<h1>Title</h1><p>Content</p>`,
+		},
+		{
+			name: "c passthrough with text content",
+			text: `<c>Plain text</c>`,
+			want: `Plain text`,
+		},
+		{
+			name: "c passthrough with mixed content",
+			text: `<c><strong>Bold</strong> and plain text</c>`,
+			want: `<strong>Bold</strong> and plain text`,
+		},
+		{
+			name: "empty c element",
+			text: `<c></c>`,
+			want: nil,
+		},
+		{
+			name: "nested c elements",
+			text: `<c><c><span>Nested</span></c></c>`,
+			want: `<span>Nested</span>`,
+		},
+
+		// Variable binding tests
+		{
+			name: "c var binding basic",
+			text: `<c var="test"><p>Hello</p></c><div>${test}</div>`,
+			want: `<div><p>Hello</p></div>`,
+		},
+		{
+			name: "c var binding with text",
+			text: `<c var="greeting">Hello World</c><p>${greeting}</p>`,
+			want: `<p>Hello World</p>`,
+		},
+		{
+			name: "c var binding with multiple elements",
+			text: `<c var="content"><h1>Title</h1><p>Text</p></c><div>${content}</div>`,
+			want: `<div><h1>Title</h1><p>Text</p></div>`,
+		},
+		{
+			name: "c var binding with expression",
+			text: `<c var="result">${123 + 456}</c><p>${result}</p>`,
+			want: `<p>579</p>`,
+		},
+		{
+			name: "c var reuse",
+			text: `<c var="item"><li>Item</li></c><ul>${item}${item}</ul>`,
+			want: `<ul><li>Item</li><li>Item</li></ul>`,
+		},
+
+		// Loop tests
+		{
+			name: "c for loop basic",
+			text: `<c for="i in [1,2,3]"><p>${i}</p></c>`,
+			want: `<p>1</p><p>2</p><p>3</p>`,
+		},
+		{
+			name: "c for loop with var",
+			text: `<c var="items" for="i in [1,2]"><li>${i}</li></c><ul>${items}</ul>`,
+			want: `<ul><li>1</li><li>2</li></ul>`,
+		},
+		{
+			name: "c for loop with index",
+			text: `<c for="val, idx in ['a','b']"><p>${idx}: ${val}</p></c>`,
+			want: `<p>0: a</p><p>1: b</p>`,
+		},
+		{
+			name: "c for loop over empty array",
+			text: `<c for="i in []"><p>${i}</p></c>`,
+			want: (*html.Node)(nil),
+		},
+		{
+			name: "c for loop with external variable",
+			text: `<c for="i in cast(items, [string])"><span>${i}</span></c>`,
+			want: `<span>x</span><span>y</span><span>z</span>`,
+			vars: map[string]any{"items": []string{"x", "y", "z"}},
+		},
+
+		// Conditional tests
+		{
+			name: "c if true",
+			text: `<c if="true"><p>Shown</p></c>`,
+			want: `<p>Shown</p>`,
+		},
+		{
+			name: "c if false",
+			text: `<c if="false"><p>Hidden</p></c>`,
+			want: (*html.Node)(nil),
+		},
+		{
+			name: "c if-else true",
+			text: `<c if="true"><p>True</p></c><c else><p>False</p></c>`,
+			want: `<p>True</p>`,
+		},
+		{
+			name: "c if-else false",
+			text: `<c if="false"><p>True</p></c><c else><p>False</p></c>`,
+			want: `<p>False</p>`,
+		},
+		{
+			name: "c if-else-if chain",
+			text: `<c if="false"><p>A</p></c><c else-if="true"><p>B</p></c><c else><p>C</p></c>`,
+			want: `<p>B</p>`,
+		},
+		{
+			name: "c if-else-if all false",
+			text: `<c if="false"><p>A</p></c><c else-if="false"><p>B</p></c><c else><p>C</p></c>`,
+			want: `<p>C</p>`,
+		},
+		{
+			name: "c conditional with var",
+			text: `<c var="result" if="condition"><p>Conditional content</p></c><div>${result}</div>`,
+			want: `<div><p>Conditional content</p></div>`,
+			vars: map[string]any{"condition": true},
+		},
+		{
+			name: "c conditional with var false",
+			text: `<c var="result" if="false"><p>Hidden</p></c><div>${result}</div>`,
+			want: `<div></div>`,
+		},
+
+		// Complex combinations
+		{
+			name: "nested c with var and loops",
+			text: `<c var="list"><c for="i in [1,2]"><li>${i}</li></c></c><ul>${list}</ul>`,
+			want: `<ul><li>1</li><li>2</li></ul>`,
+		},
+		{
+			name: "c with dynamic content",
+			text: `<c var="greeting">Hello ${name}!</c><p>${greeting}</p>`,
+			want: `<p>Hello World!</p>`,
+			vars: map[string]any{"name": "World"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := testRenderCase(tt.text, tt.want, tt.vars, nil); err != nil {
+				t.Error(err)
+			}
+		})
+	}
 }
 
 func TestRenderCHTMLImports(t *testing.T) {
@@ -384,31 +533,20 @@ func TestRenderCHTMLImports(t *testing.T) {
 			want: `<p>Hi</p>`,
 		},
 		{
-			name: "define simple attr",
-			text: `<c:attr name="text">Hi</c:attr>${text}`,
-			want: `Hi`,
+			name:    "import with arg of wrong type",
+			text:    `<c:comp2 text="${true}" />`,
+			want:    `<p>true</p>`,
+			wantErr: nil, // bool coerces to string as per ShapeString
 		},
 		{
-			name: "import with nested attr",
-			text: `<c:comp2><c:attr name="text">Hi</c:attr></c:comp2>`,
-			want: `<p>Hi</p>`,
-		},
-		{
-			name: "import with default attr",
+			name: "import with default arg",
 			text: `<c:simple-page><h1>Header</h1></c:simple-page>`,
 			want: `<html><head><title>Website</title></head><body><h1>Header</h1></body></html>`,
 		},
 		{
-			name: "import with multiple attrs",
-			text: `<c:attr name="page_title">GoPages</c:attr>` +
-				`<c:attr name="page_content"><p>Lorem ipsum</p></c:attr>` +
-				`<c:simple-page title="${page_title}"><div>${page_content}</div></c:simple-page>`,
+			name: "import with custom arg",
+			text: `<c:simple-page title="GoPages"><div><p>Lorem ipsum</p></div></c:simple-page>`,
 			want: `<html><head><title>GoPages</title></head><body><div><p>Lorem ipsum</p></div></body></html>`,
-		},
-		{
-			name: "re-use html attr",
-			text: `<c:attr name="content"><p>Lorem ipsum</p></c:attr>${content}${content}`,
-			want: `<p>Lorem ipsum</p><p>Lorem ipsum</p>`,
 		},
 		{
 			name: "bool kebab-flag attr - unset",
@@ -505,11 +643,11 @@ func (t *testImporter) init() {
 	}
 
 	comps := map[string]string{
-		"comp1": `<p>comp1</p>`,
-		"comp2": `<c:attr name="text">Hello</c:attr><p>${text}</p>`,
-		"simple-page": `<c:attr name="title">Website</c:attr>` +
+		"comp1": `<p>comp1</p>`,                          // produces html, accepts no args
+		"comp2": `<c var="text">Hello</c><p>${text}</p>`, // accepts text arg of type string
+		"simple-page": `<c var="title">Website</c>` +
 			`<html><head><title>${title}</title></head><body>${_}</body></html>`,
-		"comp3": `<c:attr name="with-flag">${false}</c:attr>${with_flag ? "true" : "false"}`,
+		"comp3": `<c var="with_flag">${false}</c>${with_flag ? "true" : "false"}`,
 	}
 
 	t.parsedComps = make(map[string]*Node)
@@ -519,6 +657,7 @@ func (t *testImporter) init() {
 		if err != nil {
 			panic(err)
 		}
+
 		t.parsedComps[name] = doc
 	}
 
@@ -541,15 +680,10 @@ type testStruct struct {
 }
 
 func TestConvertToRenderShape(t *testing.T) {
-	htmlShape := (*html.Node)(nil)
-	stringInstance := ""
-	intInstance := 0
-	int64Instance := int64(0)
-
 	tests := []struct {
 		name        string
 		value       any
-		shape       any
+		shape       *Shape
 		wantValue   any
 		wantErr     bool
 		errContains string
@@ -562,27 +696,20 @@ func TestConvertToRenderShape(t *testing.T) {
 			wantValue: "hello",
 			wantErr:   false,
 		},
-		{
-			name:      "shape is untyped nil, value is string",
-			value:     "hello",
-			shape:     interface{}(nil),
-			wantValue: "hello",
-			wantErr:   false,
-		},
 
 		// 2. Value is nil (No changes needed for non-*html.Node shapes)
 		{
-			name:      "value is nil, shape is *html.Node", // Changed
+			name:      "value is nil, shape is html",
 			value:     nil,
-			shape:     htmlShape,
-			wantValue: (*html.Node)(nil), // nil converts to typed nil
+			shape:     Html,
+			wantValue: (*html.Node)(nil),
 			wantErr:   false,
 		},
 		{
 			name:      "value is nil, shape is string (non-nillable)",
 			value:     nil,
-			shape:     stringInstance,
-			wantValue: stringInstance,
+			shape:     String,
+			wantValue: "",
 			wantErr:   false,
 		},
 
@@ -590,39 +717,32 @@ func TestConvertToRenderShape(t *testing.T) {
 		{
 			name:      "string to string",
 			value:     "hello",
-			shape:     stringInstance,
+			shape:     String,
 			wantValue: "hello",
 			wantErr:   false,
 		},
 		{
-			name:      "*html.Node to *html.Node shape", // Changed
+			name:      "*html.Node to html shape",
 			value:     &html.Node{Type: html.CommentNode, Data: "comment"},
-			shape:     htmlShape,
+			shape:     Html,
 			wantValue: &html.Node{Type: html.CommentNode, Data: "comment"},
 			wantErr:   false,
 		},
 
-		// 4. Convertible types (standard Go convertibility)
+		// 4. Convertible types (standardized for ShapeNumber)
 		{
-			name:      "int to int64",
+			name:      "int to number",
 			value:     123,
-			shape:     int64Instance,
-			wantValue: int64(123),
-			wantErr:   false,
-		},
-		{
-			name:      "MyString to string",
-			value:     MyString("hello"),
-			shape:     stringInstance,
-			wantValue: "hello",
+			shape:     Number,
+			wantValue: 123,
 			wantErr:   false,
 		},
 
-		// 5. Target is *html.Node
+		// 5. Target is html
 		{
-			name:  "string to *html.Node",
+			name:  "string to html",
 			value: "text content",
-			shape: htmlShape,
+			shape: Html,
 			wantValue: &html.Node{
 				Type: html.TextNode,
 				Data: "text content",
@@ -630,9 +750,9 @@ func TestConvertToRenderShape(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:  "bool (true) to *html.Node",
+			name:  "bool (true) to html",
 			value: true,
-			shape: htmlShape,
+			shape: Html,
 			wantValue: &html.Node{
 				Type: html.TextNode,
 				Data: "true",
@@ -640,9 +760,9 @@ func TestConvertToRenderShape(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:  "int to *html.Node",
+			name:  "int to html",
 			value: 456,
-			shape: htmlShape,
+			shape: Html,
 			wantValue: &html.Node{
 				Type: html.TextNode,
 				Data: "456",
@@ -650,9 +770,9 @@ func TestConvertToRenderShape(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:  "float64 to *html.Node",
+			name:  "float64 to html",
 			value: 7.89,
-			shape: htmlShape,
+			shape: Html,
 			wantValue: &html.Node{
 				Type: html.TextNode,
 				Data: "7.89",
@@ -660,9 +780,9 @@ func TestConvertToRenderShape(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:  "[]byte to *html.Node",
+			name:  "[]byte to html",
 			value: []byte("byte slice content"),
-			shape: htmlShape,
+			shape: Html,
 			wantValue: &html.Node{
 				Type: html.TextNode,
 				Data: "byte slice content",
@@ -670,43 +790,9 @@ func TestConvertToRenderShape(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:      "nil []byte to *html.Node",
-			value:     ([]byte)(nil),
-			shape:     htmlShape,
-			wantValue: (*html.Node)(nil),
-			wantErr:   false,
-		},
-		{
-			name:  "struct to *html.Node",
-			value: testStruct{Name: "Go", Age: 15},
-			shape: htmlShape,
-			wantValue: &html.Node{
-				Type: html.TextNode,
-				Data: "{\"Name\":\"Go\",\"Age\":15}",
-			},
-			wantErr: false,
-		},
-		{
-			name:  "slice of ints to *html.Node",
-			value: []int{10, 20, 30},
-			shape: htmlShape,
-			wantValue: &html.Node{
-				Type: html.TextNode,
-				Data: "[10,20,30]",
-			},
-			wantErr: false,
-		},
-		{
-			name:      "nil slice of ints to *html.Node",
-			value:     ([]int)(nil),
-			shape:     htmlShape,
-			wantValue: (*html.Node)(nil),
-			wantErr:   false,
-		},
-		{
-			name:  "map[string]any to *html.Node",
+			name:  "map[string]any to html",
 			value: map[string]any{"key": "val", "num": 123.0, "active": true},
-			shape: htmlShape,
+			shape: Html,
 			wantValue: &html.Node{
 				Type: html.TextNode,
 				Data: `{"active":true,"key":"val","num":123}`,
@@ -714,29 +800,48 @@ func TestConvertToRenderShape(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:      "nil map[string]any to *html.Node",
-			value:     (map[string]any)(nil),
-			shape:     htmlShape,
+			name:      "nil []byte to html",
+			value:     ([]byte)(nil),
+			shape:     Html,
+			wantValue: (*html.Node)(nil),
+			wantErr:   false,
+		},
+		{
+			name:  "struct to html",
+			value: testStruct{Name: "Go", Age: 15},
+			shape: Html,
+			wantValue: &html.Node{
+				Type: html.TextNode,
+				Data: "{\"Name\":\"Go\",\"Age\":15}",
+			},
+			wantErr: false,
+		},
+		{
+			name:  "slice of ints to html",
+			value: []int{10, 20, 30},
+			shape: Html,
+			wantValue: &html.Node{
+				Type: html.TextNode,
+				Data: "[10,20,30]",
+			},
+			wantErr: false,
+		},
+		{
+			name:      "nil slice of ints to html",
+			value:     ([]int)(nil),
+			shape:     Html,
 			wantValue: (*html.Node)(nil),
 			wantErr:   false,
 		},
 
-		// 6. Non-convertible types (general error cases - these remain the same)
+		// 6. Non-convertible types with ShapeNumber/String
 		{
-			name:        "string to int",
-			value:       "not-an-int",
-			shape:       intInstance,
+			name:        "string to number (error)",
+			value:       "not-a-number",
+			shape:       Number,
 			wantValue:   nil,
 			wantErr:     true,
-			errContains: "cannot convert type string to type int",
-		},
-		{
-			name:        "struct to string",
-			value:       testStruct{Name: "Test", Age: 1},
-			shape:       stringInstance,
-			wantValue:   nil,
-			wantErr:     true,
-			errContains: "cannot convert type chtml.testStruct to type string",
+			errContains: `cannot convert string "not-a-number" to number`,
 		},
 	}
 
@@ -753,21 +858,16 @@ func TestConvertToRenderShape(t *testing.T) {
 				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
 					t.Errorf("convertToRenderShape() error = %q, want error containing %q", err.Error(), tt.errContains)
 				}
-				// If an error was expected and its content matches (or no specific content check),
-				// and we indeed got an error, then the value check is skipped.
-				if err != nil { // Ensure we actually got an error if wantErr is true
+				if err != nil {
 					return
 				}
-				// If wantErr is true but err is nil, the first check (err != nil) != tt.wantErr would have caught it.
 			}
 
-			// If no error was expected, but we got one
 			if err != nil {
 				t.Errorf("convertToRenderShape() unexpected error = %v", err)
 				return
 			}
 
-			// General reflect.DeepEqual for other types or if one is *Node and other isn't
 			if !reflect.DeepEqual(gotValue, tt.wantValue) {
 				t.Errorf("DeepEqual mismatch.\nGot:      %#v (type %T)\nWant:     %#v (type %T)", gotValue, gotValue, tt.wantValue, tt.wantValue)
 			}

@@ -12,6 +12,14 @@ type Component interface {
 	// an HTML document (*html.Node) or anything else that can be sent over the wire or
 	// passed to another Component as an input.
 	Render(s Scope) (any, error)
+
+	// InputShape describes expected input variables for this component as an object shape
+	// (snake_case field names). Returning nil implies the component does not accept inputs.
+	InputShape() *Shape
+
+	// OutputShape describes the overall output value shape produced by Render.
+	// Returning nil indicates that the Render method returns nil.
+	OutputShape() *Shape
 }
 
 // Disposable is an optional interface for components that require explicit resource cleanup.
@@ -76,27 +84,9 @@ var _ Disposable = (*chtmlComponent)(nil)
 func (c *chtmlComponent) Render(s Scope) (any, error) {
 	c.scope = s
 
-	// Check inputs: scope.Vars() keys should be a subset of c.doc.Attr keys.
-	attrMap := make(map[string]any, len(c.doc.Attr))
-	for _, attr := range c.doc.Attr {
-		snake := toSnakeCase(attr.Key)
-		attrMap[snake] = attr.Val // TODO: should we evaluate chtml.Expr here?
-	}
-
-	for k := range s.Vars() {
-		if k == "_" {
-			continue
-		}
-		if _, ok := attrMap[k]; !ok {
-			// c.error(c.el, fmt.Errorf("unrecognized argument %s", k))
-			return nil, &UnrecognizedArgumentError{Name: k}
-		}
-	}
-
-	// Copy default values from c.args into a new map.
-	if c.env == nil {
-		c.env = map[string]any{"_": nil}
-	}
+	// Always rebuild the environment on each render to avoid stale values persisting
+	// across updates.
+	c.env = map[string]any{"_": nil}
 	for _, attr := range c.doc.Attr {
 		v, err := attr.Val.Value(&c.vm, c.env)
 		if err != nil {
@@ -116,11 +106,6 @@ func (c *chtmlComponent) Render(s Scope) (any, error) {
 	// Load variables from the Scope into vars, performing type conversion if necessary
 	if err := UnmarshalScope(s, &c.env); err != nil {
 		return nil, err
-	}
-
-	// If we're in dry run mode, return shape inference after input validation
-	if s.DryRun() {
-		return c.inferNodeShape(c.doc), nil
 	}
 
 	// Evaluate the component's expressions for actual rendering
@@ -197,22 +182,29 @@ func NewComponent(n *Node, opts *ComponentOptions) Component {
 	return c
 }
 
-// inferNodeShape walks only the immediate children of a node, and
-// combines their RenderShapes to determine the final output shape.
-// This method is used in dry run mode to optimize component composition.
-func (c *chtmlComponent) inferNodeShape(n *Node) any {
-	if n == nil {
+// InputShape returns an object shape with fields based on declared attributes.
+// By default, all inputs are treated as Any, but attempts to infer types from values.
+func (c *chtmlComponent) InputShape() *Shape {
+	if c == nil || c.doc == nil {
 		return nil
 	}
-
-	// If the node has a direct RenderShape assigned, return it
-	if n.RenderShape != nil {
-		return n.RenderShape
+	// Build from symbols collected during parse; prefer exact shapes there
+	if len(c.doc.Symbols) > 0 {
+		fields := make(map[string]*Shape, len(c.doc.Symbols))
+		for k, s := range c.doc.Symbols {
+			// normalize key to snake_case for consistency when exposed
+			fields[toSnakeCase(k)] = s
+		}
+		return Object(fields)
 	}
+	return Object(nil)
+}
 
-	var shape any
-	for child := n.FirstChild; child != nil; child = child.NextSibling {
-		shape = AnyPlusAny(shape, child.RenderShape)
+// OutputShape derives the shape from the parsed document's RenderShape.
+// If the document is nil, returns nil. Otherwise converts RenderShape to *Shape.
+func (c *chtmlComponent) OutputShape() *Shape {
+	if c == nil || c.doc == nil {
+		return nil
 	}
-	return shape
+	return c.doc.RenderShape
 }

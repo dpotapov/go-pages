@@ -18,3 +18,6 @@ func NewRequestComponentFactory() func() chtml.Component {
 		return instance
 	}
 }
+
+func (rc RequestComponent) InputShape() *chtml.Shape  { return nil }
+func (rc RequestComponent) OutputShape() *chtml.Shape { return chtml.ShapeOf[RequestArg]() }

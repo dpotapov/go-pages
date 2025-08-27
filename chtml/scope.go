@@ -38,10 +38,6 @@ type Scope interface {
 	// Touch marks the component as changed. The implementation should re-render the page
 	// when this method is called.
 	Touch()
-
-	// DryRun indicates whether this is a dry run for validation purposes.
-	// When in dry run mode, components should not fully render or modify state.
-	DryRun() bool
 }
 
 // BaseScope is a base implementation of the Scope interface. For extra functionality, this type
@@ -80,38 +76,8 @@ func (s *BaseScope) Touch() {
 	}
 }
 
-// DryRun always returns false for regular scopes, indicating full rendering should occur.
-func (s *BaseScope) DryRun() bool {
-	return false
-}
-
 func (s *BaseScope) Touched() <-chan struct{} {
 	return s.touched
-}
-
-// DryRunScope is a wrapper around a BaseScope that indicates a dry run.
-// In dry run mode, components should not perform full rendering or modify state.
-type DryRunScope struct {
-	*BaseScope
-}
-
-// NewDryRunScope creates a new scope for validation purposes.
-func NewDryRunScope(vars map[string]any) *DryRunScope {
-	return &DryRunScope{
-		BaseScope: NewBaseScope(vars),
-	}
-}
-
-// Spawn creates a new child scope that preserves the dry run state.
-func (s *DryRunScope) Spawn(vars map[string]any) Scope {
-	return &DryRunScope{
-		BaseScope: s.BaseScope.Spawn(vars).(*BaseScope),
-	}
-}
-
-// DryRun returns true, indicating this is a dry run for validation.
-func (s *DryRunScope) DryRun() bool {
-	return true
 }
 
 // UnmarshalScope reads the variables from the scope and converts them to a provided target.
@@ -181,39 +147,35 @@ func UnmarshalScope(s Scope, target any) error {
 		if targetElem.IsNil() {
 			targetElem.Set(reflect.MakeMap(targetElem.Type()))
 		}
-		for _, key := range targetElem.MapKeys() {
-			k := toSnakeCase(key.String())
-			if val, ok := snakeCaseVars[k]; ok {
-				if val == nil {
-					continue
-				}
-				val := reflect.ValueOf(val)
-
-				// Check if val is zero and if map element type can accept nil
-				if !val.IsValid() || (val.Kind() == reflect.Ptr && val.IsNil()) {
-					val = reflect.Zero(targetElem.Type().Elem())
-				}
-
-				mapValue := targetElem.MapIndex(key)
-				if mapValue.Kind() == reflect.Interface && !mapValue.IsNil() {
-					mapValue = mapValue.Elem()
-				}
-				decodedVal, err := decodeHook(val, mapValue)
-				if err != nil {
-					return &DecodeError{
-						Key: k,
-						Err: err,
-					}
-				}
-
-				targetElem.SetMapIndex(key, reflect.ValueOf(decodedVal))
-
-				/*if val.Type().ConvertibleTo(targetElem.Type().Elem()) {
-					targetElem.SetMapIndex(key, val.Convert(targetElem.Type().Elem()))
-				} else {
-					return fmt.Errorf("cannot convert value for map entry %s", k)
-				}*/
+		for k, raw := range snakeCaseVars {
+			if raw == nil {
+				continue
 			}
+			key := reflect.ValueOf(k)
+			val := reflect.ValueOf(raw)
+
+			// Prepare target prototype for decode based on existing value or element type
+			mapValue := targetElem.MapIndex(key)
+			if !mapValue.IsValid() {
+				mapValue = reflect.Zero(targetElem.Type().Elem())
+			} else if mapValue.Kind() == reflect.Interface && !mapValue.IsNil() {
+				mapValue = mapValue.Elem()
+			}
+
+			// Handle nil/zero inputs for typed destinations
+			if !val.IsValid() || (val.Kind() == reflect.Ptr && val.IsNil()) {
+				val = reflect.Zero(mapValue.Type())
+			}
+
+			decodedVal, err := decodeHook(val, mapValue)
+			if err != nil {
+				return &DecodeError{
+					Key: k,
+					Err: err,
+				}
+			}
+
+			targetElem.SetMapIndex(key, reflect.ValueOf(decodedVal))
 		}
 	default:
 		return errors.New("target must be a pointer to a struct or a map")
