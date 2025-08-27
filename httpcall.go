@@ -76,37 +76,18 @@ func NewHttpCallComponentFactory(router http.Handler) func() chtml.Component {
 	}
 }
 func (c *HttpCallComponent) Render(s chtml.Scope) (any, error) {
-	if c.router == nil {
-		return nil, fmt.Errorf("http router not set")
-	}
+    if c.router == nil {
+        return nil, fmt.Errorf("http router not set")
+    }
 
 	var args HttpCallArgs
 	if err := chtml.UnmarshalScope(s, &args); err != nil {
 		return nil, fmt.Errorf("unmarshal scope: %w", err)
 	}
 
-	if s.DryRun() || args.URL == "" {
-		// In dry run mode, use the data and error shapes if provided
-		resp := &HttpCallResponse{Success: true}
-
-		if args.DataShape != "" {
-			var data any
-			if err := json.Unmarshal([]byte(args.DataShape), &data); err != nil {
-				return nil, fmt.Errorf("unmarshal data shape: %w", err)
-			}
-			resp.Data = data
-		}
-
-		if args.ErrorShape != "" {
-			var errData any
-			if err := json.Unmarshal([]byte(args.ErrorShape), &errData); err != nil {
-				return nil, fmt.Errorf("unmarshal error shape: %w", err)
-			}
-			resp.Error = errData
-		}
-
-		return resp, nil
-	}
+    if args.URL == "" { // no-op if URL not provided
+        return nil, nil
+    }
 
 	// Get cookies from the original request in scope globals if available
 	if sc, ok := s.(*scope); ok && sc.globals != nil && sc.globals.req != nil {
@@ -154,6 +135,10 @@ func (c *HttpCallComponent) Render(s chtml.Scope) (any, error) {
 
 	return resp, nil
 }
+
+func (c *HttpCallComponent) InputShape() *chtml.Shape { return chtml.ShapeOf[HttpCallArgs]() }
+
+func (c *HttpCallComponent) OutputShape() *chtml.Shape { return chtml.ShapeOf[HttpCallResponse]() }
 
 func (c *HttpCallComponent) Dispose() error {
 	c.mu.Lock()

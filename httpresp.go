@@ -9,13 +9,17 @@ import (
 
 type HttpResponseComponent struct{}
 
+// HttpResponseArgs describes accepted inputs for HttpResponseComponent.
+// Field names are mapped to snake_case for expression/args binding.
+type HttpResponseArgs struct {
+    Status   int
+    Location string
+    Cookies  []*http.Cookie
+    Extra    any
+}
+
 func (hc HttpResponseComponent) Render(s chtml.Scope) (any, error) {
-	var args struct {
-		Status   int
-		Location string
-		Cookies  []*http.Cookie
-		Extra    any
-	}
+	var args HttpResponseArgs
 	if err := chtml.UnmarshalScope(s, &args); err != nil {
 		return nil, fmt.Errorf("unmarshal scope: %w", err)
 	}
@@ -37,6 +41,9 @@ func (hc HttpResponseComponent) Render(s chtml.Scope) (any, error) {
 	return nil, nil
 }
 
+func (hc HttpResponseComponent) InputShape() *chtml.Shape { return chtml.ShapeOf[HttpResponseArgs]() }
+func (hc HttpResponseComponent) OutputShape() *chtml.Shape           { return nil }
+
 func NewHttpResponseComponentFactory() func() chtml.Component {
 	instance := &HttpResponseComponent{}
 	return func() chtml.Component {
@@ -47,9 +54,12 @@ func NewHttpResponseComponentFactory() func() chtml.Component {
 type CookieComponent struct{}
 
 func (cc CookieComponent) Render(s chtml.Scope) (any, error) {
-	var c http.Cookie
-	return &c, chtml.UnmarshalScope(s, &c)
+    var c http.Cookie
+    return &c, chtml.UnmarshalScope(s, &c)
 }
+
+func (cc CookieComponent) InputShape() *chtml.Shape  { return chtml.ShapeOf[http.Cookie]() }
+func (cc CookieComponent) OutputShape() *chtml.Shape { return chtml.ShapeOf[http.Cookie]() }
 
 func NewCookieComponentFactory() func() chtml.Component {
 	instance := &CookieComponent{}

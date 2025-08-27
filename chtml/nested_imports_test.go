@@ -25,6 +25,9 @@ func (c *Counter) Render(scope Scope) (any, error) {
 	return fmt.Sprintf("Counter: %d", newCount), nil
 }
 
+func (c *Counter) InputShape() *Shape  { return nil }
+func (c *Counter) OutputShape() *Shape { return Any }
+
 // GetCount returns the current count
 func (c *Counter) GetCount() int64 {
 	return atomic.LoadInt64(&c.count)
@@ -105,7 +108,7 @@ func TestNestedImports(t *testing.T) {
 	// Register the counter component
 	importer.RegisterComponent("counter", counter)
 
-	htmlContent := `<html><body><c:attr name="var1"><c:counter /></c:attr></body></html>`
+	htmlContent := `<html><body><c var="var1"><c:counter /></c></body></html>`
 	_, err := Parse(strings.NewReader(htmlContent), importer)
 	if err != nil {
 		t.Fatalf("Failed to parse HTML: %v", err)
@@ -114,16 +117,16 @@ func TestNestedImports(t *testing.T) {
 	fmt.Println("--------------------------------")
 
 	count := counter.GetCount()
-	if count != 1 {
-		t.Errorf("Counter component was rendered %d times, expected 1", count)
+	if count != 0 {
+		t.Errorf("Counter component was rendered %d times, expected 0", count)
 	}
 
 	counter.Reset()
 
 	// Register templates for our test pages
-	importer.RegisterTemplate("page3", `<c:attr name="var3"><c:counter /></c:attr>`)
-	importer.RegisterTemplate("page2", `<c:attr name="var2"><c:page3 /></c:attr>`)
-	importer.RegisterTemplate("page1", `<c:attr name="var1"><c:page2 /></c:attr>`)
+	importer.RegisterTemplate("page3", `<c var="var3"><c:counter /></c>`)
+	importer.RegisterTemplate("page2", `<c var="var2"><c:page3 /></c>`)
+	importer.RegisterTemplate("page1", `<c var="var1"><c:page2 /></c>`)
 
 	// Parse and render page1
 	htmlContent = `<html><body><c:page1 /></body></html>`
@@ -136,8 +139,8 @@ func TestNestedImports(t *testing.T) {
 
 	// Check how many times the counter component was rendered during parsing
 	count = counter.GetCount()
-	if count != 1 {
-		t.Errorf("Counter component was rendered %d times, expected 1", count)
+	if count != 0 {
+		t.Errorf("Counter component was rendered %d times, expected 0", count)
 	}
 
 	counter.Reset()
@@ -178,8 +181,8 @@ func TestNestedImports(t *testing.T) {
 func TestComponentPassesListToAnotherComponent(t *testing.T) {
 	importer := NewTestImporter()
 
-	importer.RegisterTemplate("listparent", `<c:attr name="data_list">${ { "data": [1,2,3] } }</c:attr><c:listchild list="${data_list.data}" />`)
-	importer.RegisterTemplate("listchild", `<c:attr name="list">${ [] }</c:attr><p c:for="i in list">${i}</p>`)
+	importer.RegisterTemplate("listparent", `<c var="data_list">${ { "data": [1,2,3] } }</c><c:listchild list="${data_list.data}" />`)
+	importer.RegisterTemplate("listchild", `<c var="list">${ [] }</c><p c:for="i in list">${i}</p>`)
 
 	doc, err := Parse(strings.NewReader(`<c:listparent />`), importer)
 	if err != nil {

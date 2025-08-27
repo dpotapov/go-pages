@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"reflect"
 	"runtime"
 	"slices"
 	"sort"
@@ -629,104 +628,107 @@ func (cnil) Render(s Scope) (any, error) {
 	return nil, nil
 }
 
+func (cnil) InputShape() *Shape  { return nil }
+func (cnil) OutputShape() *Shape { return Any }
+
 func TestParseNodeRenderShape(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name     string
-		text     string
-		wantType any
+		name      string
+		text      string
+		wantShape *Shape
 		// Optionally, a function to select the node to check (default: first child)
 		nodeSelector func(doc *Node) *Node
 	}{
 		{
-			name:     "element node shape",
-			text:     `<p>Test</p>`,
-			wantType: (*html.Node)(nil),
+			name:      "element node shape",
+			text:      `<p>Test</p>`,
+			wantShape: Html,
 			// Select the <p> node
 			nodeSelector: func(doc *Node) *Node {
 				return doc.FirstChild
 			},
 		},
 		{
-			name:     "test html shape",
-			text:     "\n\n<h1>Title</h1>\n\n<div>Content</div>\n\n",
-			wantType: (*html.Node)(nil),
+			name:      "test html shape",
+			text:      "\n\n<h1>Title</h1>\n\n<div>Content</div>\n\n",
+			wantShape: Html,
 		},
 		{
-			name:     "special any shape variable",
-			text:     `${_}`,
-			wantType: anyShape{},
+			name:      "special any shape variable",
+			text:      `${_}`,
+			wantShape: Any,
 		},
 		{
-			name:     "special any shape variable within whitespaces",
-			text:     `   ${_}   `,
-			wantType: anyShape{},
+			name:      "special any shape variable within whitespaces",
+			text:      `   ${_}   `,
+			wantShape: Any,
 		},
 		{
-			name:     "int expression",
-			text:     `${123}`,
-			wantType: int(0),
+			name:      "int expression",
+			text:      `${123}`,
+			wantShape: Number,
 		},
 		{
-			name:     "bool expression",
-			text:     `${false}`,
-			wantType: false,
+			name:      "bool expression",
+			text:      `${false}`,
+			wantShape: Bool,
 		},
 		{
-			name:     "string expression",
-			text:     `${"foo"}`,
-			wantType: "",
+			name:      "string expression",
+			text:      `${"foo"}`,
+			wantShape: String,
 		},
 		{
 			name: "object expression",
 			text: `${{ "foo": 123 }}`,
-			wantType: map[string]any{
-				"foo": int(0),
-			},
+			wantShape: Object(map[string]*Shape{
+				"foo": Number,
+			}),
 		},
 		{
-			name:     "empty array expression",
-			text:     `${[]}`,
-			wantType: ([]any)(nil),
+			name:      "empty array expression",
+			text:      `${[]}`,
+			wantShape: ArrayOf(Any),
 		},
 		{
-			name:     "array expression",
-			text:     `${[1, "foo", true, {k: "v"}]}`,
-			wantType: ([]any)(nil),
-		},
-		{ // TODO: in the future, we should expect a type mismatch error here
-			name:     "ternary string result",
-			text:     `${ false ? 123 : 'foo'}`,
-			wantType: "",
+			name:      "array expression",
+			text:      `${[1, "foo", true, {k: "v"}]}`,
+			wantShape: ArrayOf(Any),
 		},
 		{
-			name:     "shape of loop var is nil",
-			text:     `<p c:for="v in []">${v}</p>`,
-			wantType: nil,
+			name:      "ternary result with type mismatch",
+			text:      `${ false ? 123 : 'foo'}`,
+			wantShape: Any,
+		},
+		{
+			name:      "shape of loop var is nil",
+			text:      `<p c:for="v in []">${v}</p>`,
+			wantShape: Any,
 			nodeSelector: func(doc *Node) *Node {
 				return doc.FirstChild.FirstChild // Select the ${v} element to determine its type
 			},
 		},
 		{
-			name:     "shape of loop idx is int",
-			text:     `<p c:for="v, k in []">${k}</p>`,
-			wantType: int(0),
+			name:      "shape of loop idx is int",
+			text:      `<p c:for="v, k in []">${k}</p>`,
+			wantShape: Number,
 			nodeSelector: func(doc *Node) *Node {
 				return doc.FirstChild.FirstChild // Select the ${k} element to determine its type
 			},
 		},
 		{
-			name:     "shape of map loop key",
-			text:     `<p c:for="v, k in {foo: 123}">${k}</p>`,
-			wantType: "",
+			name:      "shape of map loop key",
+			text:      `<p c:for="v, k in {foo: 123}">${k}</p>`,
+			wantShape: String,
 			nodeSelector: func(doc *Node) *Node {
 				return doc.FirstChild.FirstChild // Select the ${k} element to determine its type
 			},
 		},
 		{
-			name:     "shape of map loop value",
-			text:     `<p c:for="v, k in {foo: 123}">${v}</p>`,
-			wantType: nil,
+			name:      "shape of map loop value",
+			text:      `<p c:for="v, k in {foo: 123}">${v}</p>`,
+			wantShape: Any,
 			nodeSelector: func(doc *Node) *Node {
 				return doc.FirstChild.FirstChild // Select the ${v} element to determine its type
 			},
@@ -744,13 +746,10 @@ func TestParseNodeRenderShape(t *testing.T) {
 				n = tt.nodeSelector(doc)
 			}
 
-			shape := n.RenderShape
+			gotShape := n.RenderShape
 
-			wantType := reflect.TypeOf(tt.wantType)
-			gotType := reflect.TypeOf(shape)
-
-			if gotType != wantType {
-				t.Fatalf("RenderShape type mismatch: got %v, want %v", gotType, wantType)
+			if !gotShape.Equal(tt.wantShape) {
+				t.Fatalf("RenderShape type mismatch: got %v, want %v", gotShape, tt.wantShape)
 			}
 		})
 	}

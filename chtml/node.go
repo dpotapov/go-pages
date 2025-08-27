@@ -46,7 +46,10 @@ type Node struct {
 
 	// RenderShape holds information about the expected output shape of this node
 	// This is used to optimize component composition and validation
-	RenderShape any
+	RenderShape *Shape
+
+	// Symbols contains the final input symbol shapes collected during parsing (snake_case handled at read time).
+	Symbols map[string]*Shape
 }
 
 type Attribute struct {
@@ -55,7 +58,10 @@ type Attribute struct {
 	Val       Expr
 }
 
-const importNode html.NodeType = 100
+const (
+	importNode html.NodeType = 100
+	cNode      html.NodeType = 101
+)
 
 func (n *Node) IsWhitespace() bool {
 	return strings.TrimLeft(n.Data.RawString(), whitespace) == ""

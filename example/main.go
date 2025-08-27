@@ -18,8 +18,8 @@ func LoggerMiddleware(next http.Handler, logger *slog.Logger) http.Handler {
 }
 
 type todos struct {
-	db  *todoDB
-	sub chan struct{}
+    db  *todoDB
+    sub chan struct{}
 }
 
 var _ chtml.Component = (*todos)(nil)
@@ -52,6 +52,15 @@ func (t *todos) Render(s chtml.Scope) (any, error) {
 
 	return todos, nil
 }
+
+func (t *todos) InputShape() *chtml.Shape {
+    return chtml.Object(map[string]*chtml.Shape{
+        "add": chtml.String,
+        "del": chtml.Number,
+    })
+}
+
+func (t *todos) OutputShape() *chtml.Shape { return chtml.ArrayOf(chtml.String) }
 
 func (t *todos) Dispose() error {
 	if t.sub != nil {

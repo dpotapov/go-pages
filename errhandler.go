@@ -65,6 +65,9 @@ func (eh *errorHandlerComponent) Render(s chtml.Scope) (any, error) {
 	return eh.fallback.Render(ss)
 }
 
+func (eh *errorHandlerComponent) InputShape() *chtml.Shape { return nil }
+func (eh *errorHandlerComponent) OutputShape() *chtml.Shape           { return chtml.Any }
+
 func (eh *errorHandlerComponent) Dispose() error {
 	var errs []error
 	if d, ok := eh.comp.(chtml.Disposable); ok {

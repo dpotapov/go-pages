@@ -17,3 +17,19 @@ func (i *builtinImporter) Import(name string) (Component, error) {
 		return nil, ErrComponentNotFound
 	}
 }
+
+// importerWithAttr decorates a user importer to always support builtin attribute components.
+type importerWithAttr struct {
+	base    Importer
+	builtin builtinImporter
+}
+
+func (w *importerWithAttr) Import(name string) (Component, error) {
+	if name == "attr" {
+		return w.builtin.Import(name)
+	}
+	if w.base == nil {
+		return nil, ErrImportNotAllowed
+	}
+	return w.base.Import(name)
+}

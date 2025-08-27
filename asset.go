@@ -395,14 +395,10 @@ func NewScriptComponentFactory(collector AssetCollector) func() chtml.Component 
 }
 
 func (c *ScriptComponent) Render(s chtml.Scope) (any, error) {
-	if !s.DryRun() {
-		return nil, nil // Only active during parsing pass (DryRun=true)
-	}
-
-	var args ScriptArgs
-	if err := chtml.UnmarshalScope(s, &args); err != nil {
-		return nil, fmt.Errorf("unmarshal scope for c:script: %w", err)
-	}
+    var args ScriptArgs
+    if err := chtml.UnmarshalScope(s, &args); err != nil {
+        return nil, fmt.Errorf("unmarshal scope for c:script: %w", err)
+    }
 
 	name := args.Name
 	if name == "" {
@@ -418,12 +414,18 @@ func (c *ScriptComponent) Render(s chtml.Scope) (any, error) {
 		return nil, nil // Nothing to add
 	}
 
-	if err := c.collector.AddAsset(name, []byte(content)); err != nil {
-		return nil, fmt.Errorf("add script asset %s: %w", name, err)
-	}
+    if err := c.collector.AddAsset(name, []byte(content)); err != nil {
+        return nil, fmt.Errorf("add script asset %s: %w", name, err)
+    }
 
-	return nil, nil // Component doesn't render anything itself
+    return nil, nil // Component doesn't render anything itself
 }
+
+func (c *ScriptComponent) InputShape() *chtml.Shape {
+    return chtml.Object(map[string]*chtml.Shape{"name": chtml.String, "_": chtml.String})
+}
+
+func (c *ScriptComponent) OutputShape() *chtml.Shape { return nil }
 
 // --- StyleComponent ---
 
@@ -444,14 +446,10 @@ func NewStyleComponentFactory(assets AssetCollector) func() chtml.Component {
 }
 
 func (c *StyleComponent) Render(s chtml.Scope) (any, error) {
-	if !s.DryRun() {
-		return nil, nil // Only active during parsing pass
-	}
-
-	var args StyleArgs
-	if err := chtml.UnmarshalScope(s, &args); err != nil {
-		return nil, fmt.Errorf("unmarshal scope for c:style: %w", err)
-	}
+    var args StyleArgs
+    if err := chtml.UnmarshalScope(s, &args); err != nil {
+        return nil, fmt.Errorf("unmarshal scope for c:style: %w", err)
+    }
 
 	name := args.Name
 	if name == "" {
@@ -467,12 +465,18 @@ func (c *StyleComponent) Render(s chtml.Scope) (any, error) {
 		return nil, nil // Nothing to add
 	}
 
-	if err := c.assets.AddAsset(name, []byte(content)); err != nil {
-		return nil, fmt.Errorf("add style asset %s: %w", name, err)
-	}
+    if err := c.assets.AddAsset(name, []byte(content)); err != nil {
+        return nil, fmt.Errorf("add style asset %s: %w", name, err)
+    }
 
-	return nil, nil
+    return nil, nil
 }
+
+func (c *StyleComponent) InputShape() *chtml.Shape {
+    return chtml.Object(map[string]*chtml.Shape{"name": chtml.String, "_": chtml.String})
+}
+
+func (c *StyleComponent) OutputShape() *chtml.Shape { return nil }
 
 // --- AssetComponent ---
 
@@ -492,9 +496,6 @@ func NewAssetComponentFactory(assets AssetCollector) func() chtml.Component {
 }
 
 func (c *AssetComponent) Render(s chtml.Scope) (any, error) {
-	if s.DryRun() {
-		return &html.Node{Type: html.DocumentNode}, nil
-	}
 
 	var args AssetArgs
 	if err := chtml.UnmarshalScope(s, &args); err != nil {
@@ -538,5 +539,11 @@ func (c *AssetComponent) Render(s chtml.Scope) (any, error) {
 		return nil, fmt.Errorf("c:asset supports only '.css' or '.js' types, got '%s'", ext)
 	}
 
-	return n, nil
+    return n, nil
 }
+
+func (c *AssetComponent) InputShape() *chtml.Shape {
+    return chtml.Object(map[string]*chtml.Shape{"name": chtml.String})
+}
+
+func (c *AssetComponent) OutputShape() *chtml.Shape { return chtml.Any }

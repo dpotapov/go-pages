@@ -1,4 +1,4 @@
-<c:attr name="title"></c:attr>
+<c var="title"></c>
 
 <h1 c:if="title != ''">${title}</h1>
 

@@ -80,6 +80,12 @@ func HtmlPlusText(a *html.Node, b string) *html.Node {
 }
 
 func HtmlPlusHtml(a, b *html.Node) *html.Node {
+	if a == nil {
+		return b
+	}
+	if b == nil {
+		return a
+	}
 	if a.Type == html.TextNode && b.Type == html.TextNode {
 		a.Data += b.Data
 		return a

@@ -5,6 +5,8 @@ import (
 	"iter"
 	"reflect"
 	"sort"
+	"strconv"
+	"strings"
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
@@ -21,6 +23,11 @@ import (
 //     appending the result to the destination node.
 func (c *chtmlComponent) render(n *Node) any {
 	var res, rr any // res is the accumulated result, rr is the result of the current node/operation
+
+	// Delegate C element entirely to its own renderer to keep this method clean
+	if n.Type == cNode {
+		return c.renderC(n)
+	}
 
 	if c.evalIf(n) {
 		for c := range c.evalFor(n) {
@@ -48,9 +55,9 @@ func (c *chtmlComponent) render(n *Node) any {
 		convertedRes, convErr := convertToRenderShape(res, n.RenderShape)
 		if convErr != nil {
 			c.error(n, fmt.Errorf("convert to render shape: %w", convErr))
-		} else {
-			res = convertedRes
+			return nil
 		}
+		return convertedRes
 	}
 	return res
 }
@@ -92,18 +99,9 @@ func (c *chtmlComponent) renderDocument(n *Node) any {
 			continue
 		}
 
-		if attr, ok := rr.(Attribute); ok {
-			v, err := attr.Val.Value(&c.vm, c.env)
-			if err != nil {
-				c.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
-				continue
-			}
-			if n == c.doc {
-				snake := toSnakeCase(attr.Key)
-				if !c.scopeHasVar(snake) {
-					c.env[snake] = v
-				}
-			}
+		if _, ok := rr.(Attribute); ok {
+			// Silently ignore root-level c:attr outputs; no env mutation or output.
+			continue
 		} else {
 			res = AnyPlusAny(res, rr)
 		}
@@ -182,9 +180,9 @@ func (c *chtmlComponent) renderImport(n *Node) any {
 		for child := n.FirstChild; child != nil; child = child.NextSibling {
 			rr := c.render(child)
 			if attr, ok := rr.(Attribute); ok {
-				v, err := attr.Val.Value(&c.vm, c.env)
-				if err != nil {
-					c.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
+				v, errAttr := attr.Val.Value(&c.vm, c.env)
+				if errAttr != nil {
+					c.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, errAttr))
 					return nil
 				}
 				vars[attr.Key] = v
@@ -230,13 +228,82 @@ func (c *chtmlComponent) renderImport(n *Node) any {
 		c.children[n] = append(c.children[n], comp)
 	}
 
-	rr, err := comp.Render(s)
-	if err != nil {
-		c.error(n, fmt.Errorf("render import %s: %w", n.Data.RawString(), err))
+	// Decode import vars to the component's expected shapes (for flags, etc.)
+	if ish := comp.InputShape(); ish != nil && ish.Kind == ShapeObject {
+		for key, fieldShape := range ish.Fields {
+			if key == "_" {
+				continue
+			}
+			if raw, ok := vars[key]; ok {
+				// Special handling: implied boolean flag when attribute present with no value
+				if fieldShape == Bool {
+					if str, isStr := raw.(string); isStr {
+						if str == "" {
+							raw = true
+						} else {
+							c.error(n, &DecodeError{Key: key, Err: fmt.Errorf("string value %q cannot be converted to bool, use ${true|false} syntax instead", str)})
+							return nil
+						}
+					}
+				}
+				if fieldShape != nil && fieldShape != Any {
+					converted, convErr := convertToRenderShape(raw, fieldShape)
+					if convErr != nil {
+						c.error(n, &DecodeError{Key: key, Err: convErr})
+						return nil
+					}
+					vars[key] = converted
+				}
+			}
+		}
+	}
+
+	rr, errRender := comp.Render(s)
+	if errRender != nil {
+		c.error(n, fmt.Errorf("render import %s: %w", n.Data.RawString(), errRender))
+		return nil
+	}
+	return rr
+}
+
+// renderC renders the <c> special element: passthrough, var binding, loops, conditionals
+func (c *chtmlComponent) renderC(n *Node) any {
+	// Handle conditionals first
+	if !c.evalIf(n) {
 		return nil
 	}
 
-	return rr
+	// Determine var name if present (snake_case for consistency)
+	var varName string
+	for _, attr := range n.Attr {
+		if strings.EqualFold(attr.Key, "var") {
+			varName = toSnakeCase(attr.Val.RawString())
+			break
+		}
+	}
+
+	var agg any
+	// Iterate (or single pass if no loop)
+	for childComp := range c.evalFor(n) {
+		// Render children of <c>
+		var iterRes any
+		for child := n.FirstChild; child != nil; child = child.NextSibling {
+			rr := childComp.render(child)
+			iterRes = AnyPlusAny(iterRes, rr)
+		}
+		agg = AnyPlusAny(agg, iterRes)
+	}
+
+	// If var present, bind aggregated content into env and suppress output
+	if varName != "" {
+		if _, exists := c.env[varName]; !exists || c.env[varName] == nil {
+			c.env[varName] = agg
+		}
+		return nil
+	}
+
+	// Passthrough mode: return aggregated content (or nil if none)
+	return agg
 }
 
 // renderAttrs loops over the attributes of the source node and evaluates the expressions for them.
@@ -435,7 +502,11 @@ func (c *chtmlComponent) evalFor(n *Node) iter.Seq[*chtmlComponent] {
 				}
 				loopEnv[n.LoopVar] = val.Interface()
 				if n.LoopIdx != "" {
-					loopEnv[n.LoopIdx] = key.Interface()
+					if key.Kind() != reflect.String {
+						c.error(n, fmt.Errorf("c:for map iteration requires string keys"))
+						continue
+					}
+					loopEnv[n.LoopIdx] = key.String()
 				}
 
 				var loopComp *chtmlComponent
@@ -483,145 +554,99 @@ func (c *chtmlComponent) scopeHasVar(v string) bool {
 	return ok
 }
 
-func convertToRenderShape(v any, shape any) (any, error) {
-	// If no target shape is specified, return the original value.
-	// `shape` is an `any` (interface{}), so `shape == nil` means the interface itself is nil.
-	if shape == nil || shape == AnyShape {
+func convertToRenderShape(v any, shape *Shape) (any, error) {
+	if shape == nil || shape == Any {
 		return v, nil
 	}
-
-	targetType := reflect.TypeOf(shape)
-	if targetType == nil {
-		// This occurs if `shape` is an untyped nil passed as `any`.
-		// Consistent with `shape == nil` at the top, implies no specific shape to convert to.
-		return v, nil
-	}
-
-	// Handle the case where the input value `v` is nil.
-	if v == nil {
-		// If v is nil, return the zero value for the targetType.
-		// return reflect.Zero(targetType).Interface(), nil
-		return shape, nil
-	}
-
-	sourceValue := reflect.ValueOf(v) // v is not nil at this point
-	sourceType := sourceValue.Type()
-
-	// 1. If the types are already the same, return the value as is.
-	if sourceType == targetType {
-		return v, nil
-	}
-
-	// 2. If the source type is directly convertible to the target type using Go's rules.
-	if sourceType.ConvertibleTo(targetType) {
-		convertedValue := sourceValue.Convert(targetType)
-		return convertedValue.Interface(), nil
-	}
-
-	// 3. Special conversion rules
-	if converted, ok := tryConvertToHtmlNode(v, sourceType, targetType); ok {
-		return converted, nil
-	}
-
-	if converted, ok := trySliceToSliceConversion(v, shape, sourceType, targetType, sourceValue); ok {
-		return converted, nil
-	}
-
-	// 4. If none of the above conversion strategies work, return an error.
-	return nil, fmt.Errorf("cannot convert type %s to type %s", sourceType.String(), targetType.String())
-}
-
-// tryConvertToHtmlNode attempts to convert a value to *html.Node.
-// If the targetType is *html.Node, it converts v to an *html.Node representation using repr().
-func tryConvertToHtmlNode(v any, sourceType, targetType reflect.Type) (any, bool) {
-	htmlNodeType := reflect.TypeOf((*html.Node)(nil))
-	if targetType != htmlNodeType {
-		return nil, false // Not targeting *html.Node
-	}
-
-	if sourceType == htmlNodeType { // Already *html.Node
-		return v, true
-	}
-
-	if v == nil { // Source is nil (untyped), target is *html.Node
-		return (*html.Node)(nil), true
-	}
-
-	// Check for typed nils (e.g., (*SomeStruct)(nil), ([]byte)(nil))
-	val := reflect.ValueOf(v)
-	switch val.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
-		if val.IsNil() {
-			return (*html.Node)(nil), true
+	switch shape.Kind {
+	case ShapeHtml:
+		if node, ok := v.(*html.Node); ok {
+			return node, nil
 		}
-	}
-
-	return &html.Node{Type: html.TextNode, Data: repr(v)}, true
-}
-
-// trySliceToSliceConversion attempts to convert a slice of interface{} to a slice of a specific type.
-// It returns the converted slice and true if successful, otherwise nil and false.
-func trySliceToSliceConversion(v any, shape any, sourceType, targetType reflect.Type, sourceValue reflect.Value) (any, bool) {
-	if targetType.Kind() == reflect.Slice && sourceType.Kind() == reflect.Slice && sourceType.Elem().Kind() == reflect.Interface {
-		targetElemType := targetType.Elem()
-		// Optimistically assume all elements can be converted.
-		// We will build a new slice of reflect.Value to hold potentially converted elements.
-		convertedElements := make([]reflect.Value, sourceValue.Len())
-
-		for i := 0; i < sourceValue.Len(); i++ {
-			elem := sourceValue.Index(i).Interface() // Get element as any
-
-			if elem == nil { // Handle nil elements in the source slice
-				// If target element type is a pointer, chan, func, interface, map, or slice, its zero value is nil.
-				// Otherwise, we can't assign nil to a non-pointer/interface type.
-				if !isNilCompatible(targetElemType) {
-					return nil, false // Cannot convert, nil is not compatible
-				}
-				// For nil-compatible types, the zero value is appropriate.
-				convertedElements[i] = reflect.Zero(targetElemType)
-				continue
+		if v == nil || isTypedNil(v) {
+			return (*html.Node)(nil), nil
+		}
+		return &html.Node{Type: html.TextNode, Data: repr(v)}, nil
+	case ShapeString:
+		if v == nil {
+			return "", nil
+		}
+		return fmt.Sprint(v), nil
+	case ShapeBool:
+		switch vv := v.(type) {
+		case bool:
+			return vv, nil
+		case nil:
+			return false, nil
+		default:
+			return nil, fmt.Errorf("cannot convert type %T to bool", v)
+		}
+	case ShapeNumber:
+		switch vv := v.(type) {
+		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+			return vv, nil
+		case string:
+			// Accept numeric strings (e.g. from http forms) and convert to float64
+			// Downstream code may convert to specific int/float types as needed.
+			if vv == "" {
+				return float64(0), nil
 			}
-
-			elemValue := reflect.ValueOf(elem)
-			if elemValue.Type().ConvertibleTo(targetElemType) {
-				convertedElements[i] = elemValue.Convert(targetElemType)
-			} else {
-				// Try recursive conversion for complex elements
-				// Pass the zero value of the target element type as the shape hint for the recursive call.
-				recursivelyConverted, err := convertToRenderShape(elem, reflect.Zero(targetElemType).Interface())
-				if err == nil {
-					// Ensure the recursively converted value is assignable to the target element type.
-					// This check is important if convertToRenderShape returns a value of a different,
-					// albeit compatible, type.
-					val := reflect.ValueOf(recursivelyConverted)
-					if val.Type().AssignableTo(targetElemType) {
-						convertedElements[i] = val
-					} else if val.Type().ConvertibleTo(targetElemType) {
-						convertedElements[i] = val.Convert(targetElemType)
-					} else {
-						return nil, false // Recursive conversion returned an incompatible type
+			if i, err := strconv.ParseInt(vv, 10, 64); err == nil {
+				return float64(i), nil
+			}
+			if f, err := strconv.ParseFloat(vv, 64); err == nil {
+				return f, nil
+			}
+			return nil, fmt.Errorf("cannot convert string %q to number", vv)
+		default:
+			return nil, fmt.Errorf("cannot convert type %T to number", v)
+		}
+	case ShapeArray:
+		if v == nil {
+			return []any(nil), nil
+		}
+		rv := reflect.ValueOf(v)
+		if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
+			return nil, fmt.Errorf("cannot convert type %T to array", v)
+		}
+		out := make([]any, rv.Len())
+		for i := 0; i < rv.Len(); i++ {
+			elem := rv.Index(i).Interface()
+			converted, err := convertToRenderShape(elem, shape.Elem)
+			if err != nil {
+				return nil, err
+			}
+			out[i] = converted
+		}
+		return out, nil
+	case ShapeObject:
+		if v == nil {
+			return map[string]any(nil), nil
+		}
+		if m, ok := v.(map[string]any); ok {
+			if shape.Fields != nil {
+				for k, fs := range shape.Fields {
+					if val, exists := m[k]; exists {
+						if conv, err := convertToRenderShape(val, fs); err == nil {
+							m[k] = conv
+						}
 					}
-				} else {
-					return nil, false // Recursive conversion failed
 				}
 			}
+			return m, nil
 		}
-
-		// If we've reached here, all elements were convertible (or were nil and compatible).
-		// Create the new slice and copy converted elements.
-		newSlice := reflect.MakeSlice(targetType, sourceValue.Len(), sourceValue.Len())
-		for i := 0; i < sourceValue.Len(); i++ {
-			newSlice.Index(i).Set(convertedElements[i])
-		}
-		return newSlice.Interface(), true
+		// Allow structs and other object types to pass through; downstream rendering will stringify/JSON them
+		return v, nil
+	default:
+		return v, nil
 	}
-	return nil, false
 }
 
-func isNilCompatible(t reflect.Type) bool {
-	switch t.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
-		return true
+func isTypedNil(v any) bool {
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Slice, reflect.Map, reflect.Func, reflect.Pointer, reflect.Interface, reflect.Chan:
+		return rv.IsNil()
 	default:
 		return false
 	}
