@@ -94,14 +94,56 @@ with `c:` namespace:
   Any attributes on the element are passed to the component as arguments as well.
   Typically, the component is a `.chtml` file, but it can also be a virtual component defined in Go code.
 
-- `<c:attr name="ATTR_NAME">...</c:attr>` - is a builtin component that adds an attribute
-  named `ATTR_NAME` to the parent element.
+- `<c:attr name="ATTR_NAME">VALUE</c:attr>` — builtin that applies the attribute `ATTR_NAME`
+  with value `VALUE` to the parent element/component. It:
+  - must be nested inside an element or component (top-level usage is ignored)
+  - supports string interpolation in `VALUE`
+  - has no side effects beyond setting the attribute (no env/scope mutation)
+  Examples:
+  ```html
+  <a><c:attr name="href">${link}</c:attr>Open</a>
+  <!-- Renders: <a href="/path">Open</a> -->
+
+  <c:MyButton>
+    <c:attr name="variant">primary</c:attr>
+    Click me
+  </c:MyButton>
+  ```
 
 - `c:if`, `c:else-if`, `c:else` attribute for conditional rendering.
 
 - `c:for` attribute for iterating over a slice or a map.
 
 All `c:` elements and attributes are removed from the final HTML output.
+
+### Special `<c>` element
+
+`<c>...</c>` is a control-only container that does not render its own tag. It can:
+
+- passthrough children as-is:
+  ```html
+  <c><p>Hello</p></c>
+  <!-- Renders: <p>Hello</p> -->
+  ```
+- bind rendered content to a variable and suppress output via `var`:
+  ```html
+  <c var="paragraph"><p>Hello</p></c>
+  <div>${paragraph}</div>
+  <!-- Renders: <div><p>Hello</p></div> -->
+  ```
+- loop with `for`:
+  ```html
+  <c for="i in items"><li>${i}</li></c>
+  ```
+- conditionally render with `if` / `else-if` / `else`:
+  ```html
+  <c if="cond">A</c><c else-if="other">B</c><c else>C</c>
+  ```
+
+Constraints and notes:
+- Do not mix `for` with `if`/`else-if`/`else` on the same `<c>`.
+- Do not use `c:*` directives on `<c>`; use plain attributes `if`, `else-if`, `else`, `for`.
+- `<c>` with no children produces no output.
 
 **Kebab-case conversion**
 
