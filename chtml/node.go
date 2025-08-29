@@ -48,14 +48,22 @@ type Node struct {
 	// This is used to optimize component composition and validation
 	RenderShape *Shape
 
+	// VarShape holds the explicit type shape for <c var="name type"> elements
+	// When nil, the shape is inferred from content; when set, content is cast to this shape
+	VarShape *Shape
+
 	// Symbols contains the final input symbol shapes collected during parsing (snake_case handled at read time).
 	Symbols map[string]*Shape
+
+	// Source contains the source location information for this node
+	Source Source
 }
 
 type Attribute struct {
 	Namespace string
 	Key       string
 	Val       Expr
+	Source    Source // Source location of the attribute value (quotes included)
 }
 
 const (

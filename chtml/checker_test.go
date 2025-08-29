@@ -38,9 +38,10 @@ func Test_shapeLiteralFromAST(t *testing.T) {
 		require.True(t, ok)
 		require.True(t, sh.Equal(ArrayOf(String)))
 
-		// Invalid: empty
-		_, ok = shapeLiteralFromAST(&ast.ArrayNode{Nodes: nil})
-		require.False(t, ok)
+		// Valid: empty array means ArrayOf(Any)
+		sh2, ok := shapeLiteralFromAST(&ast.ArrayNode{Nodes: nil})
+		require.True(t, ok)
+		require.True(t, sh2.Equal(ArrayOf(Any)))
 
 		// Invalid: multiple elements
 		_, ok = shapeLiteralFromAST(&ast.ArrayNode{Nodes: []ast.Node{

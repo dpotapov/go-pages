@@ -1,6 +1,7 @@
 package chtml
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"reflect"
@@ -870,6 +871,173 @@ func TestConvertToRenderShape(t *testing.T) {
 
 			if !reflect.DeepEqual(gotValue, tt.wantValue) {
 				t.Errorf("DeepEqual mismatch.\nGot:      %#v (type %T)\nWant:     %#v (type %T)", gotValue, gotValue, tt.wantValue, tt.wantValue)
+			}
+		})
+	}
+}
+
+func TestCElementTypeCasting(t *testing.T) {
+	tests := []struct {
+		name     string
+		template string
+		vars     map[string]any
+		want     string
+		wantErr  bool
+		errMsg   string
+	}{
+		// Basic type casting
+		{
+			name:     "cast string to number",
+			template: `<c var="num number">123</c><p>${num}</p>`,
+			vars:     nil,
+			want:     `<p>123</p>`,
+		},
+		{
+			name:     "cast expression to string",
+			template: `<c var="text string">${123 + 456}</c><p>${text}</p>`,
+			vars:     nil,
+			want:     `<p>579</p>`,
+		},
+		{
+			name:     "cast boolean expression",
+			template: `<c var="flag bool">${true}</c><p>${flag ? "yes" : "no"}</p>`,
+			vars:     nil,
+			want:     `<p>yes</p>`,
+		},
+		
+		// Object type casting
+		{
+			name:     "cast to object type",
+			template: `<c var="obj {name: string, age: number}">${{name: "John", age: 30}}</c><p>${obj.name}</p>`,
+			vars:     nil,
+			want:     `<p>John</p>`,
+		},
+		{
+			name:     "cast nil to object type",
+			template: `<c var="obj {name: string, age: number}">${nil}</c><p>${obj.name}</p>`,
+			vars:     nil,
+			want:     `<p></p>`,
+		},
+		
+		// Array type casting
+		{
+			name:     "cast to array type",
+			template: `<c var="nums [number]">${[1, 2, 3]}</c><p c:for="n in nums">${n}</p>`,
+			vars:     nil,
+			want:     `<p>1</p><p>2</p><p>3</p>`,
+		},
+		
+		// Backward compatibility - existing syntax should work
+		{
+			name:     "backward compatible - no type",
+			template: `<c var="greeting">Hello</c><p>${greeting}</p>`,
+			vars:     nil,
+			want:     `<p>Hello</p>`,
+		},
+		
+		// Error cases
+		{
+			name:     "incompatible type conversion",
+			template: `<c var="num number">not_a_number</c><p>${num}</p>`,
+			vars:     nil,
+			wantErr:  true,
+			errMsg:   "cannot convert",
+		},
+		{
+			name:     "invalid type syntax",
+			template: `<c var="invalid invalid_type">123</c>`,
+			vars:     nil,
+			wantErr:  true,
+			errMsg:   "invalid type literal",
+		},
+		{
+			name:     "empty var name",
+			template: `<c var="">123</c>`,
+			vars:     nil,
+			wantErr:  true,
+			errMsg:   "var attribute cannot be empty",
+		},
+		{
+			name:     "invalid var name",
+			template: `<c var="123invalid">123</c>`,
+			vars:     nil,
+			wantErr:  true,
+			errMsg:   "var name must be a valid identifier",
+		},
+		
+		// Complex type casting scenarios
+		{
+			name:     "nested object type",
+			template: `<c var="user {profile: {name: string, age: number}}">${{profile: {name: "Alice", age: 25}}}</c><p>${user.profile.name}</p>`,
+			vars:     nil,
+			want:     `<p>Alice</p>`,
+		},
+		{
+			name:     "array of objects",
+			template: `<c var="users [{name: string}]">${[{name: "John"}, {name: "Jane"}]}</c><p c:for="u in users">${u.name}</p>`,
+			vars:     nil,
+			want:     `<p>John</p><p>Jane</p>`,
+		},
+		{
+			name:     "html content type",
+			template: `<c var="content html"><span>Text</span>${123}</c><div>${content}</div>`,
+			vars:     nil,
+			want:     `<div><span>Text</span>123</div>`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			doc, err := Parse(strings.NewReader(tt.template), nil)
+			
+			if tt.wantErr {
+				if err == nil {
+					comp := NewComponent(doc, nil)
+					scope := NewBaseScope(tt.vars)
+					_, err = comp.Render(scope)
+				}
+				if err == nil {
+					t.Errorf("expected error but got none")
+					return
+				}
+				if tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
+					t.Errorf("error = %q, want error containing %q", err.Error(), tt.errMsg)
+				}
+				return
+			}
+			
+			if err != nil {
+				t.Errorf("parse error: %v", err)
+				return
+			}
+
+			comp := NewComponent(doc, nil)
+			scope := NewBaseScope(tt.vars)
+			result, err := comp.Render(scope)
+			if err != nil {
+				t.Errorf("render error: %v", err)
+				return
+			}
+
+			var got string
+			switch r := result.(type) {
+			case string:
+				got = r
+			case *html.Node:
+				buf := &bytes.Buffer{}
+				err := html.Render(buf, r)
+				if err != nil {
+					t.Errorf("html render error: %v", err)
+					return
+				}
+				got = buf.String()
+			default:
+				t.Errorf("unexpected result type: %T", result)
+				return
+			}
+
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
 			}
 		})
 	}

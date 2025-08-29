@@ -2,6 +2,7 @@ package pages
 
 import (
 	"errors"
+	"io/fs"
 
 	"github.com/dpotapov/go-pages/chtml"
 )
@@ -18,17 +19,21 @@ type errorHandlerComponent struct {
 
 	// compErrs is a list of ComponentError that occurred during parsing or rendering of comp.
 	compErrs []*chtml.ComponentError
+
+	// fsys is the FileSystem for reading source files
+	fsys fs.FS
 }
 
 var _ chtml.Component = &errorHandlerComponent{}
 
-func NewErrorHandlerComponent(name string, imp chtml.Importer, fallback chtml.Component) *errorHandlerComponent {
+func NewErrorHandlerComponent(name string, imp chtml.Importer, fallback chtml.Component, fsys fs.FS) *errorHandlerComponent {
 	comp, err := imp.Import(name)
 
 	return &errorHandlerComponent{
 		comp:      comp,
 		importErr: err,
 		fallback:  fallback,
+		fsys:      fsys,
 	}
 }
 
@@ -54,8 +59,19 @@ func (eh *errorHandlerComponent) Render(s chtml.Scope) (any, error) {
 		}
 	}
 
+	// Enhanced: Add source code for each error
+	var enrichedErrors []map[string]any
+	for _, ce := range eh.compErrs {
+		sourceCtx := ce.SourceCodeContext(eh.fsys, 3)
+		enrichedErrors = append(enrichedErrors, map[string]any{
+			"error":  ce,
+			"source": sourceCtx,
+		})
+	}
+
 	ss := s.Spawn(map[string]any{
-		"errors": eh.compErrs,
+		"errors": enrichedErrors,
+		"fsys":   eh.fsys,
 	})
 
 	if eh.fallback == nil {
