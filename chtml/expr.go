@@ -23,9 +23,16 @@ const (
 
 // Expr is a struct to hold interpolated string data for the CHTML nodes.
 type Expr struct {
-	raw   string
-	expr  *vm.Program
-	shape *Shape
+	raw       string
+	expr      *vm.Program
+	shape     *Shape
+	exprSpans []ExprSpan // Spans of ${...} expressions within the raw string
+}
+
+// ExprSpan captures the location of an expression within a string
+type ExprSpan struct {
+	Start  int // Start offset within the parent string
+	Length int // Length of the expression (excluding ${})
 }
 
 func NewExpr(s string, syms Symbols) (Expr, error) {
@@ -56,7 +63,7 @@ func NewExprInterpol(s string, syms Symbols) (Expr, error) {
 	if s == "" {
 		return Expr{}, nil
 	}
-	prog, err := interpol(s)
+	prog, spans, err := interpolWithSpans(s)
 	if err != nil {
 		return Expr{}, err
 	}
@@ -69,7 +76,7 @@ func NewExprInterpol(s string, syms Symbols) (Expr, error) {
 		// No interpolation → plain text
 		shp = String
 	}
-	return Expr{raw: s, expr: prog, shape: shp}, nil
+	return Expr{raw: s, expr: prog, shape: shp, exprSpans: spans}, nil
 }
 
 // NewExprRaw creates an Expr with a raw string, no interpolation.
@@ -110,10 +117,9 @@ func (e Expr) IsEmpty() bool {
 // Shape returns the statically-derived output shape for this expression.
 func (e Expr) Shape() *Shape { return e.shape }
 
-// interpol converts a string with ${}-style placeholders to meta program.
-// If the string is a simple text with no interpolation, it returns (nil, nil).
-// If args is not nil, the expression engine will do type checking.
-func interpol(s string) (*vm.Program, error) {
+// interpolWithSpans converts a string with ${}-style placeholders to meta program,
+// also returning the spans of each expression within the string.
+func interpolWithSpans(s string) (*vm.Program, []ExprSpan, error) {
 	l := &exprLexer{
 		input: s,
 		items: make([]item, 0),
@@ -123,24 +129,31 @@ func interpol(s string) (*vm.Program, error) {
 		state = state(l)
 	}
 
-	if l.items[0].typ == itemError {
-		return nil, fmt.Errorf("%s", l.items[0].val)
-	} else if l.items[0].typ == itemText && len(l.items) == 1 {
-		return nil, nil
+	if len(l.items) > 0 && l.items[0].typ == itemError {
+		return nil, nil, fmt.Errorf("%s", l.items[0].val)
+	} else if len(l.items) == 1 && l.items[0].typ == itemText {
+		return nil, nil, nil
 	}
 
 	in := make([]ast.Node, 0, len(l.items))
+	spans := make([]ExprSpan, 0)
 
 loop:
 	for _, item := range l.items {
 		switch item.typ {
 		case itemError:
-			return nil, fmt.Errorf("%s", item.val)
+			return nil, nil, fmt.Errorf("%s", item.val)
 		case itemEOF:
 			break loop
 		case itemText:
 			in = append(in, &ast.StringNode{Value: item.val})
 		case itemExpr:
+			// Capture the span of this expression
+			spans = append(spans, ExprSpan{
+				Start:  item.start,
+				Length: item.length,
+			})
+			
 			p, err := expr.Compile(item.val,
 				expr.DisableBuiltin("type"),
 				expr.DisableBuiltin("duration"),
@@ -148,7 +161,7 @@ loop:
 				expr.Function("type", TypeFunction),
 				expr.Function("duration", DurationFunction))
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			in = append(in, p.Node())
 		}
@@ -181,8 +194,17 @@ loop:
 	for _, opt := range opts {
 		opt(c)
 	}
-	return compiler.Compile(tree, c)
+	
+	prog, err := compiler.Compile(tree, c)
+	return prog, spans, err
+}
 
+// interpol converts a string with ${}-style placeholders to meta program.
+// If the string is a simple text with no interpolation, it returns (nil, nil).
+// If args is not nil, the expression engine will do type checking.
+func interpol(s string) (*vm.Program, error) {
+	prog, _, err := interpolWithSpans(s)
+	return prog, err
 }
 
 func parseLoopExpr(s string) (v, k, expr string, err error) {
@@ -238,7 +260,12 @@ type exprLexer struct {
 
 // emit passes an item back to the client.
 func (l *exprLexer) emit(t itemType) stateFn {
-	l.items = append(l.items, item{t, l.input[l.start:l.pos]})
+	l.items = append(l.items, item{
+		typ:    t,
+		val:    l.input[l.start:l.pos],
+		start:  l.start,
+		length: l.pos - l.start,
+	})
 	l.start = l.pos
 	return nil
 }
@@ -248,8 +275,10 @@ func (l *exprLexer) emit(t itemType) stateFn {
 // state, terminating l.run.
 func (l *exprLexer) errorf(format string, args ...interface{}) stateFn {
 	l.items = append(l.items, item{
-		itemError,
-		fmt.Sprintf(format, args...),
+		typ:    itemError,
+		val:    fmt.Sprintf(format, args...),
+		start:  l.start,
+		length: l.pos - l.start,
 	})
 	return nil
 }
@@ -402,8 +431,10 @@ const (
 )
 
 type item struct {
-	typ itemType
-	val string
+	typ    itemType
+	val    string
+	start  int // Byte offset where this item starts
+	length int // Length in bytes
 }
 
 // stateFn represents the state of the scanner

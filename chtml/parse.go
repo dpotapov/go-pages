@@ -17,6 +17,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/expr-lang/expr/parser"
 	"golang.org/x/net/html"
 	a "golang.org/x/net/html/atom"
 )
@@ -50,6 +51,16 @@ type chtmlParser struct {
 	importer Importer
 	// errs captures all errors encountered during parsing.
 	errs []error
+	// file is the source file name for span tracking
+	file string
+	// offset is the current byte offset in the source
+	offset int
+	// line is the current line number (1-based)
+	line int
+	// column is the current column number (1-based, in runes)
+	column int
+	// lineStart is the byte offset of the start of the current line
+	lineStart int
 }
 
 func (p *chtmlParser) top() *Node {
@@ -218,14 +229,20 @@ func (p *chtmlParser) addText(text string) {
 
 	t := p.top()
 	if n := t.LastChild; n != nil && n.Type == html.TextNode {
+		// Extend existing text node
 		expr, err := NewExprInterpol(n.Data.RawString()+text, p.symbols)
 		if err != nil {
 			p.error(t, err)
 		}
 		n.Data = expr
 		n.RenderShape = expr.Shape()
+		// Extend the span length when merging text
+		n.Source.Span.Length = p.offset - n.Source.Span.Offset
 		return
 	}
+
+	// Create new text node with span
+	span := p.captureTokenSpan()
 
 	expr, err := NewExprInterpol(text, p.symbols)
 	if err != nil {
@@ -235,6 +252,10 @@ func (p *chtmlParser) addText(text string) {
 	textNode := &Node{
 		Type: html.TextNode,
 		Data: expr,
+		Source: Source{
+			File: p.file,
+			Span: span,
+		},
 	}
 
 	// Use statically derived shape from expression
@@ -245,11 +266,18 @@ func (p *chtmlParser) addText(text string) {
 
 // addElement adds a child element based on the current token.
 func (p *chtmlParser) addElement() {
+	// Capture the span for this element
+	span := p.captureTokenSpan()
+
 	n := &Node{
 		Type:     html.ElementNode,
 		DataAtom: p.tok.DataAtom,
 		Data:     NewExprRaw(p.tok.Data),
 		Attr:     make([]Attribute, 0, len(p.tok.Attr)),
+		Source: Source{
+			File: p.file,
+			Span: span,
+		},
 	}
 
 	if strings.HasPrefix(strings.ToLower(p.tok.Data), "c:") {
@@ -294,6 +322,20 @@ func (p *chtmlParser) addElement() {
 		p.pushSymbols(introduced)
 	}
 
+	// Scan for attribute value positions if we have attributes
+	var attrSpans map[string]Span
+	if len(p.tok.Attr) > 0 {
+		// Extract attribute keys in order
+		attrKeys := make([]string, len(p.tok.Attr))
+		for i, a := range p.tok.Attr {
+			attrKeys[i] = a.Key
+		}
+		// Scan the raw token to find attribute value positions
+		raw := p.tokenizer.Raw()
+		// For now, just use 0 as base offset since we're calculating positions within token
+		attrSpans = scanAttributeSpans(raw, 0, attrKeys)
+	}
+
 	// Now process regular attributes, loop variables are in env
 	for _, t := range regularAttrs {
 		expr, err := NewExprInterpol(t.Val, p.symbols)
@@ -302,11 +344,29 @@ func (p *chtmlParser) addElement() {
 			continue
 		}
 
-		n.Attr = append(n.Attr, Attribute{
+		attr := Attribute{
 			Namespace: t.Namespace,
 			Key:       t.Key,
 			Val:       expr,
-		})
+		}
+
+		// Set attribute source span if found
+		if span, ok := attrSpans[t.Key]; ok {
+			// Calculate line and column for the attribute value
+			line, col := p.calculateAttrPosition(span.Start)
+			attr.Source = Source{
+				File: p.file,
+				Span: Span{
+					Offset: span.Offset,
+					Line:   line,
+					Column: col,
+					Length: span.Length,
+					Start:  span.Start,
+				},
+			}
+		}
+
+		n.Attr = append(n.Attr, attr)
 	}
 
 	p.addChild(n)
@@ -315,7 +375,8 @@ func (p *chtmlParser) addElement() {
 // deriveLoopIterShapes returns (varShape, idxShape) for a loop given the overall collection shape.
 // Rules:
 // - Array: var = elem shape (or Any), idx = Number
-// - Object (map-like): var = Any, idx = String
+// - Map (object with Elem): var = elem shape, idx = String
+// - Object (named fields): var = Any, idx = String
 // - Fallback: (Any, Any)
 func deriveLoopIterShapes(s *Shape) (*Shape, *Shape) {
 	if s == nil {
@@ -329,8 +390,12 @@ func deriveLoopIterShapes(s *Shape) (*Shape, *Shape) {
 		}
 		return elem, Number
 	case ShapeObject:
-		// For map/object iteration, the index is always a string key,
-		// and the value shape is considered unknown (Any) for safety.
+		// Check if this is a map type (Fields=nil, Elem!=nil)
+		if s.Elem != nil && s.Fields == nil {
+			// Map with uniform value types
+			return s.Elem, String
+		}
+		// Regular object with named fields
 		return Any, String
 	default:
 		return Any, Any
@@ -340,6 +405,13 @@ func deriveLoopIterShapes(s *Shape) (*Shape, *Shape) {
 // popElement will panic if the stack is empty.
 func (p *chtmlParser) popElement() *Node {
 	n := p.oe.pop()
+
+	// Finalize the span length for this element
+	if !n.Source.Span.IsZero() && n.Source.Span.Length == 0 {
+		// Set length from start to current position
+		n.Source.Span.Length = p.offset - n.Source.Span.Offset
+	}
+
 	// If the element introduced variables, pop the symbols
 	if n.Type == html.ElementNode && !n.Loop.IsEmpty() {
 		p.popSymbols()
@@ -365,7 +437,44 @@ func (p *chtmlParser) parseImportElement(n *Node) {
 
 	comp, err := p.importer.Import(compName)
 	if err != nil {
-		p.error(n, fmt.Errorf("import %q: %w", n.Data.RawString(), err))
+		// Check if err is a multi-error from nested parsing
+		if multierr, ok := err.(interface{ Unwrap() []error }); ok {
+			// Add each error individually with import context
+			for _, e := range multierr.Unwrap() {
+				var ce *ComponentError
+				if errors.As(e, &ce) {
+					// Preserve the original ComponentError's source location and HTML context
+					importErr := newComponentError(n, fmt.Errorf("import %q: %s", n.Data.RawString(), ce.err))
+					// Copy source location from the original error if it has better location info
+					if ce.HasSourceLocation() && !n.Source.Span.IsZero() {
+						// Keep the nested component's source location for more precise error reporting
+						importErr.File = ce.File
+						importErr.Line = ce.Line
+						importErr.Column = ce.Column
+						importErr.Length = ce.Length
+					}
+					p.errs = append(p.errs, importErr)
+				} else {
+					p.error(n, fmt.Errorf("import %q: %w", n.Data.RawString(), e))
+				}
+			}
+		} else {
+			// Single error - check if it's a ComponentError and preserve its context
+			var ce *ComponentError
+			if errors.As(err, &ce) {
+				importErr := newComponentError(n, fmt.Errorf("import %q: %s", n.Data.RawString(), ce.err))
+				// Copy source location from the original error
+				if ce.HasSourceLocation() && !n.Source.Span.IsZero() {
+					importErr.File = ce.File
+					importErr.Line = ce.Line
+					importErr.Column = ce.Column
+					importErr.Length = ce.Length
+				}
+				p.errs = append(p.errs, importErr)
+			} else {
+				p.error(n, fmt.Errorf("import %q: %w", n.Data.RawString(), err))
+			}
+		}
 		return
 	}
 	defer func() {
@@ -427,7 +536,12 @@ func (p *chtmlParser) finalizeCElement(n *Node) {
 		if strings.EqualFold(a.Key, "var") {
 			varName := a.Val.RawString()
 			if n.Parent != nil && n.Parent == p.doc && varName != "" {
-				p.symbols[varName] = shape
+				// Use explicit shape if provided, otherwise use inferred shape
+				finalShape := n.VarShape
+				if finalShape == nil {
+					finalShape = shape
+				}
+				p.symbols[varName] = finalShape
 			}
 			n.RenderShape = nil
 			return
@@ -481,21 +595,62 @@ func (p *chtmlParser) parseSpecialAttrs(n *Node, t *html.Attribute) bool {
 	}
 }
 
+// parseVarDeclaration parses var attribute declarations with optional type casting
+// Supports formats: "name" or "name type" where type is a shape literal
+func (p *chtmlParser) parseVarDeclaration(value string) (varName string, varShape *Shape, err error) {
+	parts := strings.Fields(value)
+	if len(parts) == 0 {
+		return "", nil, fmt.Errorf("var attribute cannot be empty")
+	}
+	
+	varName = parts[0]
+	if !isValidIdentifier(varName) {
+		return "", nil, fmt.Errorf("var name must be a valid identifier, got %q", varName)
+	}
+	
+	// If no type specified, return with nil shape (will be inferred)
+	if len(parts) == 1 {
+		return varName, nil, nil
+	}
+	
+	// Parse type literal from remaining parts
+	typeExpr := strings.Join(parts[1:], " ")
+	
+	// Parse the type expression using expr-lang parser
+	prog, err := parser.Parse(typeExpr)
+	if err != nil {
+		return "", nil, fmt.Errorf("invalid type expression %q: %w", typeExpr, err)
+	}
+	
+	// Convert AST to shape using existing shapeLiteralFromAST function
+	shape, ok := shapeLiteralFromAST(prog.Node)
+	if !ok {
+		return "", nil, fmt.Errorf("invalid type literal %q", typeExpr)
+	}
+	
+	return varName, shape, nil
+}
+
 // parseCElementAttrs handles special attributes for <c> elements
 func (p *chtmlParser) parseCElementAttrs(n *Node, t *html.Attribute) bool {
 	switch fk := strings.ToLower(t.Key); fk {
 	case "var":
-		// Validate that var is a valid identifier
-		if !isValidIdentifier(t.Val) {
-			p.error(n, fmt.Errorf("var attribute must be a valid identifier, got %q", t.Val))
+		// Parse variable declaration with optional type
+		varName, varShape, err := p.parseVarDeclaration(t.Val)
+		if err != nil {
+			p.error(n, err)
 			return true
 		}
-		// Store as regular attribute - will be used during rendering
+		
+		// Store the variable name as attribute for rendering
 		n.Attr = append(n.Attr, Attribute{
 			Namespace: t.Namespace,
 			Key:       t.Key,
-			Val:       NewExprRaw(t.Val),
+			Val:       NewExprRaw(varName),
 		})
+		
+		// Store the explicit shape if provided
+		n.VarShape = varShape
 		return true
 	case "if", "else", "else-if":
 		scond := t.Val
@@ -606,7 +761,12 @@ const whitespace = " \t\r\n\f"
 func inBodyIM(p *chtmlParser) bool {
 	switch p.tok.Type {
 	case html.DoctypeToken:
+		span := p.captureTokenSpan()
 		n := parseDoctype(p.tok.Data)
+		n.Source = Source{
+			File: p.file,
+			Span: span,
+		}
 		p.addChild(n)
 	case html.TextToken:
 		d := p.tok.Data
@@ -823,9 +983,14 @@ func inBodyIM(p *chtmlParser) bool {
 			p.inBodyEndTagOther(p.tok.DataAtom, p.tok.Data)
 		}
 	case html.CommentToken:
+		span := p.captureTokenSpan()
 		n := &Node{
 			Type: html.CommentNode,
 			Data: NewExprRaw(p.tok.Data),
+			Source: Source{
+				File: p.file,
+				Span: span,
+			},
 		}
 		p.addChild(n)
 	case html.ErrorToken:
@@ -975,6 +1140,10 @@ func (p *chtmlParser) parse() error {
 			}
 		}
 		p.parseCurrentToken()
+		// Update position after processing each token
+		if raw := p.tokenizer.Raw(); len(raw) > 0 {
+			p.updatePosition(raw)
+		}
 	}
 
 	// Propagate RenderShape to the document node
@@ -998,17 +1167,106 @@ func (p *chtmlParser) parse() error {
 	return nil
 }
 
+// updatePosition updates line and column tracking based on raw bytes
+func (p *chtmlParser) updatePosition(raw []byte) {
+	for _, b := range raw {
+		if b == '\n' {
+			p.line++
+			p.column = 1
+			p.lineStart = p.offset + 1
+		} else {
+			// Count runes for column tracking (UTF-8 aware)
+			p.column++
+		}
+		p.offset++
+	}
+}
+
+// captureTokenSpan captures the span for the current token
+func (p *chtmlParser) captureTokenSpan() Span {
+	raw := p.tokenizer.Raw()
+
+	return Span{
+		Offset: p.offset,
+		Line:   p.line,
+		Column: p.column,
+		Length: len(raw),
+	}
+}
+
+// calculateStartPosition calculates the line and column at the start of raw bytes
+func (p *chtmlParser) calculateStartPosition(raw []byte) (line, col int) {
+	line = p.line
+	col = p.column - len(raw)
+
+	// Adjust for newlines in the raw content
+	for i := len(raw) - 1; i >= 0; i-- {
+		if raw[i] == '\n' {
+			line--
+			// Find the column by counting from the previous newline
+			col = 0
+			for j := i - 1; j >= 0 && raw[j] != '\n'; j-- {
+				col++
+			}
+			break
+		}
+	}
+
+	// Handle case where column goes negative (token spans multiple lines)
+	if col <= 0 {
+		col = 1 // Default to column 1 if we can't determine
+	}
+
+	return line, col
+}
+
+// calculateAttrPosition calculates the line and column for an attribute at a given position within the token
+func (p *chtmlParser) calculateAttrPosition(posInToken int) (line, col int) {
+	// For single-line tokens (which most start tags are), we can calculate directly
+	// Start with the token's start position and add the offset within the token
+	raw := p.tokenizer.Raw()
+	startLine, startCol := p.calculateStartPosition(raw)
+
+	line = startLine
+	col = startCol
+
+	// Count through the token bytes up to the position
+	for i := 0; i < posInToken && i < len(raw); i++ {
+		if raw[i] == '\n' {
+			line++
+			col = 1
+		} else {
+			col++
+		}
+	}
+
+	return line, col
+}
+
 // Parse returns the parsed *Node tree for the HTML from the given Reader.
 // The input is assumed to be UTF-8 encoded.
 func Parse(r io.Reader, imp Importer) (*Node, error) {
+	return ParseWithSource("", r, imp)
+}
+
+// ParseWithSource returns the parsed *Node tree for the HTML from the given Reader,
+// with source file information for error reporting.
+func ParseWithSource(name string, r io.Reader, imp Importer) (*Node, error) {
 	p := &chtmlParser{
 		tokenizer: html.NewTokenizer(r),
 		doc: &Node{
 			Type: html.DocumentNode,
+			Source: Source{
+				File: name,
+			},
 		},
-		symbols:  map[string]*Shape{"_": Any},
-		im:       inBodyIM,
-		importer: &importerWithAttr{base: imp},
+		symbols:   map[string]*Shape{"_": Any},
+		im:        inBodyIM,
+		importer:  &importerWithAttr{base: imp},
+		file:      name,
+		line:      1,
+		column:    1,
+		lineStart: 0,
 	}
 
 	if err := p.parse(); err != nil {

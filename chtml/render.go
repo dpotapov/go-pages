@@ -297,7 +297,17 @@ func (c *chtmlComponent) renderC(n *Node) any {
 	// If var present, bind aggregated content into env and suppress output
 	if varName != "" {
 		if _, exists := c.env[varName]; !exists || c.env[varName] == nil {
-			c.env[varName] = agg
+			// Perform type conversion if explicit shape is provided
+			finalValue := agg
+			if n.VarShape != nil {
+				converted, err := convertToRenderShape(agg, n.VarShape)
+				if err != nil {
+					c.error(n, fmt.Errorf("cannot convert %T to %s: %w", agg, n.VarShape.String(), err))
+					return nil
+				}
+				finalValue = converted
+			}
+			c.env[varName] = finalValue
 		}
 		return nil
 	}

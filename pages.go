@@ -176,7 +176,7 @@ func (h *Handler) servePage(
 
 	compName := path.Base(strings.TrimSuffix(fsPath, chtmlExt))
 
-	comp := NewErrorHandlerComponent(compName, imp, h.errComp)
+	comp := NewErrorHandlerComponent(compName, imp, h.errComp, h.FileSystem)
 	defer func() {
 		if err := comp.Dispose(); err != nil {
 			h.logger.Warn("Dispose component", "error", err)
@@ -715,7 +715,7 @@ func parseFile(fsys fs.FS, fname string, imp chtml.Importer) (*chtml.Node, error
 	}
 	defer func() { _ = f.Close() }()
 
-	return chtml.Parse(f, imp)
+	return chtml.ParseWithSource(fname, f, imp)
 }
 
 func stringMapToAnyMap(m map[string]string) map[string]any {

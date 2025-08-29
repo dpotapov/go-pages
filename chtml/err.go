@@ -3,7 +3,8 @@ package chtml
 import (
 	"errors"
 	"fmt"
-	"runtime/debug"
+	"io/fs"
+	"runtime"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -16,6 +17,39 @@ var (
 	// ErrImportNotAllowed is returned when an Importer is not set for the component.
 	ErrImportNotAllowed = errors.New("imports are not allowed")
 )
+
+// captureStack captures a stack trace, skipping the specified number of frames
+// plus the frames for runtime.Callers and captureStack itself
+func captureStack(skip int) []byte {
+	// Use runtime.Stack directly but we need to skip frames manually
+	// since runtime.Stack doesn't have a skip parameter
+	buf := make([]byte, 64*1024) // Large buffer to capture full stack
+	n := runtime.Stack(buf, false)
+	if n == 0 {
+		return []byte("stack trace unavailable")
+	}
+	
+	// Parse the stack trace and skip the first few frames
+	stack := string(buf[:n])
+	lines := strings.Split(stack, "\n")
+	
+	// Each frame consists of 2 lines: function name and file:line info
+	// Skip frames: captureStack and caller-specified frames (skip+1 total)
+	framesToSkip := 1 + skip // captureStack + caller frames  
+	linesToSkip := framesToSkip * 2
+	
+	if len(lines) <= linesToSkip+1 { // +1 for goroutine header
+		return []byte("stack trace too short")
+	}
+	
+	// Keep the goroutine header line and skip the unwanted frames
+	filteredLines := []string{lines[0]} // Keep "goroutine N [running]:"
+	if len(lines) > linesToSkip+1 {
+		filteredLines = append(filteredLines, lines[linesToSkip+1:]...)
+	}
+	
+	return []byte(strings.Join(filteredLines, "\n"))
+}
 
 type UnrecognizedArgumentError struct {
 	Name string
@@ -58,19 +92,61 @@ func (e *DecodeError) Is(target error) bool {
 }
 
 type ComponentError struct {
-	err   error
-	path  string
-	html  *html.Node
-	stack []byte
+	err    error
+	path   string
+	stack  []byte
+	File   string // Source file path
+	Line   int    // Line number (1-based)
+	Column int    // Column number (1-based)
+	Length int    // Span length in bytes
 }
 
 func newComponentError(n *Node, err error) *ComponentError {
-	return &ComponentError{
+	ce := &ComponentError{
 		err:   err,
 		path:  buildErrorPath(n),
-		html:  buildErrorContext(n),
-		stack: debug.Stack(),
+		stack: captureStack(1), // Skip newComponentError frame
 	}
+	
+	// Check if the error is a TypeError with position info
+	var typeErr *TypeError
+	if errors.As(err, &typeErr) && typeErr.Pos > 0 && n != nil && !n.Source.Span.IsZero() {
+		// For TypeErrors with position info, calculate the position within the expression
+		ce.File = n.Source.File
+		// The TypeError.Pos is a byte offset within the expression, 
+		// so we add it to the node's starting position
+		ce.Line = n.Source.Span.Line
+		ce.Column = n.Source.Span.Column + typeErr.Pos
+		ce.Length = 1 // Default to highlighting just one character
+	} else if n != nil && !n.Source.Span.IsZero() {
+		ce.File = n.Source.File
+		ce.Line = n.Source.Span.Line
+		ce.Column = n.Source.Span.Column
+		ce.Length = n.Source.Span.Length
+	}
+	return ce
+}
+
+// newComponentErrorWithAttr creates a component error with specific attribute span information
+func newComponentErrorWithAttr(n *Node, attr *Attribute, err error) *ComponentError {
+	ce := &ComponentError{
+		err:   err,
+		path:  buildErrorPath(n),
+		stack: captureStack(1), // Skip newComponentErrorWithAttr frame
+	}
+	// Prefer attribute span if available, fallback to node span
+	if attr != nil && !attr.Source.Span.IsZero() {
+		ce.File = attr.Source.File
+		ce.Line = attr.Source.Span.Line
+		ce.Column = attr.Source.Span.Column
+		ce.Length = attr.Source.Span.Length
+	} else if n != nil && !n.Source.Span.IsZero() {
+		ce.File = n.Source.File
+		ce.Line = n.Source.Span.Line
+		ce.Column = n.Source.Span.Column
+		ce.Length = n.Source.Span.Length
+	}
+	return ce
 }
 
 func (e *ComponentError) Error() string {
@@ -84,138 +160,123 @@ func (e *ComponentError) Unwrap() error {
 	return e.err
 }
 
-func (e *ComponentError) HTMLContext() string {
-	var buf strings.Builder
-	_ = html.Render(&buf, e.html)
-
-	return buf.String()
-}
 
 // StackTrace returns the captured stack trace from when the error was created
 func (e *ComponentError) StackTrace() string {
 	return string(e.stack)
 }
 
-// errorContextBuilder is a type to organize helper functions for building error context trees.
-type errorContextBuilder struct {
-	html *html.Node
+// SourceFile returns the source file path where the error occurred
+func (e *ComponentError) SourceFile() string {
+	return e.File
 }
 
-func (b errorContextBuilder) addPrevSiblings(src *Node) {
-	var nodesToAdd []*Node
-	for s, c := src.PrevSibling, 0; s != nil && c < 2; s = s.PrevSibling {
-		nodesToAdd = append(nodesToAdd, s)
-		if !s.IsWhitespace() {
-			c++
-		}
-		if c == 2 && s.PrevSibling != nil {
-			nodesToAdd = append(nodesToAdd, &Node{Type: html.TextNode, Data: NewExprRaw("...")})
-		}
-	}
-	for i := len(nodesToAdd) - 1; i >= 0; i-- {
-		b.addNode(nodesToAdd[i], true)
-	}
+// SourceLine returns the line number where the error occurred (1-based)
+func (e *ComponentError) SourceLine() int {
+	return e.Line
 }
 
-func (b errorContextBuilder) addNextSiblings(src *Node) {
-	for s, c := src.NextSibling, 0; s != nil && c < 2; s = s.NextSibling {
-		if !s.IsWhitespace() {
-			c++
-		}
-		b.addNode(s, true)
-		if c == 2 && s.NextSibling != nil {
-			b.html.AppendChild(&html.Node{Type: html.TextNode, Data: "..."})
-		}
-	}
+// SourceColumn returns the column number where the error occurred (1-based)
+func (e *ComponentError) SourceColumn() int {
+	return e.Column
 }
 
-// converts the given Node into html.Node and adds it to the HTML error context tree.
-// If the Node has child nodes, the placeholder "..." is added to the tree.
-func (b errorContextBuilder) addNode(src *Node, children bool) {
-	n := &html.Node{
-		Type:      src.Type,
-		DataAtom:  src.DataAtom,
-		Data:      src.Data.RawString(),
-		Namespace: src.Namespace,
-	}
-	if len(src.Attr) > 0 {
-		n.Attr = make([]html.Attribute, len(src.Attr))
-		for i, a := range src.Attr {
-			n.Attr[i] = html.Attribute{Key: a.Key, Val: a.Val.RawString()}
-		}
-	}
-	if n.Type == importNode {
-		n.Type = html.ElementNode
-	}
-
-	if children && src.FirstChild != nil {
-		var nonTextNode *Node
-		for c := src.FirstChild; c != nil; c = c.NextSibling {
-			if c.Type == html.TextNode {
-				n.AppendChild(&html.Node{Type: html.TextNode, Data: c.Data.RawString()})
-			} else {
-				n.AppendChild(&html.Node{Type: html.TextNode, Data: "..."})
-				nonTextNode = c
-				break
-			}
-		}
-		for c := src.LastChild; nonTextNode != nil && c != nonTextNode; c = c.PrevSibling {
-			if c.Type == html.TextNode {
-				n.AppendChild(&html.Node{Type: html.TextNode, Data: c.Data.RawString()})
-			} else {
-				break
-			}
-		}
-	}
-	b.html.AppendChild(n)
+// SourceLength returns the length of the span where the error occurred
+func (e *ComponentError) SourceLength() int {
+	return e.Length
 }
 
-func (b errorContextBuilder) wrapParent(src *Node) {
-	if src.Parent == nil || src.Parent.Type != html.ElementNode {
-		return
-	}
-	b.addNode(src.Parent, false)
-
-	// reparent nodes
-	newParent := b.html.LastChild
-	for {
-		child := b.html.FirstChild
-		if child == newParent {
-			break
-		}
-		b.html.RemoveChild(child)
-		newParent.AppendChild(child)
-	}
+// HasSourceLocation returns true if the error has source location information
+func (e *ComponentError) HasSourceLocation() bool {
+	return e.Line > 0 && e.Column > 0
 }
 
-// remove first and last whitespace nodes from the children of the given node.
-func (b errorContextBuilder) stripWhitespace() {
-	if b.html.FirstChild == nil {
-		return
+// SourceContext represents source code lines around an error
+type SourceContext struct {
+	Lines       []SourceLine `json:"lines"`
+	ErrorLine   int         `json:"errorLine"`
+	ErrorColumn int         `json:"errorColumn"`
+	ErrorLength int         `json:"errorLength"`
+}
+
+// SourceLine represents a single line of source code
+type SourceLine struct {
+	Number  int    `json:"number"`
+	Text    string `json:"text"`
+	IsError bool   `json:"isError"`
+}
+
+// SourceCodeContext returns lines of source code around the error location
+// with contextLines before and after. Returns nil if source is not available.
+func (e *ComponentError) SourceCodeContext(fsys fs.FS, contextLines int) *SourceContext {
+	if !e.HasSourceLocation() || e.File == "" {
+		return &SourceContext{
+			Lines: []SourceLine{
+				{Number: 1, Text: "No source location available", IsError: false},
+			},
+			ErrorLine:   e.Line,
+			ErrorColumn: e.Column,
+			ErrorLength: e.Length,
+		}
 	}
-	if b.html.FirstChild.Type == html.TextNode && strings.TrimSpace(b.html.FirstChild.Data) == "" {
-		b.html.RemoveChild(b.html.FirstChild)
+	
+	// Read the file
+	content, err := fs.ReadFile(fsys, e.File)
+	if err != nil {
+		return &SourceContext{
+			Lines: []SourceLine{
+				{Number: 1, Text: fmt.Sprintf("Failed to read file: %v", err), IsError: false},
+				{Number: 2, Text: fmt.Sprintf("File: %q", e.File), IsError: false},
+			},
+			ErrorLine:   e.Line,
+			ErrorColumn: e.Column,
+			ErrorLength: e.Length,
+		}
 	}
-	if b.html.LastChild == nil {
-		return
+	
+	// Split into lines
+	lines := strings.Split(string(content), "\n")
+	
+	// Calculate line range
+	startLine := max(1, e.Line-contextLines)
+	endLine := min(len(lines), e.Line+contextLines)
+	
+	// Extract relevant lines
+	var sourceLines []SourceLine
+	for i := startLine; i <= endLine; i++ {
+		lineText := ""
+		if i-1 < len(lines) {
+			lineText = lines[i-1]
+		}
+		sourceLines = append(sourceLines, SourceLine{
+			Number:  i,
+			Text:    lineText,
+			IsError: i == e.Line,
+		})
 	}
-	if b.html.LastChild.Type == html.TextNode && strings.TrimSpace(b.html.LastChild.Data) == "" {
-		b.html.RemoveChild(b.html.LastChild)
+	
+	return &SourceContext{
+		Lines:       sourceLines,
+		ErrorLine:   e.Line,
+		ErrorColumn: e.Column,
+		ErrorLength: e.Length,
 	}
 }
 
-// buildErrorContext creates an XML tree around the token t to provide context for an error.
-func buildErrorContext(n *Node) *html.Node {
-	b := errorContextBuilder{
-		html: &html.Node{Type: html.DocumentNode},
+func max(a, b int) int {
+	if a > b {
+		return a
 	}
-	b.addPrevSiblings(n)
-	b.addNode(n, true)
-	b.addNextSiblings(n)
-	b.wrapParent(n)
-	b.stripWhitespace()
-	return b.html
+	return b
 }
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 
 func buildErrorPath(n *Node) string {
 	// recursively build path to the node n from the root

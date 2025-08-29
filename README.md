@@ -131,6 +131,13 @@ All `c:` elements and attributes are removed from the final HTML output.
   <div>${paragraph}</div>
   <!-- Renders: <div><p>Hello</p></div> -->
   ```
+- bind with automatic type casting:
+  ```html
+  <c var="myvar number">123</c>
+  <c var="myobj { name: string, age: number }">${ {name: "John", age: 30} }</c>
+  <p>${myobj.name} is ${myobj.age} years old</p>
+  <!-- Content is automatically converted to the specified type -->
+  ```
 - loop with `for`:
   ```html
   <c for="i in items"><li>${i}</li></c>
@@ -139,6 +146,25 @@ All `c:` elements and attributes are removed from the final HTML output.
   ```html
   <c if="cond">A</c><c else-if="other">B</c><c else>C</c>
   ```
+
+**Type Casting Support**
+
+The `var` attribute supports optional type casting using the syntax `var="name type"`:
+
+- Basic types: `string`, `number`, `bool`, `html`, `any`
+- Arrays: `[type]` (e.g., `[string]`, `[number]`)
+- Objects: `{field: type, ...}` (e.g., `{name: string, age: number}`)
+- Uniform objects: `{ _: type }` (e.g., `{ _: string }` means any keys with string values)
+- Nested structures: `{items: [{name: string}]}`
+
+Uniform objects are useful when the set of keys is not known ahead of time but all values share the same type. For example:
+
+```html
+<c var="labels { _: string }">${ {a: "Alpha", b: "Beta"} }</c>
+<p>${labels.a} / ${labels.b}</p>
+```
+
+If the content cannot be converted to the specified type, a runtime error is thrown with a descriptive message.
 
 Constraints and notes:
 - Do not mix `for` with `if`/`else-if`/`else` on the same `<c>`.

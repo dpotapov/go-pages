@@ -54,8 +54,9 @@ func shapeFromType(rt reflect.Type, seen map[reflect.Type]*Shape) *Shape {
 	case reflect.Slice, reflect.Array:
 		return ArrayOf(shapeFromType(rt.Elem(), seen))
 	case reflect.Map:
-		// Dynamic key/value bag; return unshaped object
-		return Object(nil)
+		// Map type: infer value type and create map shape {_:value_type}
+		valueType := shapeFromType(rt.Elem(), seen)
+		return &Shape{Kind: ShapeObject, Fields: nil, Elem: valueType}
 	case reflect.Struct:
 		// Special cases for common stdlib types
 		if rt.PkgPath() == "time" && rt.Name() == "Time" {

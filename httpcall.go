@@ -48,8 +48,6 @@ type HttpCallArgs struct {
 	Cookies           []*http.Cookie
 	Header            http.Header
 	Query             map[string]any
-	DataShape         string    // JSON string defining the shape of Data in dry run mode
-	ErrorShape        string    // JSON string defining the shape of Error in dry run mode
 	Body              io.Reader // must be at the end
 }
 
