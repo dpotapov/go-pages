@@ -299,10 +299,13 @@ func (c *chtmlComponent) renderC(n *Node) any {
 		if _, exists := c.env[varName]; !exists || c.env[varName] == nil {
 			// Perform type conversion if explicit shape is provided
 			finalValue := agg
+			if n.VarShape != nil && n.VarShape.Kind != ShapeString && isWhitespaceString(finalValue) {
+				finalValue = nil
+			}
 			if n.VarShape != nil {
-				converted, err := convertToRenderShape(agg, n.VarShape)
+				converted, err := convertToRenderShape(finalValue, n.VarShape)
 				if err != nil {
-					c.error(n, fmt.Errorf("cannot convert %T to %s: %w", agg, n.VarShape.String(), err))
+					c.error(n, fmt.Errorf("cannot convert %T to %s: %w", finalValue, n.VarShape.String(), err))
 					return nil
 				}
 				finalValue = converted
@@ -568,12 +571,17 @@ func convertToRenderShape(v any, shape *Shape) (any, error) {
 	if shape == nil || shape == Any {
 		return v, nil
 	}
+
+	if v == nil || isTypedNil(v) {
+		v = zeroValueForShape(shape)
+	}
+
 	switch shape.Kind {
 	case ShapeHtml:
 		if node, ok := v.(*html.Node); ok {
 			return node, nil
 		}
-		if v == nil || isTypedNil(v) {
+		if v == nil {
 			return (*html.Node)(nil), nil
 		}
 		return &html.Node{Type: html.TextNode, Data: repr(v)}, nil
@@ -613,7 +621,7 @@ func convertToRenderShape(v any, shape *Shape) (any, error) {
 		}
 	case ShapeArray:
 		if v == nil {
-			return []any(nil), nil
+			return []any{}, nil
 		}
 		rv := reflect.ValueOf(v)
 		if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
@@ -631,7 +639,11 @@ func convertToRenderShape(v any, shape *Shape) (any, error) {
 		return out, nil
 	case ShapeObject:
 		if v == nil {
-			return map[string]any(nil), nil
+			return zeroValueForShape(shape), nil
+		}
+		// Handle whitespace strings as empty values for objects with named fields
+		if isWhitespaceString(v) && shape.Fields != nil {
+			return zeroValueForShape(shape), nil
 		}
 		if m, ok := v.(map[string]any); ok {
 			if shape.Fields != nil {
@@ -640,6 +652,8 @@ func convertToRenderShape(v any, shape *Shape) (any, error) {
 						if conv, err := convertToRenderShape(val, fs); err == nil {
 							m[k] = conv
 						}
+					} else {
+						m[k] = zeroValueForShape(fs)
 					}
 				}
 			}
@@ -660,4 +674,44 @@ func isTypedNil(v any) bool {
 	default:
 		return false
 	}
+}
+
+func zeroValueForShape(shape *Shape) any {
+	if shape == nil || shape == Any {
+		return nil
+	}
+
+	switch shape.Kind {
+	case ShapeBool:
+		return false
+	case ShapeString:
+		return ""
+	case ShapeNumber:
+		return float64(0)
+	case ShapeArray:
+		return []any{}
+	case ShapeObject:
+		if shape.Fields == nil {
+			return map[string]any{}
+		}
+		out := make(map[string]any, len(shape.Fields))
+		for k, field := range shape.Fields {
+			out[k] = zeroValueForShape(field)
+		}
+		return out
+	case ShapeHtml:
+		return (*html.Node)(nil)
+	case ShapeHtmlAttr:
+		return nil
+	default:
+		return nil
+	}
+}
+
+func isWhitespaceString(v any) bool {
+	str, ok := v.(string)
+	if !ok {
+		return false
+	}
+	return strings.TrimSpace(str) == ""
 }

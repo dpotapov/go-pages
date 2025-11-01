@@ -904,7 +904,7 @@ func TestCElementTypeCasting(t *testing.T) {
 			vars:     nil,
 			want:     `<p>yes</p>`,
 		},
-		
+
 		// Object type casting
 		{
 			name:     "cast to object type",
@@ -918,7 +918,19 @@ func TestCElementTypeCasting(t *testing.T) {
 			vars:     nil,
 			want:     `<p></p>`,
 		},
-		
+		{
+			name:     "typed var defaults when nested conditional false",
+			template: `<c var="myvar {param1: string, param2: bool}"><c if="false">${{param1: "abc", param2: true}}</c></c><p>${myvar.param1}|${myvar.param2}</p>`,
+			vars:     nil,
+			want:     `<p>|false</p>`,
+		},
+		{
+			name:     "typed var uses data when nested conditional true",
+			template: `<c var="myvar {param1: string, param2: bool}"><c if="true">${{param1: "abc", param2: true}}</c></c><p>${myvar.param1}|${myvar.param2}</p>`,
+			vars:     nil,
+			want:     `<p>abc|true</p>`,
+		},
+
 		// Array type casting
 		{
 			name:     "cast to array type",
@@ -926,7 +938,7 @@ func TestCElementTypeCasting(t *testing.T) {
 			vars:     nil,
 			want:     `<p>1</p><p>2</p><p>3</p>`,
 		},
-		
+
 		// Backward compatibility - existing syntax should work
 		{
 			name:     "backward compatible - no type",
@@ -934,7 +946,7 @@ func TestCElementTypeCasting(t *testing.T) {
 			vars:     nil,
 			want:     `<p>Hello</p>`,
 		},
-		
+
 		// Error cases
 		{
 			name:     "incompatible type conversion",
@@ -964,7 +976,7 @@ func TestCElementTypeCasting(t *testing.T) {
 			wantErr:  true,
 			errMsg:   "var name must be a valid identifier",
 		},
-		
+
 		// Complex type casting scenarios
 		{
 			name:     "nested object type",
@@ -989,7 +1001,7 @@ func TestCElementTypeCasting(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			doc, err := Parse(strings.NewReader(tt.template), nil)
-			
+
 			if tt.wantErr {
 				if err == nil {
 					comp := NewComponent(doc, nil)
@@ -1005,7 +1017,7 @@ func TestCElementTypeCasting(t *testing.T) {
 				}
 				return
 			}
-			
+
 			if err != nil {
 				t.Errorf("parse error: %v", err)
 				return
