@@ -72,7 +72,7 @@ func shapeLiteralFromAST(n ast.Node) (*Shape, bool) {
 		if len(node.Pairs) == 0 {
 			return Object(nil), true
 		}
-		
+
 		// Check for context-sensitive "_" interpretation:
 		// { "_": shape } (single key) → map type with uniform values
 		// { "_": shape, other: ... } → object with literal "_" field
@@ -90,7 +90,7 @@ func shapeLiteralFromAST(n ast.Node) (*Shape, bool) {
 			default:
 				return Any, false
 			}
-			
+
 			// Single "_" key → map type
 			if key == "_" {
 				valueShape, ok := shapeLiteralFromAST(p.Value)
@@ -105,7 +105,7 @@ func shapeLiteralFromAST(n ast.Node) (*Shape, bool) {
 				}, true
 			}
 		}
-		
+
 		// Regular object with named fields (including literal "_" if other keys present)
 		fields := make(map[string]*Shape, len(node.Pairs))
 		for _, pn := range node.Pairs {
@@ -205,7 +205,7 @@ func shapeOf(n ast.Node, sym Symbols) (*Shape, error) {
 			default:
 				memberName = fmt.Sprintf("<%T>", prop)
 			}
-			
+
 			// Extract object expression for error context
 			var objectExpr string
 			switch objNode := node.Node.(type) {
@@ -216,12 +216,12 @@ func shapeOf(n ast.Node, sym Symbols) (*Shape, error) {
 			default:
 				objectExpr = "expression"
 			}
-			
+
 			objShape := "nil"
 			if obj != nil {
 				objShape = obj.Kind.String()
 			}
-			
+
 			// Special handling for array access
 			if obj != nil && obj.Kind == ShapeArray {
 				// Check if this is array indexing (IntegerNode) vs invalid member access
@@ -243,7 +243,7 @@ func shapeOf(n ast.Node, sym Symbols) (*Shape, error) {
 					}
 				}
 			}
-			
+
 			return Any, &TypeError{
 				Msg:        fmt.Sprintf("cannot access member '%s' on %s of shape %s", memberName, objectExpr, objShape),
 				Pos:        loc.From,
@@ -251,7 +251,7 @@ func shapeOf(n ast.Node, sym Symbols) (*Shape, error) {
 				ObjectExpr: objectExpr,
 			}
 		}
-		
+
 		// Handle member access on objects
 		switch prop := node.Property.(type) {
 		case *ast.StringNode:
@@ -309,7 +309,7 @@ func shapeOf(n ast.Node, sym Symbols) (*Shape, error) {
 		if len(node.Pairs) == 0 {
 			return Object(map[string]*Shape{}), nil
 		}
-		
+
 		// Check for context-sensitive "_" interpretation:
 		// { "_": shape } (single key) → map type with uniform values
 		// { "_": shape, other: ... } → object with literal "_" field
@@ -323,7 +323,7 @@ func shapeOf(n ast.Node, sym Symbols) (*Shape, error) {
 				case *ast.IdentifierNode:
 					key = k.Value
 				}
-				
+
 				// Single "_" key → map type
 				if key == "_" {
 					valueShape, err := shapeOf(p.Value, sym)
@@ -339,7 +339,7 @@ func shapeOf(n ast.Node, sym Symbols) (*Shape, error) {
 				}
 			}
 		}
-		
+
 		// Regular object with named fields (including literal "_" if other keys present)
 		fields := make(map[string]*Shape, len(node.Pairs))
 		for _, pn := range node.Pairs {
@@ -421,6 +421,14 @@ func shapeOf(n ast.Node, sym Symbols) (*Shape, error) {
 				return shapeOf(node.Arguments[0], sym)
 			case "duration":
 				return Number, nil
+			case "formatDuration":
+				if len(node.Arguments) < 1 {
+					return Any, &TypeError{
+						Msg: "formatDuration: missing argument",
+						Pos: node.Location().From,
+					}
+				}
+				return String, nil
 			case "filter", "sort", "reverse", "unique", "take":
 				if len(node.Arguments) < 1 {
 					return Any, &TypeError{
@@ -483,7 +491,7 @@ func shapeOf(n ast.Node, sym Symbols) (*Shape, error) {
 		if err != nil {
 			return Any, err
 		}
-		
+
 		// Create a new symbol table with the variable binding
 		newSym := make(Symbols)
 		if sym != nil {
@@ -492,7 +500,7 @@ func shapeOf(n ast.Node, sym Symbols) (*Shape, error) {
 			}
 		}
 		newSym[node.Name] = valueShape
-		
+
 		// Evaluate the expression with the new binding
 		return shapeOf(node.Expr, newSym)
 	case *ast.SequenceNode:
@@ -501,7 +509,7 @@ func shapeOf(n ast.Node, sym Symbols) (*Shape, error) {
 		currentSym := sym
 		var lastShape *Shape
 		var lastErr error
-		
+
 		for _, expr := range node.Nodes {
 			if varDecl, ok := expr.(*ast.VariableDeclaratorNode); ok {
 				// Variable declaration - update symbols
@@ -509,7 +517,7 @@ func shapeOf(n ast.Node, sym Symbols) (*Shape, error) {
 				if err != nil {
 					return Any, err
 				}
-				
+
 				// Create new symbol table with this binding
 				newSym := make(Symbols)
 				if currentSym != nil {
@@ -519,19 +527,19 @@ func shapeOf(n ast.Node, sym Symbols) (*Shape, error) {
 				}
 				newSym[varDecl.Name] = valueShape
 				currentSym = newSym
-				
+
 				// The shape of the declaration itself is the shape of the expression
 				lastShape, lastErr = shapeOf(varDecl.Expr, currentSym)
 			} else {
 				// Regular expression
 				lastShape, lastErr = shapeOf(expr, currentSym)
 			}
-			
+
 			if lastErr != nil {
 				return Any, lastErr
 			}
 		}
-		
+
 		if lastShape == nil {
 			return Any, nil
 		}
