@@ -19,6 +19,7 @@ func compileExpr(t *testing.T, s string) ast.Node {
 		expr.Function("cast", CastFunction),
 		expr.Function("type", TypeFunction),
 		expr.Function("duration", DurationFunction),
+		expr.Function("formatDuration", FormatDurationFunction),
 	)
 	require.NoError(t, err)
 	return prog.Node()
@@ -50,7 +51,7 @@ func TestCheck_Expressions_Table(t *testing.T) {
 		{"map type with complex value", `{_: {label: string}}`, nil, &Shape{Kind: ShapeObject, Fields: nil, Elem: Object(map[string]*Shape{"label": String})}, ""},
 		{"object with literal _ field", `{_: "x", name: "y"}`, nil, Object(map[string]*Shape{"_": String, "name": String}), ""},
 
-		// Variable declarations  
+		// Variable declarations
 		{"let simple object", `let n = {}; n`, nil, Object(map[string]*Shape{}), ""},
 		{"let with number", `let x = 42; x`, nil, Number, ""},
 		{"let with string", `let s = "hello"; s`, nil, String, ""},
@@ -58,7 +59,7 @@ func TestCheck_Expressions_Table(t *testing.T) {
 		{"let with shaped object", `let obj = {name: "test", count: 5}; obj`, nil, Object(map[string]*Shape{"name": String, "count": Number}), ""},
 		{"let with member access", `let obj = {x: 1}; obj.x`, nil, Number, ""},
 		{"let nested", `let a = {}; let b = a; b`, nil, Object(map[string]*Shape{}), ""},
-		
+
 		// Member access
 		{"member field ok", `obj.name`, Symbols{"obj": Object(map[string]*Shape{"name": String})}, String, ""},
 		{"member missing field Any", `obj.missing`, Symbols{"obj": Object(map[string]*Shape{"name": String})}, Any, ""},
@@ -80,6 +81,7 @@ func TestCheck_Expressions_Table(t *testing.T) {
 		{"cast wrong literal error", `cast(x, y)`, Symbols{"x": Any, "y": String}, Any, "shape literal"},
 		{"type returns arg shape", `type("a")`, nil, String, ""},
 		{"duration returns number", `duration("1s")`, nil, Number, ""},
+		{"formatDuration returns string", `formatDuration(26134000000000)`, nil, String, ""},
 		{"combine strings string", `combine("a", "b")`, nil, String, ""},
 		{"combine mixed Any", `combine("a", 1)`, nil, Any, ""},
 		{"filter preserves array shape", `filter(nums, {# > 1})`, Symbols{"nums": ArrayOf(Number)}, ArrayOf(Number), ""},

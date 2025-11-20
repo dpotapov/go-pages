@@ -46,7 +46,8 @@ func NewExpr(s string, syms Symbols) (Expr, error) {
 		expr.DisableBuiltin("duration"),
 		expr.Function("cast", CastFunction),
 		expr.Function("type", TypeFunction),
-		expr.Function("duration", DurationFunction))
+		expr.Function("duration", DurationFunction),
+		expr.Function("formatDuration", FormatDurationFunction))
 	if err != nil {
 		return x, err
 	}
@@ -153,13 +154,14 @@ loop:
 				Start:  item.start,
 				Length: item.length,
 			})
-			
+
 			p, err := expr.Compile(item.val,
 				expr.DisableBuiltin("type"),
 				expr.DisableBuiltin("duration"),
 				expr.Function("cast", CastFunction),
 				expr.Function("type", TypeFunction),
-				expr.Function("duration", DurationFunction))
+				expr.Function("duration", DurationFunction),
+				expr.Function("formatDuration", FormatDurationFunction))
 			if err != nil {
 				return nil, nil, err
 			}
@@ -183,6 +185,7 @@ loop:
 		expr.Function("cast", CastFunction),
 		expr.Function("type", TypeFunction),
 		expr.Function("duration", DurationFunction),
+		expr.Function("formatDuration", FormatDurationFunction),
 		expr.Function("combine", func(args ...any) (any, error) {
 			var acc any
 			for _, arg := range args {
@@ -194,7 +197,7 @@ loop:
 	for _, opt := range opts {
 		opt(c)
 	}
-	
+
 	prog, err := compiler.Compile(tree, c)
 	return prog, spans, err
 }
