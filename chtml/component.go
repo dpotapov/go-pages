@@ -1,7 +1,6 @@
 package chtml
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/expr-lang/expr/vm"
@@ -69,9 +68,6 @@ type chtmlComponent struct {
 	// A Node can have multiple children in case of c:for loops.
 	children map[*Node][]Component
 
-	// errs stores errors that occurred during rendering.
-	errs []error
-
 	// vm is the expression engine used to evaluate expressions in the CHTML nodes.
 	vm vm.VM
 }
@@ -97,7 +93,11 @@ func (c *chtmlComponent) Render(s Scope) (any, error) {
 
 		// Default args could be unrendered nodes, so we need to evaluate them first.
 		if n, ok := v.(*Node); ok {
-			c.env[snake] = c.render(n)
+			rendered, err := c.render(n)
+			if err != nil {
+				return nil, err
+			}
+			c.env[snake] = rendered
 		} else {
 			c.env[snake] = v
 		}
@@ -109,7 +109,7 @@ func (c *chtmlComponent) Render(s Scope) (any, error) {
 	}
 
 	// Evaluate the component's expressions for actual rendering
-	return c.render(c.doc), errors.Join(c.errs...)
+	return c.render(c.doc)
 }
 
 func (c *chtmlComponent) Dispose() error {
@@ -132,9 +132,7 @@ func (c *chtmlComponent) closeChildren(n *Node, idx int) {
 	// This iterates over the elements that are intended to be removed.
 	for i := idx; i < len(comps); i++ {
 		if d, ok := comps[i].(Disposable); ok {
-			if err := d.Dispose(); err != nil {
-				c.error(n, fmt.Errorf("dispose child %d: %w", i, err))
-			}
+			_ = d.Dispose() // Ignore dispose errors during cleanup
 		}
 	}
 
@@ -145,7 +143,6 @@ func (c *chtmlComponent) closeChildren(n *Node, idx int) {
 		// 'idx' children, but the loop producing them terminated early, resulting
 		// in only 'len(comps)' children being present. This is handled gracefully
 		// by only keeping the existing children.
-		// c.error(n, fmt.Errorf("internal warning: closeChildren called with idx %d > current len %d", idx, len(comps)))
 		finalLen = len(comps)
 	} else {
 		// idx <= len(comps), this is the expected case.
@@ -162,18 +159,12 @@ func (c *chtmlComponent) closeChildren(n *Node, idx int) {
 	}
 }
 
-// error appends a new error to the errs list.
-func (c *chtmlComponent) error(n *Node, err error) {
-	c.errs = append(c.errs, newComponentError(n, err))
-}
-
 func NewComponent(n *Node, opts *ComponentOptions) Component {
 	c := &chtmlComponent{
 		doc:            n,
 		renderComments: true,
 		hidden:         make(map[*Node]struct{}),
 		children:       make(map[*Node][]Component),
-		errs:           nil,
 	}
 	if opts != nil {
 		c.importer = opts.Importer

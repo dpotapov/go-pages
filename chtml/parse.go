@@ -322,6 +322,14 @@ func (p *chtmlParser) addElement() {
 		p.pushSymbols(introduced)
 	}
 
+	// Handle c:if "as IDENT" bindings *before* processing regular attributes
+	if n.Cond.IsMatchCond() && n.Cond.BindVar() != "" {
+		introduced := map[string]*Shape{
+			n.Cond.BindVar(): n.Cond.Shape(),
+		}
+		p.pushSymbols(introduced)
+	}
+
 	// Scan for attribute value positions if we have attributes
 	var attrSpans map[string]Span
 	if len(p.tok.Attr) > 0 {
@@ -416,9 +424,13 @@ func (p *chtmlParser) popElement() *Node {
 	if n.Type == html.ElementNode && !n.Loop.IsEmpty() {
 		p.popSymbols()
 	}
-	if n.Type == importNode {
+	if (n.Type == html.ElementNode || n.Type == cNode) && n.Cond.IsMatchCond() && n.Cond.BindVar() != "" {
+		p.popSymbols()
+	}
+	switch n.Type {
+	case importNode:
 		p.parseImportElement(n)
-	} else if n.Type == cNode {
+	case cNode:
 		p.finalizeCElement(n)
 	}
 	return n
@@ -558,12 +570,15 @@ func (p *chtmlParser) parseSpecialAttrs(n *Node, t *html.Attribute) bool {
 		if fk == "c:else" {
 			scond = "true"
 		}
-		cond, err := NewExpr(scond, p.symbols)
+
+		// Parse as condition expression (supports "is SHAPE as IDENT" syntax)
+		cond, err := NewExprCond(scond, p.symbols)
 		if err != nil {
 			p.error(n, fmt.Errorf("parse condition: %w", err))
 			n.Cond = NewExprConst(false) // fallback to false to prevent further errors
 			return true
 		}
+
 		if fk != "c:if" {
 			if prev := p.findPrevCond(p.top().LastChild); prev != nil {
 				n.PrevCond = prev
@@ -573,6 +588,7 @@ func (p *chtmlParser) parseSpecialAttrs(n *Node, t *html.Attribute) bool {
 				return true
 			}
 		}
+
 		n.Cond = cond
 		return true
 	case "c:for":
@@ -602,32 +618,32 @@ func (p *chtmlParser) parseVarDeclaration(value string) (varName string, varShap
 	if len(parts) == 0 {
 		return "", nil, fmt.Errorf("var attribute cannot be empty")
 	}
-	
+
 	varName = parts[0]
 	if !isValidIdentifier(varName) {
 		return "", nil, fmt.Errorf("var name must be a valid identifier, got %q", varName)
 	}
-	
+
 	// If no type specified, return with nil shape (will be inferred)
 	if len(parts) == 1 {
 		return varName, nil, nil
 	}
-	
+
 	// Parse type literal from remaining parts
 	typeExpr := strings.Join(parts[1:], " ")
-	
+
 	// Parse the type expression using expr-lang parser
 	prog, err := parser.Parse(typeExpr)
 	if err != nil {
 		return "", nil, fmt.Errorf("invalid type expression %q: %w", typeExpr, err)
 	}
-	
+
 	// Convert AST to shape using existing shapeLiteralFromAST function
 	shape, ok := shapeLiteralFromAST(prog.Node)
 	if !ok {
 		return "", nil, fmt.Errorf("invalid type literal %q", typeExpr)
 	}
-	
+
 	return varName, shape, nil
 }
 
@@ -641,14 +657,14 @@ func (p *chtmlParser) parseCElementAttrs(n *Node, t *html.Attribute) bool {
 			p.error(n, err)
 			return true
 		}
-		
+
 		// Store the variable name as attribute for rendering
 		n.Attr = append(n.Attr, Attribute{
 			Namespace: t.Namespace,
 			Key:       t.Key,
 			Val:       NewExprRaw(varName),
 		})
-		
+
 		// Store the explicit shape if provided
 		n.VarShape = varShape
 		return true
@@ -657,12 +673,15 @@ func (p *chtmlParser) parseCElementAttrs(n *Node, t *html.Attribute) bool {
 		if fk == "else" {
 			scond = "true"
 		}
-		cond, err := NewExpr(scond, p.symbols)
+
+		// Parse as condition expression (supports "is SHAPE as IDENT" syntax)
+		cond, err := NewExprCond(scond, p.symbols)
 		if err != nil {
 			p.error(n, fmt.Errorf("parse condition: %w", err))
 			n.Cond = NewExprConst(false) // fallback to false to prevent further errors
 			return true
 		}
+
 		if fk != "if" {
 			if prev := p.findPrevCond(p.top().LastChild); prev != nil {
 				n.PrevCond = prev
@@ -672,6 +691,7 @@ func (p *chtmlParser) parseCElementAttrs(n *Node, t *html.Attribute) bool {
 				return true
 			}
 		}
+
 		n.Cond = cond
 		return true
 	case "for":
@@ -782,7 +802,7 @@ func inBodyIM(p *chtmlParser) bool {
 				}
 			}
 		}
-		d = strings.Replace(d, "\x00", "", -1)
+		d = strings.ReplaceAll(d, "\x00", "")
 		if d == "" {
 			return true
 		}

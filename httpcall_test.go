@@ -12,7 +12,7 @@ import (
 )
 
 func TestHttpCallComponent_Render(t *testing.T) {
-	type wantVars struct {
+	type wantResponse struct {
 		Code  int
 		Data  any
 		Error any
@@ -37,40 +37,38 @@ func TestHttpCallComponent_Render(t *testing.T) {
 	})
 
 	tests := []struct {
-		name     string
-		vars     map[string]any
-		req      *http.Request
-		wantVars *wantVars
+		name         string
+		vars         map[string]any
+		req          *http.Request
+		wantResponse *wantResponse // When ignore_http_error=true, expect full HttpCallResponse
+		wantData     any           // When ignore_http_error=false (default), expect data directly
+		wantNil      bool          // When no URL provided, expect nil
 	}{
 		{
-			name:     "noArgs",
-			vars:     map[string]any{},
-			req:      nil,
-			wantVars: nil,
+			name:    "noArgs",
+			vars:    map[string]any{},
+			req:     nil,
+			wantNil: true,
 		},
 		{
-			name:     "noURL",
-			vars:     map[string]any{},
-			req:      nil,
-			wantVars: nil,
+			name:    "noURL",
+			vars:    map[string]any{},
+			req:     nil,
+			wantNil: true,
 		},
 		{
 			name: "getData",
 			vars: map[string]any{
 				"url": "/api/data",
 			},
-			req: nil,
-			wantVars: &wantVars{
-				Code: 200,
-				Data: map[string]any{
-					"data": "hello",
-				},
-			},
+			req:      nil,
+			wantData: map[string]any{"data": "hello"},
 		},
 		{
 			name: "passthrough cookies",
 			vars: map[string]any{
-				"url": "/api/cookies",
+				"url":               "/api/cookies",
+				"ignore_http_error": true,
 			},
 			req: func() *http.Request {
 				r := httptest.NewRequest("GET", "/original", nil)
@@ -78,7 +76,7 @@ func TestHttpCallComponent_Render(t *testing.T) {
 				r.AddCookie(&http.Cookie{Name: "theme", Value: "dark"})
 				return r
 			}(),
-			wantVars: &wantVars{
+			wantResponse: &wantResponse{
 				Code: 200,
 				Data: map[string]any{
 					"cookies": []any{"session=xyz123", "theme=dark"},
@@ -88,7 +86,8 @@ func TestHttpCallComponent_Render(t *testing.T) {
 		{
 			name: "explicit cookies override request cookies",
 			vars: map[string]any{
-				"url": "/api/cookies",
+				"url":               "/api/cookies",
+				"ignore_http_error": true,
 				"cookies": []*http.Cookie{
 					{Name: "explicit", Value: "cookie"},
 				},
@@ -98,7 +97,7 @@ func TestHttpCallComponent_Render(t *testing.T) {
 				r.AddCookie(&http.Cookie{Name: "session", Value: "xyz123"})
 				return r
 			}(),
-			wantVars: &wantVars{
+			wantResponse: &wantResponse{
 				Code: 200,
 				Data: map[string]any{
 					"cookies": []any{"explicit=cookie"},
@@ -123,19 +122,34 @@ func TestHttpCallComponent_Render(t *testing.T) {
 				t.Errorf("Render() error = %v", err)
 				return
 			}
-			if tt.wantVars != nil {
-				if got, ok := rr.(*HttpCallResponse); ok {
-					if got.Code != tt.wantVars.Code {
-						t.Errorf("Render() got.Code = %v, want %v", got.Code, tt.wantVars.Code)
-					}
-					if !reflect.DeepEqual(got.Data, tt.wantVars.Data) {
-						t.Errorf("Render() got.Data = %v, want %v", got.Data, tt.wantVars.Data)
-					}
-					if got.Error != tt.wantVars.Error {
-						t.Errorf("Render() got.Error = %v, want %v", got.Error, tt.wantVars.Error)
-					}
-				} else {
-					t.Errorf("Render() got = nil, want %v", tt.wantVars)
+
+			if tt.wantNil {
+				if rr != nil {
+					t.Errorf("Render() got = %v, want nil", rr)
+				}
+				return
+			}
+
+			if tt.wantResponse != nil {
+				// Expect full HttpCallResponse
+				got, ok := rr.(*HttpCallResponse)
+				if !ok {
+					t.Errorf("Render() got = %T, want *HttpCallResponse", rr)
+					return
+				}
+				if got.Code != tt.wantResponse.Code {
+					t.Errorf("Render() got.Code = %v, want %v", got.Code, tt.wantResponse.Code)
+				}
+				if !reflect.DeepEqual(got.Data, tt.wantResponse.Data) {
+					t.Errorf("Render() got.Data = %v, want %v", got.Data, tt.wantResponse.Data)
+				}
+				if got.Error != tt.wantResponse.Error {
+					t.Errorf("Render() got.Error = %v, want %v", got.Error, tt.wantResponse.Error)
+				}
+			} else if tt.wantData != nil {
+				// Expect data directly
+				if !reflect.DeepEqual(rr, tt.wantData) {
+					t.Errorf("Render() got = %v, want %v", rr, tt.wantData)
 				}
 			}
 		})
@@ -212,9 +226,9 @@ func TestHttpCallComponent_SetCookieHeaders(t *testing.T) {
 		_, _ = w.Write([]byte(`{"status": "cookies-set"}`))
 	})
 
-	// Create a scope with the test URL
+	// Create a scope with the test URL (use ignore_http_error to get full response)
 	req := httptest.NewRequest("GET", "/original", nil)
-	s := newScope(map[string]any{"url": "/api/set-cookies"}, req)
+	s := newScope(map[string]any{"url": "/api/set-cookies", "ignore_http_error": true}, req)
 
 	// Create the component and render
 	comp := NewHttpCallComponent(mux)
@@ -277,11 +291,12 @@ func TestHttpCallComponent_SetCookieHeaders(t *testing.T) {
 	}
 
 	// Test polling behavior: cookies should be in response but not in headers
-	// Create a scope with interval for polling
+	// Create a scope with interval for polling (use ignore_http_error to get full response)
 	pollingReq := httptest.NewRequest("GET", "/original", nil)
 	sPolling := newScope(map[string]any{
-		"url":      "/api/set-cookies",
-		"interval": "1s",
+		"url":               "/api/set-cookies",
+		"interval":          "1s",
+		"ignore_http_error": true,
 	}, pollingReq)
 
 	// Verify no Set-Cookie headers are already in the scope
@@ -318,6 +333,128 @@ func TestHttpCallComponent_SetCookieHeaders(t *testing.T) {
 	}
 }
 
+func TestHttpCallComponent_ErrorHandling(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/not-found", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Header().Set("Content-Type", "application/problem+json")
+		_, _ = w.Write([]byte(`{"detail": "Resource not found"}`))
+	})
+
+	mux.HandleFunc("/api/forbidden", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		w.Header().Set("Content-Type", "application/problem+json")
+		_, _ = w.Write([]byte(`{"detail": "Access denied"}`))
+	})
+
+	mux.HandleFunc("/api/success", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status": "ok"}`))
+	})
+
+	tests := []struct {
+		name        string
+		url         string
+		expectError bool
+		expectData  bool
+		wantData    map[string]any
+	}{
+		{
+			name:        "404 returns HttpCallError",
+			url:         "/api/not-found",
+			expectError: true,
+			expectData:  false,
+		},
+		{
+			name:        "403 returns HttpCallError",
+			url:         "/api/forbidden",
+			expectError: true,
+			expectData:  false,
+		},
+		{
+			name:        "200 returns data directly",
+			url:         "/api/success",
+			expectError: false,
+			expectData:  true,
+			wantData:    map[string]any{"status": "ok"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := chtml.NewBaseScope(map[string]any{"url": tt.url})
+			comp := NewHttpCallComponent(mux)
+			defer func() { _ = comp.Dispose() }()
+
+			rr, err := comp.Render(s)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected HttpCallError, got nil")
+					return
+				}
+				httpErr, ok := err.(*HttpCallError)
+				if !ok {
+					t.Errorf("expected HttpCallError, got %T: %v", err, err)
+					return
+				}
+				if httpErr.Response.Code < 200 || httpErr.Response.Code >= 300 {
+					// Good, it's a non-2xx code
+				} else {
+					t.Errorf("expected non-2xx status code in error, got %d", httpErr.Response.Code)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+					return
+				}
+				if tt.expectData {
+					if !reflect.DeepEqual(rr, tt.wantData) {
+						t.Errorf("got data = %v, want %v", rr, tt.wantData)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestHttpCallComponent_IgnoreHttpErrorAttribute(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/not-found", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Header().Set("Content-Type", "application/problem+json")
+		_, _ = w.Write([]byte(`{"detail": "Resource not found"}`))
+	})
+
+	// With ignore_http_error=true, should return full response even on 404
+	s := chtml.NewBaseScope(map[string]any{
+		"url":               "/api/not-found",
+		"ignore_http_error": true,
+	})
+	comp := NewHttpCallComponent(mux)
+	defer func() { _ = comp.Dispose() }()
+
+	rr, err := comp.Render(s)
+	if err != nil {
+		t.Errorf("unexpected error with ignore_http_error=true: %v", err)
+		return
+	}
+
+	resp, ok := rr.(*HttpCallResponse)
+	if !ok {
+		t.Errorf("expected HttpCallResponse, got %T", rr)
+		return
+	}
+
+	if resp.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.Code)
+	}
+
+	if resp.Success {
+		t.Errorf("expected Success=false for 404, got true")
+	}
+}
+
 func TestHttpCallComponent_QueryMerging(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/query", func(w http.ResponseWriter, r *http.Request) {
@@ -329,9 +466,11 @@ func TestHttpCallComponent_QueryMerging(t *testing.T) {
 	})
 
 	// URL already has ?foo=bar, Query adds foo=baz and x=1,x=2
+	// Use ignore_http_error to get full response for this test
 	vars := map[string]any{
-		"url":   "/api/query?foo=bar",
-		"query": map[string]any{"foo": "baz", "x": []string{"1", "2"}},
+		"url":               "/api/query?foo=bar",
+		"query":             map[string]any{"foo": "baz", "x": []string{"1", "2"}},
+		"ignore_http_error": true,
 	}
 	s := chtml.NewBaseScope(vars)
 	comp := NewHttpCallComponent(mux)

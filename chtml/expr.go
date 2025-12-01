@@ -27,6 +27,14 @@ type Expr struct {
 	expr      *vm.Program
 	shape     *Shape
 	exprSpans []ExprSpan // Spans of ${...} expressions within the raw string
+
+	// isMatchCond indicates this is a type-matching condition ("EXPR is SHAPE").
+	// When true, the condition evaluates to true only if the value matches shape.
+	isMatchCond bool
+
+	// bindVar is the variable name to bind the matched value to (for "as IDENT" syntax).
+	// Empty string means no variable binding.
+	bindVar string
 }
 
 // ExprSpan captures the location of an expression within a string
@@ -35,29 +43,103 @@ type ExprSpan struct {
 	Length int // Length of the expression (excluding ${})
 }
 
-func NewExpr(s string, syms Symbols) (Expr, error) {
-	if s == "" {
-		return Expr{}, nil
-	}
-	x := Expr{raw: s}
-	// Parse with type-check disabled, then run our checker, then keep the compiled program.
-	prog, err := expr.Compile(s,
+// exprOptions returns the standard options for compiling expressions.
+func exprOptions() []expr.Option {
+	return []expr.Option{
 		expr.DisableBuiltin("type"),
 		expr.DisableBuiltin("duration"),
 		expr.Function("cast", CastFunction),
 		expr.Function("type", TypeFunction),
 		expr.Function("duration", DurationFunction),
-		expr.Function("formatDuration", FormatDurationFunction))
+		expr.Function("formatDuration", FormatDurationFunction),
+	}
+}
+
+func NewExpr(s string, syms Symbols) (Expr, error) {
+	if s == "" {
+		return Expr{}, nil
+	}
+	x := Expr{raw: s}
+
+	// Parse the expression
+	tree, err := expr_parser.Parse(s)
+	if err != nil {
+		return x, err
+	}
+
+	// Transform cast() shape literals to *Shape constants for runtime validation
+	transformCastShapes(tree.Node)
+
+	// Compile the transformed AST
+	prog, err := compileTransformed(tree.Node, exprOptions()...)
 	if err != nil {
 		return x, err
 	}
 	x.expr = prog
-	shape, err := Check(prog.Node(), syms)
+
+	// Type check the transformed AST
+	shape, err := Check(tree.Node, syms)
 	if err != nil {
 		return x, err
 	}
 	x.shape = shape
 	return x, nil
+}
+
+// transformCastShapes mutates the AST, replacing shape literals in cast() calls
+// with *Shape constants so they're available at runtime for validation.
+func transformCastShapes(node ast.Node) {
+	switch n := node.(type) {
+	case *ast.CallNode:
+		for _, arg := range n.Arguments {
+			transformCastShapes(arg)
+		}
+		if id, ok := n.Callee.(*ast.IdentifierNode); ok && id.Value == "cast" && len(n.Arguments) >= 2 {
+			if shape, ok := shapeLiteralFromAST(n.Arguments[1]); ok {
+				n.Arguments[1] = &ast.ConstantNode{Value: shape}
+			}
+		}
+	case *ast.ArrayNode:
+		for _, elem := range n.Nodes {
+			transformCastShapes(elem)
+		}
+	case *ast.MapNode:
+		for _, pair := range n.Pairs {
+			if p, ok := pair.(*ast.PairNode); ok {
+				transformCastShapes(p.Key)
+				transformCastShapes(p.Value)
+			}
+		}
+	case *ast.BinaryNode:
+		transformCastShapes(n.Left)
+		transformCastShapes(n.Right)
+	case *ast.UnaryNode:
+		transformCastShapes(n.Node)
+	case *ast.ConditionalNode:
+		transformCastShapes(n.Cond)
+		transformCastShapes(n.Exp1)
+		transformCastShapes(n.Exp2)
+	case *ast.MemberNode:
+		transformCastShapes(n.Node)
+	case *ast.SliceNode:
+		transformCastShapes(n.Node)
+		if n.From != nil {
+			transformCastShapes(n.From)
+		}
+		if n.To != nil {
+			transformCastShapes(n.To)
+		}
+	}
+}
+
+// compileTransformed compiles a transformed AST node.
+func compileTransformed(node ast.Node, opts ...expr.Option) (*vm.Program, error) {
+	tree := &expr_parser.Tree{Node: node}
+	c := conf.CreateNew()
+	for _, opt := range opts {
+		opt(c)
+	}
+	return compiler.Compile(tree, c)
 }
 
 func NewExprInterpol(s string, syms Symbols) (Expr, error) {
@@ -155,17 +237,13 @@ loop:
 				Length: item.length,
 			})
 
-			p, err := expr.Compile(item.val,
-				expr.DisableBuiltin("type"),
-				expr.DisableBuiltin("duration"),
-				expr.Function("cast", CastFunction),
-				expr.Function("type", TypeFunction),
-				expr.Function("duration", DurationFunction),
-				expr.Function("formatDuration", FormatDurationFunction))
+			// Parse the expression and transform cast() calls
+			tree, err := expr_parser.Parse(item.val)
 			if err != nil {
 				return nil, nil, err
 			}
-			in = append(in, p.Node())
+			transformCastShapes(tree.Node)
+			in = append(in, tree.Node)
 		}
 	}
 
@@ -179,13 +257,7 @@ loop:
 	}
 
 	c := conf.CreateNew()
-	opts := []expr.Option{
-		expr.DisableBuiltin("type"),
-		expr.DisableBuiltin("duration"),
-		expr.Function("cast", CastFunction),
-		expr.Function("type", TypeFunction),
-		expr.Function("duration", DurationFunction),
-		expr.Function("formatDuration", FormatDurationFunction),
+	opts := append(exprOptions(),
 		expr.Function("combine", func(args ...any) (any, error) {
 			var acc any
 			for _, arg := range args {
@@ -193,7 +265,7 @@ loop:
 			}
 			return acc, nil
 		}),
-	}
+	)
 	for _, opt := range opts {
 		opt(c)
 	}
@@ -208,6 +280,171 @@ loop:
 func interpol(s string) (*vm.Program, error) {
 	prog, _, err := interpolWithSpans(s)
 	return prog, err
+}
+
+// NewExprCond parses a condition expression that may contain "is SHAPE as IDENT" syntax.
+// This extends normal expression parsing to support type matching for conditionals.
+// If the condition doesn't use the "is" syntax, it behaves like NewExpr.
+func NewExprCond(s string, syms Symbols) (Expr, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return Expr{}, nil
+	}
+
+	// Look for " is " keyword (with spaces to avoid matching inside identifiers like "isActive")
+	exprPart, matchShape, bindVar, err := splitCondMatchParts(s)
+	if err != nil {
+		return Expr{}, err
+	}
+
+	// Parse the expression part using standard NewExpr
+	x, err := NewExpr(exprPart, syms)
+	if err != nil {
+		return Expr{}, err
+	}
+
+	// For type matching, override the shape with the match shape
+	if matchShape != nil {
+		x.shape = matchShape
+		x.isMatchCond = true
+	}
+	x.bindVar = bindVar
+
+	// Keep the original raw string for debugging/display
+	x.raw = s
+
+	return x, nil
+}
+
+// IsMatchCond returns true if this expression has type matching ("is SHAPE" syntax).
+func (e Expr) IsMatchCond() bool {
+	return e.isMatchCond
+}
+
+// BindVar returns the variable name to bind the matched value to (for "as IDENT" syntax).
+func (e Expr) BindVar() string {
+	return e.bindVar
+}
+
+// splitCondMatchParts splits a condition string into expression, shape, and bind variable.
+// Returns: (exprPart, matchShape, bindVar, error)
+// If no "is" syntax is found, shape and bindVar will be nil/empty.
+func splitCondMatchParts(s string) (exprPart string, matchShape *Shape, bindVar string, err error) {
+	// We need to find " is " that's not inside a string literal or parentheses
+	isIdx := findCondMatchKeyword(s, " is ")
+	if isIdx == -1 {
+		// No "is" keyword, just a regular expression
+		return s, nil, "", nil
+	}
+
+	exprPart = strings.TrimSpace(s[:isIdx])
+	remainder := strings.TrimSpace(s[isIdx+4:]) // Skip " is "
+
+	// Now look for " as " in the remainder
+	asIdx := findCondMatchKeyword(remainder, " as ")
+	var shapePart string
+	if asIdx != -1 {
+		shapePart = strings.TrimSpace(remainder[:asIdx])
+		bindVar = strings.TrimSpace(remainder[asIdx+4:]) // Skip " as "
+
+		// Validate bindVar is a valid identifier
+		if !isValidCondMatchIdent(bindVar) {
+			return "", nil, "", fmt.Errorf("invalid identifier after 'as': %q", bindVar)
+		}
+	} else {
+		// No explicit "as IDENT", use expression as variable name if it's a simple identifier
+		shapePart = remainder
+		if isValidCondMatchIdent(exprPart) {
+			bindVar = exprPart
+		}
+	}
+
+	// Parse the shape
+	shape, err := parseShapeLiteral(shapePart)
+	if err != nil {
+		return "", nil, "", fmt.Errorf("invalid shape in condition: %w", err)
+	}
+
+	return exprPart, shape, bindVar, nil
+}
+
+// findCondMatchKeyword finds the position of a keyword in a string, respecting
+// string literals and nested braces/parentheses.
+func findCondMatchKeyword(s, keyword string) int {
+	depth := 0
+	inString := false
+	var stringChar rune
+
+	for i := 0; i < len(s); i++ {
+		r := rune(s[i])
+
+		if inString {
+			if r == '\\' && i+1 < len(s) {
+				i++ // Skip escaped character
+				continue
+			}
+			if r == stringChar {
+				inString = false
+			}
+			continue
+		}
+
+		switch r {
+		case '"', '\'', '`':
+			inString = true
+			stringChar = r
+		case '(', '[', '{':
+			depth++
+		case ')', ']', '}':
+			depth--
+		default:
+			// Only match keyword at depth 0 and outside strings
+			if depth == 0 && strings.HasPrefix(s[i:], keyword) {
+				// Make sure we're at a word boundary (spaces around the keyword)
+				return i
+			}
+		}
+	}
+	return -1
+}
+
+// isValidCondMatchIdent checks if a string is a valid identifier for binding.
+func isValidCondMatchIdent(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i, r := range s {
+		if i == 0 {
+			if !isLetter(r) && r != '_' {
+				return false
+			}
+		} else {
+			if !isLetter(r) && !isDigit(r) && r != '_' {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// parseShapeLiteral parses a shape literal string using the expr-lang parser.
+func parseShapeLiteral(s string) (*Shape, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil, fmt.Errorf("empty shape")
+	}
+
+	tree, err := expr_parser.Parse(s)
+	if err != nil {
+		return nil, fmt.Errorf("parse shape: %w", err)
+	}
+
+	shape, ok := shapeLiteralFromAST(tree.Node)
+	if !ok {
+		return nil, fmt.Errorf("invalid shape literal: %s", s)
+	}
+
+	return shape, nil
 }
 
 func parseLoopExpr(s string) (v, k, expr string, err error) {
@@ -357,14 +594,14 @@ func lexExpr(l *exprLexer) stateFn {
 		l.emit(itemExpr)
 		return lexRightDelim
 	}
-	switch r := l.next(); {
-	case r == eof:
+	switch r := l.next(); r {
+	case eof:
 		return l.errorf("unclosed action")
-	case r == '\'' || r == '"':
+	case '\'', '"':
 		l.scanString(r)
-	case r == '{':
+	case '{':
 		l.bracesDepth++
-	case r == '}':
+	case '}':
 		l.bracesDepth--
 	}
 	return lexExpr

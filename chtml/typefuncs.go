@@ -7,13 +7,37 @@ import (
 )
 
 // CastFunction implements cast(v, shape) at runtime.
-// For v1 it is a no-op pass-through (static checking enforces shapes).
+// It validates that the value structurally matches the expected shape.
+// If validation fails, it returns a CastError.
 func CastFunction(args ...any) (any, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("cast expects 2 args (value, shape)")
 	}
-	// Return the value unchanged; conversions (if any) are handled by renderer paths.
-	return args[0], nil
+
+	value := args[0]
+	shapeArg := args[1]
+
+	// Extract *Shape from the argument
+	// Shape constants from AST transformation should be passed as *Shape
+	shape, ok := shapeArg.(*Shape)
+	if !ok {
+		// If transformation didn't work (expr doesn't preserve *Shape constants),
+		// we can't validate at runtime. Return the value unchanged for backwards compatibility.
+		// The main use case (<c var="foo Shape">) is handled in renderC() with VarShape.
+		return value, nil
+	}
+
+	// Validate the value matches the shape
+	if err := validateShape(value, shape, ""); err != nil {
+		return nil, &CastError{
+			Expected: shape,
+			Actual:   value,
+			Err:      err,
+		}
+	}
+
+	// Return the value unchanged; type coercion (if needed) is handled by convertToRenderShape
+	return value, nil
 }
 
 // TypeFunction returns a runtime description of the value's shape.

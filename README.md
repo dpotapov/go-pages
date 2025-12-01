@@ -147,24 +147,97 @@ All `c:` elements and attributes are removed from the final HTML output.
   <c if="cond">A</c><c else-if="other">B</c><c else>C</c>
   ```
 
-**Type Casting Support**
+**Type Annotations (Shapes)**
 
-The `var` attribute supports optional type casting using the syntax `var="name type"`:
+`go-pages` supports type annotations using a shape syntax. Shapes can be used for:
+1. **Variable declarations** with type casting (`<c var="name SHAPE">`)
+2. **Inline expressions** with the `cast()` function (`cast(value, SHAPE)`)
+3. **Conditionals** with type matching (`c:if="EXPR is SHAPE"`)
 
-- Basic types: `string`, `number`, `bool`, `html`, `any`
-- Arrays: `[type]` (e.g., `[string]`, `[number]`)
-- Objects: `{field: type, ...}` (e.g., `{name: string, age: number}`)
-- Uniform objects: `{ _: type }` (e.g., `{ _: string }` means any keys with string values)
-- Nested structures: `{items: [{name: string}]}`
+*Supported shapes:*
 
-Uniform objects are useful when the set of keys is not known ahead of time but all values share the same type. For example:
+| Shape             | Description                    | Example                                 |
+|-------------------|--------------------------------|-----------------------------------------|
+| `string`          | String value                   | `"hello"`                               |
+| `number`          | Integer or float               | `42`, `3.14`                            |
+| `bool`            | Boolean                        | `true`, `false`                         |
+| `html`            | HTML node                      | `<p>text</p>`                           |
+| `any`             | Any type                       | —                                       |
+| `[T]`             | Array of type T                | `[string]`, `[{name: string}]`          |
+| `{field: T, ...}` | Object with typed fields       | `{name: string, age: number}`           |
+| `{_: T}`          | Object with uniform value type | `{_: string}` (any keys, string values) |
+
+*Type Casting in Variables*
+
+The `var` attribute supports type casting with the syntax `var="name SHAPE"`:
 
 ```html
-<c var="labels { _: string }">${ {a: "Alpha", b: "Beta"} }</c>
+<c var="count number">42</c>
+<c var="user {name: string, age: number}">${ {name: "John", age: 30} }</c>
+<p>${user.name} is ${user.age} years old</p>
+```
+
+Uniform objects (`{_: T}`) are useful when keys are dynamic but values share a type:
+
+```html
+<c var="labels {_: string}">${ {a: "Alpha", b: "Beta"} }</c>
 <p>${labels.a} / ${labels.b}</p>
 ```
 
-If the content cannot be converted to the specified type, a runtime error is thrown with a descriptive message.
+If the value cannot be converted to the specified shape, a runtime error is thrown.
+
+*The `cast()` Function*
+
+Use `cast(value, SHAPE)` in expressions to validate and cast values inline:
+
+```html
+<!-- Cast in attribute -->
+<c:my-component items="${ cast(data, [string]) }" />
+
+<!-- Cast in loop -->
+<c for="item in cast(items, [{name: string}])">
+  <p>${ item.name }</p>
+</c>
+
+<!-- Cast with nested shape -->
+<p>${ cast(response, {user: {name: string}}).user.name }</p>
+```
+
+The function validates that the value matches the shape and returns it unchanged. If validation fails, a runtime error is thrown.
+
+*Type Matching in Conditionals*
+
+Conditionals support type matching with the syntax `EXPR is SHAPE`:
+
+```html
+<!-- Basic type matching -->
+<p c:if="value is string">${ value }</p>
+<p c:else-if="value is number">Number: ${ value }</p>
+<p c:else>Unknown type</p>
+
+<!-- Object shape matching -->
+<div c:if="response is {success: bool, data: string}">
+  Success: ${ response.data }
+</div>
+```
+
+Use `as IDENT` to bind the matched value to a new variable:
+
+```html
+<c if="result is {user: {name: string}} as r">
+  <p>User: ${ r.user.name }</p>
+</c>
+<c else>
+  <p>No user data</p>
+</c>
+```
+
+The `as IDENT` part is optional:
+- If omitted and EXPR is a simple identifier (e.g., `data`), that name is reused
+- If omitted and EXPR is complex (e.g., `obj.field`), no variable is bound
+- If provided, the matched value is bound to the specified name
+
+The condition evaluates to `true` only if the value is not `nil` and structurally matches the shape.
 
 Constraints and notes:
 - Do not mix `for` with `if`/`else-if`/`else` on the same `<c>`.

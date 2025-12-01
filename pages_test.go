@@ -151,7 +151,9 @@ func TestPages_Handler_Fragments(t *testing.T) {
 	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
 		t.Fatalf("Failed to create test file %s: %v", filePath, err)
 	}
-	defer os.Remove(filePath) // Clean up the test file
+	defer func() {
+		_ = os.Remove(filePath) // Clean up the test file
+	}()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

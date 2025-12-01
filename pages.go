@@ -78,9 +78,6 @@ type Handler struct {
 	// logger is a private logger instance that is used to log internal events.
 	logger *slog.Logger
 
-	// errComp is an imported error component instance if OnErrorComponent is set.
-	errComp chtml.Component
-
 	// FragmentSelector is a function that extracts the fragment name from the request.
 	// If set, it is called for every request to determine which fragment to render.
 	// If not set, the whole template is rendered.
@@ -103,16 +100,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// initialize the fragment selector:
 		if h.FragmentSelector == nil {
 			h.FragmentSelector = func(r *http.Request) string { return "" }
-		}
-
-		// initialize the error component:
-		if h.OnErrorComponent != "" {
-			imp := h.importer(".")
-			ec, err := imp.Import(h.OnErrorComponent)
-			if err != nil {
-				h.logger.Error("Import error component", "error", err)
-			}
-			h.errComp = ec
 		}
 	})
 
@@ -176,7 +163,7 @@ func (h *Handler) servePage(
 
 	compName := path.Base(strings.TrimSuffix(fsPath, chtmlExt))
 
-	comp := NewErrorHandlerComponent(compName, imp, h.errComp, h.FileSystem)
+	comp := NewErrorHandlerComponent(compName, imp, h.OnErrorComponent, h.FileSystem)
 	defer func() {
 		if err := comp.Dispose(); err != nil {
 			h.logger.Warn("Dispose component", "error", err)
@@ -190,7 +177,9 @@ func (h *Handler) servePage(
 		if err != nil {
 			return err
 		}
-		defer ws.Close()
+		defer func() {
+			_ = ws.Close()
+		}()
 
 		// Render the component on:
 		// 1. each incoming websocket message

@@ -379,6 +379,14 @@ func shapeOf(n ast.Node, sym Symbols) (*Shape, error) {
 		if t.Kind == ShapeHtml || f.Kind == ShapeHtml {
 			return Html, nil
 		}
+		// When one branch is Any (e.g., nil), prefer the other branch's shape.
+		// This handles patterns like: condition ? someObject : nil
+		if t.Equal(Any) {
+			return f, nil
+		}
+		if f.Equal(Any) {
+			return t, nil
+		}
 		return Any, nil
 	case *ast.UnaryNode:
 		return shapeOf(node.Node, sym)
@@ -401,16 +409,26 @@ func shapeOf(n ast.Node, sym Symbols) (*Shape, error) {
 						Pos: node.Location().From,
 					}
 				}
-				if shp, ok := shapeLiteralFromAST(node.Arguments[1]); ok {
-					if _, err := shapeOf(node.Arguments[0], sym); err != nil {
-						return shp, err
+				// Check for *Shape in ConstantNode (from AST transformation) or shape literal
+				var shp *Shape
+				if cn, ok := node.Arguments[1].(*ast.ConstantNode); ok {
+					if s, ok := cn.Value.(*Shape); ok {
+						shp = s
 					}
-					return shp, nil
 				}
-				return Any, &TypeError{
-					Msg: "cast: second argument must be a shape literal",
-					Pos: node.Location().From,
+				if shp == nil {
+					var ok bool
+					if shp, ok = shapeLiteralFromAST(node.Arguments[1]); !ok {
+						return Any, &TypeError{
+							Msg: "cast: second argument must be a shape literal",
+							Pos: node.Location().From,
+						}
+					}
 				}
+				if _, err := shapeOf(node.Arguments[0], sym); err != nil {
+					return shp, err
+				}
+				return shp, nil
 			case "type":
 				if len(node.Arguments) < 1 {
 					return Any, &TypeError{
@@ -494,10 +512,8 @@ func shapeOf(n ast.Node, sym Symbols) (*Shape, error) {
 
 		// Create a new symbol table with the variable binding
 		newSym := make(Symbols)
-		if sym != nil {
-			for k, v := range sym {
-				newSym[k] = v
-			}
+		for k, v := range sym {
+			newSym[k] = v
 		}
 		newSym[node.Name] = valueShape
 
@@ -520,10 +536,8 @@ func shapeOf(n ast.Node, sym Symbols) (*Shape, error) {
 
 				// Create new symbol table with this binding
 				newSym := make(Symbols)
-				if currentSym != nil {
-					for k, v := range currentSym {
-						newSym[k] = v
-					}
+				for k, v := range currentSym {
+					newSym[k] = v
 				}
 				newSym[varDecl.Name] = valueShape
 				currentSym = newSym
