@@ -174,6 +174,33 @@ func Test_shapeOf_ConditionalAndCalls(t *testing.T) {
 	got, err = shapeOf(&ast.ConditionalNode{Exp1: &ast.IntegerNode{Value: 1}, Exp2: &ast.StringNode{Value: "b"}}, nil)
 	require.NoError(t, err)
 	require.True(t, got.Equal(Any))
+	// Conditional: nil in false branch → uses true branch's shape
+	got, err = shapeOf(&ast.ConditionalNode{Exp1: &ast.StringNode{Value: "a"}, Exp2: &ast.NilNode{}}, nil)
+	require.NoError(t, err)
+	require.True(t, got.Equal(String), "expected String but got %v", got)
+	// Conditional: nil in true branch → uses false branch's shape
+	got, err = shapeOf(&ast.ConditionalNode{Exp1: &ast.NilNode{}, Exp2: &ast.IntegerNode{Value: 42}}, nil)
+	require.NoError(t, err)
+	require.True(t, got.Equal(Number), "expected Number but got %v", got)
+	// Conditional: array element with object shape or nil → preserves object shape
+	symsWithErrors := Symbols{
+		"errors": ArrayOf(Object(map[string]*Shape{
+			"type":       String,
+			"http_error": Object(map[string]*Shape{"code": Number}),
+		})),
+	}
+	// Simulates: condition ? errors[0] : nil
+	got, err = shapeOf(&ast.ConditionalNode{
+		Exp1: &ast.MemberNode{
+			Node:     &ast.IdentifierNode{Value: "errors"},
+			Property: &ast.IntegerNode{Value: 0},
+		},
+		Exp2: &ast.NilNode{},
+	}, symsWithErrors)
+	require.NoError(t, err)
+	require.Equal(t, ShapeObject, got.Kind, "expected object shape but got %v", got.Kind)
+	require.NotNil(t, got.Fields, "expected fields to be non-nil")
+	require.Contains(t, got.Fields, "http_error", "should have http_error field")
 
 	// Calls
 	// cast(x, string) → string

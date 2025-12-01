@@ -56,9 +56,9 @@ func dumpLevel(w io.Writer, n *Node, level int) error {
 		return errors.New("unexpected DocumentNode")
 	case html.ElementNode, importNode:
 		if n.Namespace != "" {
-			fmt.Fprintf(w, "<%s %s>", n.Namespace, n.Data.RawString())
+			_, _ = fmt.Fprintf(w, "<%s %s>", n.Namespace, n.Data.RawString())
 		} else {
-			fmt.Fprintf(w, "<%s>", n.Data.RawString())
+			_, _ = fmt.Fprintf(w, "<%s>", n.Data.RawString())
 		}
 		if !n.Cond.IsEmpty() {
 			_, _ = io.WriteString(w, "\n")
@@ -99,11 +99,11 @@ func dumpLevel(w io.Writer, n *Node, level int) error {
 			_, _ = io.WriteString(w, "content")
 		}
 	case html.TextNode:
-		fmt.Fprintf(w, `"%s"`, n.Data.RawString())
+		_, _ = fmt.Fprintf(w, `"%s"`, n.Data.RawString())
 	case html.CommentNode:
-		fmt.Fprintf(w, "<!-- %s -->", n.Data.RawString())
+		_, _ = fmt.Fprintf(w, "<!-- %s -->", n.Data.RawString())
 	case html.DoctypeNode:
-		fmt.Fprintf(w, "<!DOCTYPE %s", n.Data.RawString())
+		_, _ = fmt.Fprintf(w, "<!DOCTYPE %s", n.Data.RawString())
 		if n.Attr != nil {
 			var p, s string
 			for _, a := range n.Attr {

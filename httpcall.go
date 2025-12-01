@@ -14,6 +14,17 @@ import (
 	"github.com/dpotapov/go-pages/chtml"
 )
 
+// HttpCallError is returned when an HTTP call fails (non-2xx status) and IgnoreHttpError is false.
+// It allows the error handler to access the full response details.
+type HttpCallError struct {
+	Response HttpCallResponse `expr:"response"`
+	Args     HttpCallArgs     `expr:"args"`
+}
+
+func (e *HttpCallError) Error() string {
+	return fmt.Sprintf("http call to %s failed with status %d", e.Args.URL, e.Response.Code)
+}
+
 // HttpCallComponent implements a CHTML component for making HTTP requests and storing
 // returned data in the scope.
 type HttpCallComponent struct {
@@ -40,15 +51,20 @@ var _ chtml.Component = &HttpCallComponent{}
 var _ chtml.Disposable = &HttpCallComponent{}
 
 type HttpCallArgs struct {
-	Method            string
-	URL               string
-	Interval          time.Duration
-	BasicAuthUsername string
-	BasicAuthPassword string
+	Method            string        `expr:"method"`
+	URL               string        `expr:"url"`
+	Interval          time.Duration `expr:"interval"`
+	BasicAuthUsername string        `expr:"basic_auth_username"`
+	BasicAuthPassword string        `expr:"basic_auth_password"`
 	Cookies           []*http.Cookie
 	Header            http.Header
 	Query             map[string]any
-	Body              io.Reader // must be at the end
+
+	// IgnoreHttpError if true, prevents returning HttpCallError on non-2xx status codes.
+	// Instead, the full HttpCallResponse object is returned.
+	IgnoreHttpError bool `expr:"ignore_http_error"`
+
+	Body io.Reader // must be at the end
 }
 
 type HttpCallResponse struct {
@@ -74,18 +90,18 @@ func NewHttpCallComponentFactory(router http.Handler) func() chtml.Component {
 	}
 }
 func (c *HttpCallComponent) Render(s chtml.Scope) (any, error) {
-    if c.router == nil {
-        return nil, fmt.Errorf("http router not set")
-    }
+	if c.router == nil {
+		return nil, fmt.Errorf("http router not set")
+	}
 
 	var args HttpCallArgs
 	if err := chtml.UnmarshalScope(s, &args); err != nil {
 		return nil, fmt.Errorf("unmarshal scope: %w", err)
 	}
 
-    if args.URL == "" { // no-op if URL not provided
-        return nil, nil
-    }
+	if args.URL == "" { // no-op if URL not provided
+		return nil, nil
+	}
 
 	// Get cookies from the original request in scope globals if available
 	if sc, ok := s.(*scope); ok && sc.globals != nil && sc.globals.req != nil {
@@ -131,12 +147,30 @@ func (c *HttpCallComponent) Render(s chtml.Scope) (any, error) {
 		}
 	}
 
-	return resp, nil
+	// If IgnoreHttpError is explicitly true, return the full response object
+	// and do not treat non-2xx codes as errors.
+	if args.IgnoreHttpError {
+		return resp, nil
+	}
+
+	// Default behavior: Treat non-2xx as errors
+	if !resp.Success {
+		return nil, &HttpCallError{
+			Response: *resp,
+			Args:     args,
+		}
+	}
+
+	// On success (2xx), return the data directly
+	return resp.Data, nil
 }
 
 func (c *HttpCallComponent) InputShape() *chtml.Shape { return chtml.ShapeOf[HttpCallArgs]() }
 
-func (c *HttpCallComponent) OutputShape() *chtml.Shape { return chtml.ShapeOf[HttpCallResponse]() }
+func (c *HttpCallComponent) OutputShape() *chtml.Shape {
+	// Output shape is dynamic: can return HttpCallResponse (if ignore-http-error) or any (data)
+	return chtml.Any
+}
 
 func (c *HttpCallComponent) Dispose() error {
 	c.mu.Lock()

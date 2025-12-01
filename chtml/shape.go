@@ -166,7 +166,7 @@ func (s *Shape) stringWithVisited(visited map[*Shape]bool) string {
 		if s.Elem != nil && s.Fields == nil {
 			return "{_:" + s.Elem.stringWithVisited(visited) + "}"
 		}
-		
+
 		// Handle regular objects
 		if len(s.Fields) == 0 {
 			return "{}"

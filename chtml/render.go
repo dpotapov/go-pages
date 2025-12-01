@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
@@ -21,7 +22,7 @@ import (
 //     loop variables (this is implemented by the spawning of new components within evalFor method).
 //  3. Render the node and its children, calling the appropriate function based on a node type, and
 //     appending the result to the destination node.
-func (c *chtmlComponent) render(n *Node) any {
+func (c *chtmlComponent) render(n *Node) (any, error) {
 	var res, rr any // res is the accumulated result, rr is the result of the current node/operation
 
 	// Delegate C element entirely to its own renderer to keep this method clean
@@ -29,23 +30,42 @@ func (c *chtmlComponent) render(n *Node) any {
 		return c.renderC(n)
 	}
 
-	if c.evalIf(n) {
-		for c := range c.evalFor(n) {
+	cond, err := c.evalIf(n)
+	if err != nil {
+		return nil, err
+	}
+
+	if cond.shouldRender {
+		defer c.bindVar(cond.bindVar, cond.bindValue)()
+
+		seq, err := c.evalFor(n)
+		if err != nil {
+			return nil, err
+		}
+		for loopComp := range seq {
+			var renderErr error
 			switch n.Type {
 			case html.ElementNode:
-				rr = c.renderElement(n)
+				rr, renderErr = loopComp.renderElement(n)
 			case html.TextNode:
-				rr = c.renderText(n)
+				rr, renderErr = loopComp.renderText(n)
 			case html.CommentNode:
-				rr = c.renderComment(n)
+				rr, renderErr = loopComp.renderComment(n)
 			case html.DocumentNode:
-				rr = c.renderDocument(n)
+				rr, renderErr = loopComp.renderDocument(n)
+			case html.DoctypeNode:
+				// Skip doctype nodes - they should not be rendered to avoid conflicts
+				// when components are nested (e.g., comp1 with doctype imports comp2 with doctype)
+				rr = nil
 			case importNode:
-				rr = c.renderImport(n)
+				rr, renderErr = loopComp.renderImport(n)
 			default:
-				c.error(n, fmt.Errorf("unexpected node type: %v", n.Type))
+				return nil, newComponentError(n, fmt.Errorf("unexpected node type: %v", n.Type))
 			}
 
+			if renderErr != nil {
+				return nil, renderErr
+			}
 			res = AnyPlusAny(res, rr)
 		}
 	}
@@ -54,47 +74,47 @@ func (c *chtmlComponent) render(n *Node) any {
 	if n.RenderShape != nil {
 		convertedRes, convErr := convertToRenderShape(res, n.RenderShape)
 		if convErr != nil {
-			c.error(n, fmt.Errorf("convert to render shape: %w", convErr))
-			return nil
+			return nil, newComponentError(n, fmt.Errorf("convert to render shape: %w", convErr))
 		}
-		return convertedRes
+		return convertedRes, nil
 	}
-	return res
+	return res, nil
 }
 
 // renderText evaluates the interpolated expression for the given text node and stores the result in
 // the destination node.
 // If the text node is not an expression, the value is copied as is.
-func (c *chtmlComponent) renderText(n *Node) any {
+func (c *chtmlComponent) renderText(n *Node) (any, error) {
 	res, err := n.Data.Value(&c.vm, c.env)
 	if err != nil {
-		c.error(n, fmt.Errorf("eval text: %w", err))
-		return nil
+		return nil, newComponentError(n, fmt.Errorf("eval text: %w", err))
 	}
 
-	return res
+	return res, nil
 }
 
-func (c *chtmlComponent) renderComment(n *Node) *html.Node {
+func (c *chtmlComponent) renderComment(n *Node) (*html.Node, error) {
 	if c.renderComments {
 		data, err := n.Data.Value(&c.vm, c.env)
 		if err != nil {
-			c.error(n, fmt.Errorf("eval comment: %w", err))
-			return nil
+			return nil, newComponentError(n, fmt.Errorf("eval comment: %w", err))
 		}
 		return &html.Node{
 			Type: html.CommentNode,
 			Data: fmt.Sprint(data),
-		}
+		}, nil
 	}
-	return nil
+	return nil, nil
 }
 
-func (c *chtmlComponent) renderDocument(n *Node) any {
+func (c *chtmlComponent) renderDocument(n *Node) (any, error) {
 	var res any
 
 	for child := n.FirstChild; child != nil; child = child.NextSibling {
-		rr := c.render(child)
+		rr, err := c.render(child)
+		if err != nil {
+			return nil, err
+		}
 		if rr == nil {
 			continue
 		}
@@ -106,10 +126,10 @@ func (c *chtmlComponent) renderDocument(n *Node) any {
 			res = AnyPlusAny(res, rr)
 		}
 	}
-	return res
+	return res, nil
 }
 
-func (c *chtmlComponent) renderElement(n *Node) any {
+func (c *chtmlComponent) renderElement(n *Node) (any, error) {
 	clone := &html.Node{
 		Type:     html.ElementNode,
 		DataAtom: n.DataAtom,
@@ -118,22 +138,23 @@ func (c *chtmlComponent) renderElement(n *Node) any {
 
 	// eval attributes into values for the cloned node
 	if err := c.renderAttrs(clone, n); err != nil {
-		c.error(n, fmt.Errorf("eval attributes: %w", err))
-		return nil
+		return nil, newComponentError(n, fmt.Errorf("eval attributes: %w", err))
 	}
 
 	var res any
 
 	for child := n.FirstChild; child != nil; child = child.NextSibling {
-		rr := c.render(child)
+		rr, err := c.render(child)
+		if err != nil {
+			return nil, err
+		}
 		if rr == nil {
 			continue
 		}
 		if attr, ok := rr.(Attribute); ok {
 			v, err := attr.Val.Value(&c.vm, c.env)
 			if err != nil {
-				c.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
-				continue
+				return nil, newComponentError(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
 			}
 			clone.Attr = append(clone.Attr, html.Attribute{
 				Namespace: attr.Namespace,
@@ -157,18 +178,17 @@ func (c *chtmlComponent) renderElement(n *Node) any {
 		}
 	}
 
-	return clone
+	return clone, nil
 }
 
 // renderImport renders the imported component (<c:NAME>) and appends the result to the destination.
-func (c *chtmlComponent) renderImport(n *Node) any {
+func (c *chtmlComponent) renderImport(n *Node) (any, error) {
 	// Build variables for the imported component
 	vars := make(map[string]any)
 	for _, attr := range n.Attr {
 		res, err := attr.Val.Value(&c.vm, c.env)
 		if err != nil {
-			c.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
-			return nil
+			return nil, newComponentError(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
 		}
 		snake := toSnakeCase(attr.Key)
 		vars[snake] = res
@@ -178,12 +198,14 @@ func (c *chtmlComponent) renderImport(n *Node) any {
 		vars["_"] = nil
 
 		for child := n.FirstChild; child != nil; child = child.NextSibling {
-			rr := c.render(child)
+			rr, err := c.render(child)
+			if err != nil {
+				return nil, err
+			}
 			if attr, ok := rr.(Attribute); ok {
 				v, errAttr := attr.Val.Value(&c.vm, c.env)
 				if errAttr != nil {
-					c.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, errAttr))
-					return nil
+					return nil, newComponentError(n, fmt.Errorf("eval attr %q: %w", attr.Key, errAttr))
 				}
 				vars[attr.Key] = v
 			} else {
@@ -202,26 +224,22 @@ func (c *chtmlComponent) renderImport(n *Node) any {
 	} else {
 		impName, err := n.Data.Value(&c.vm, c.env)
 		if err != nil {
-			c.error(n, fmt.Errorf("eval import name: %w", err))
-			return nil
+			return nil, newComponentError(n, fmt.Errorf("eval import name: %w", err))
 		}
 		impNameStr, ok := impName.(string)
 		if !ok {
-			c.error(n, fmt.Errorf("import name must be a string"))
-			return nil
+			return nil, newComponentError(n, fmt.Errorf("import name must be a string"))
 		}
 		imp := c.importer
 		if impNameStr == "c:attr" {
 			imp = &builtinImporter{}
 		}
 		if imp == nil {
-			c.error(n, ErrImportNotAllowed)
-			return nil
+			return nil, newComponentError(n, ErrImportNotAllowed)
 		}
 		comp, err = imp.Import(impNameStr[2:])
 		if err != nil {
-			c.error(n, fmt.Errorf("import %q: %w", impNameStr, err))
-			return nil
+			return nil, newComponentError(n, fmt.Errorf("import %q: %w", impNameStr, err))
 		}
 
 		// save component for reuse:
@@ -241,16 +259,14 @@ func (c *chtmlComponent) renderImport(n *Node) any {
 						if str == "" {
 							raw = true
 						} else {
-							c.error(n, &DecodeError{Key: key, Err: fmt.Errorf("string value %q cannot be converted to bool, use ${true|false} syntax instead", str)})
-							return nil
+							return nil, newComponentError(n, &DecodeError{Key: key, Err: fmt.Errorf("string value %q cannot be converted to bool, use ${true|false} syntax instead", str)})
 						}
 					}
 				}
 				if fieldShape != nil && fieldShape != Any {
 					converted, convErr := convertToRenderShape(raw, fieldShape)
 					if convErr != nil {
-						c.error(n, &DecodeError{Key: key, Err: convErr})
-						return nil
+						return nil, newComponentError(n, &DecodeError{Key: key, Err: convErr})
 					}
 					vars[key] = converted
 				}
@@ -260,18 +276,23 @@ func (c *chtmlComponent) renderImport(n *Node) any {
 
 	rr, errRender := comp.Render(s)
 	if errRender != nil {
-		c.error(n, fmt.Errorf("render import %s: %w", n.Data.RawString(), errRender))
-		return nil
+		return nil, newComponentError(n, fmt.Errorf("render import %s: %w", n.Data.RawString(), errRender))
 	}
-	return rr
+	return rr, nil
 }
 
 // renderC renders the <c> special element: passthrough, var binding, loops, conditionals
-func (c *chtmlComponent) renderC(n *Node) any {
+func (c *chtmlComponent) renderC(n *Node) (any, error) {
 	// Handle conditionals first
-	if !c.evalIf(n) {
-		return nil
+	cond, err := c.evalIf(n)
+	if err != nil {
+		return nil, err
 	}
+	if !cond.shouldRender {
+		return nil, nil
+	}
+
+	defer c.bindVar(cond.bindVar, cond.bindValue)()
 
 	// Determine var name if present (snake_case for consistency)
 	var varName string
@@ -284,11 +305,18 @@ func (c *chtmlComponent) renderC(n *Node) any {
 
 	var agg any
 	// Iterate (or single pass if no loop)
-	for childComp := range c.evalFor(n) {
+	seq, err := c.evalFor(n)
+	if err != nil {
+		return nil, err
+	}
+	for childComp := range seq {
 		// Render children of <c>
 		var iterRes any
 		for child := n.FirstChild; child != nil; child = child.NextSibling {
-			rr := childComp.render(child)
+			rr, err := childComp.render(child)
+			if err != nil {
+				return nil, err
+			}
 			iterRes = AnyPlusAny(iterRes, rr)
 		}
 		agg = AnyPlusAny(agg, iterRes)
@@ -297,26 +325,34 @@ func (c *chtmlComponent) renderC(n *Node) any {
 	// If var present, bind aggregated content into env and suppress output
 	if varName != "" {
 		if _, exists := c.env[varName]; !exists || c.env[varName] == nil {
-			// Perform type conversion if explicit shape is provided
+			// Perform cast validation and type conversion if explicit shape is provided
 			finalValue := agg
 			if n.VarShape != nil && n.VarShape.Kind != ShapeString && isWhitespaceString(finalValue) {
 				finalValue = nil
 			}
 			if n.VarShape != nil {
+				// Validate the shape (cast semantics)
+				if err := validateShape(finalValue, n.VarShape, ""); err != nil {
+					return nil, newComponentError(n, &CastError{
+						Expected: n.VarShape,
+						Actual:   finalValue,
+						Err:      err,
+					})
+				}
+				// Then perform type coercion
 				converted, err := convertToRenderShape(finalValue, n.VarShape)
 				if err != nil {
-					c.error(n, fmt.Errorf("cannot convert %T to %s: %w", finalValue, n.VarShape.String(), err))
-					return nil
+					return nil, newComponentError(n, fmt.Errorf("cannot convert %T to %s: %w", finalValue, n.VarShape.String(), err))
 				}
 				finalValue = converted
 			}
 			c.env[varName] = finalValue
 		}
-		return nil
+		return nil, nil
 	}
 
 	// Passthrough mode: return aggregated content (or nil if none)
-	return agg
+	return agg, nil
 }
 
 // renderAttrs loops over the attributes of the source node and evaluates the expressions for them.
@@ -328,8 +364,7 @@ func (c *chtmlComponent) renderAttrs(dst *html.Node, n *Node) error {
 	for _, attr := range n.Attr {
 		v, err := attr.Val.Value(&c.vm, c.env)
 		if err != nil {
-			c.error(n, fmt.Errorf("eval attr %q: %w", attr.Key, err))
-			continue
+			return fmt.Errorf("eval attr %q: %w", attr.Key, err)
 		}
 
 		// special case for inputs:
@@ -373,49 +408,40 @@ func (c *chtmlComponent) renderAttrs(dst *html.Node, n *Node) error {
 	return nil
 }
 
+// condResult contains the result of evaluating a condition.
+type condResult struct {
+	shouldRender bool
+	bindVar      string // Variable name to bind (empty if none)
+	bindValue    any    // Value to bind
+}
+
 // evalIf evaluates the conditional expression (c:if, c:else-if, c:else) for the given node and
 // marks it as hidden if the condition is false.
-// Returns true if the node should be rendered, false otherwise.
-func (c *chtmlComponent) evalIf(n *Node) bool {
+// Returns the result indicating whether to render and any variable to bind.
+// For conditions with shape matching ("EXPR is SHAPE as IDENT"), also returns the bound variable info.
+func (c *chtmlComponent) evalIf(n *Node) (condResult, error) {
 	if n.Cond.IsEmpty() {
-		return true // no condition, render by default
+		return condResult{shouldRender: true}, nil // no condition, render by default
 	}
 
 	if _, ok := c.hidden[n]; ok {
 		delete(c.hidden, n) // reset hidden state for the next rendering cycle
-		return false
+		return condResult{shouldRender: false}, nil
 	}
 
-	render := true
-
+	// Evaluate the expression
 	res, err := n.Cond.Value(&c.vm, c.env)
 	if err != nil {
-		c.error(n, fmt.Errorf("eval c:if: %w", err))
-		render = false
-	} else {
-		switch v := res.(type) {
-		case bool:
-			render = v
-		case string:
-			render = v != ""
-		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-			render = v != 0
-		case float32, float64:
-			render = v != 0.0
-		case nil:
-			render = false
-		default:
-			// check if the value is a non-empty slice
-			rv := reflect.ValueOf(res)
-			if rv.Kind() == reflect.Slice && rv.Len() == 0 {
-				render = false
-			}
-			// check if the value is a non-empty map
-			if rv.Kind() == reflect.Map && rv.Len() == 0 {
-				render = false
-			}
-		}
+		return condResult{}, newComponentError(n, fmt.Errorf("eval c:if: %w", err))
 	}
+
+	// Check if this is a shape matching condition
+	if n.Cond.IsMatchCond() {
+		return c.evalIfWithMatch(n, res)
+	}
+
+	// Regular condition - check truthiness
+	render := isTruthy(res)
 
 	if render {
 		// mark next conditional as not rendered
@@ -426,31 +452,170 @@ func (c *chtmlComponent) evalIf(n *Node) bool {
 	} else {
 		c.closeChildren(n, 0)
 	}
-	return render
+	return condResult{shouldRender: render}, nil
+}
+
+// evalIfWithMatch handles conditions with shape matching ("EXPR is SHAPE as IDENT").
+func (c *chtmlComponent) evalIfWithMatch(n *Node, res any) (condResult, error) {
+	cond := n.Cond
+
+	// Check if the value matches the shape
+	matched := matchShape(res, cond.Shape())
+
+	result := condResult{shouldRender: matched}
+
+	if matched {
+		// Prepare variable binding info if specified
+		if cond.BindVar() != "" {
+			result.bindVar = toSnakeCase(cond.BindVar())
+			result.bindValue = res
+		}
+
+		// mark next conditional as not rendered
+		for next := n.NextCond; next != nil; next = next.NextCond {
+			c.hidden[next] = struct{}{}
+			c.closeChildren(next, 0)
+		}
+	} else {
+		c.closeChildren(n, 0)
+	}
+
+	return result, nil
+}
+
+// isTruthy returns true if the value is considered truthy for conditional rendering.
+func isTruthy(res any) bool {
+	switch v := res.(type) {
+	case bool:
+		return v
+	case string:
+		return v != ""
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		return v != 0
+	case float32, float64:
+		return v != 0.0
+	case nil:
+		return false
+	default:
+		// check if the value is a non-empty slice
+		rv := reflect.ValueOf(res)
+		if rv.Kind() == reflect.Slice && rv.Len() == 0 {
+			return false
+		}
+		// check if the value is a non-empty map
+		if rv.Kind() == reflect.Map && rv.Len() == 0 {
+			return false
+		}
+		return true
+	}
+}
+
+// matchShape checks if a value structurally matches the expected shape.
+// This is used for "EXPR is SHAPE" conditional matching.
+// Unlike validateShape (which is for casting), this returns false for nil values
+// since nil represents the absence of a value.
+func matchShape(v any, shape *Shape) bool {
+	// nil doesn't match any shape (design choice for pattern matching)
+	if v == nil || isTypedNil(v) {
+		return false
+	}
+
+	// nil shape or Any accepts everything (except nil, handled above)
+	if shape == nil || shape == Any {
+		return true
+	}
+
+	switch shape.Kind {
+	case ShapeBool:
+		_, ok := v.(bool)
+		return ok
+
+	case ShapeString:
+		_, ok := v.(string)
+		return ok
+
+	case ShapeNumber:
+		switch v.(type) {
+		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+			return true
+		default:
+			return false
+		}
+
+	case ShapeArray:
+		rv := reflect.ValueOf(v)
+		if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
+			return false
+		}
+		// For array matching, we don't validate each element shape
+		// (that would be too strict for pattern matching)
+		return true
+
+	case ShapeObject:
+		rv := reflect.ValueOf(v)
+		// Dereference pointers to get the underlying type
+		for rv.Kind() == reflect.Ptr {
+			if rv.IsNil() {
+				return false
+			}
+			rv = rv.Elem()
+		}
+
+		// Handle map[string]any
+		if m, ok := v.(map[string]any); ok {
+			if shape.Fields != nil {
+				// Check that all required fields exist and match their shapes
+				for k, fieldShape := range shape.Fields {
+					val, exists := m[k]
+					if !exists {
+						// Missing field is not a match
+						return false
+					}
+					if !matchShape(val, fieldShape) {
+						return false
+					}
+				}
+			}
+			return true
+		}
+
+		// Handle structs and other object types
+		if rv.Kind() == reflect.Struct || rv.Kind() == reflect.Map {
+			return true
+		}
+
+		return false
+
+	case ShapeHtml, ShapeHtmlAttr:
+		// HTML shapes accept any value for matching purposes
+		return true
+
+	default:
+		return true
+	}
 }
 
 // evalFor evaluates the loop expression (c:for) for the given node and updates the environment
 // with the loop variables.
 // If no loop expression is present, the function return true only once (assuming that the node
 // should be rendered by default).
-func (c *chtmlComponent) evalFor(n *Node) iter.Seq[*chtmlComponent] {
+func (c *chtmlComponent) evalFor(n *Node) (iter.Seq[*chtmlComponent], error) {
 	if n.Loop.IsEmpty() {
 		return func(yield func(*chtmlComponent) bool) {
 			yield(c)
-		}
+		}, nil
 	}
 
 	res, err := n.Loop.Value(&c.vm, c.env)
 	if err != nil {
-		c.error(n, fmt.Errorf("eval c:for: %w", err))
 		c.closeChildren(n, 0)
-		return func(yield func(*chtmlComponent) bool) {}
+		return nil, newComponentError(n, fmt.Errorf("eval c:for: %w", err))
 	}
 	v := reflect.ValueOf(res)
 
 	if res == nil || !v.IsValid() {
 		c.closeChildren(n, 0)
-		return func(yield func(*chtmlComponent) bool) {}
+		return func(yield func(*chtmlComponent) bool) {}, nil
 	}
 
 	switch v.Kind() {
@@ -480,7 +645,7 @@ func (c *chtmlComponent) evalFor(n *Node) iter.Seq[*chtmlComponent] {
 						loopComp = childComp
 						loopComp.env = loopEnv
 					} else {
-						c.error(n, fmt.Errorf("unexpected node type: %T", c.children[n][i]))
+						// Internal error - shouldn't happen in normal usage
 						continue
 					}
 				} else {
@@ -492,7 +657,7 @@ func (c *chtmlComponent) evalFor(n *Node) iter.Seq[*chtmlComponent] {
 					break
 				}
 			}
-		}
+		}, nil
 	case reflect.Map:
 		return func(yield func(*chtmlComponent) bool) {
 			mapKeys := v.MapKeys()
@@ -516,7 +681,7 @@ func (c *chtmlComponent) evalFor(n *Node) iter.Seq[*chtmlComponent] {
 				loopEnv[n.LoopVar] = val.Interface()
 				if n.LoopIdx != "" {
 					if key.Kind() != reflect.String {
-						c.error(n, fmt.Errorf("c:for map iteration requires string keys"))
+						// Skip non-string keys silently
 						continue
 					}
 					loopEnv[n.LoopIdx] = key.String()
@@ -528,7 +693,7 @@ func (c *chtmlComponent) evalFor(n *Node) iter.Seq[*chtmlComponent] {
 						loopComp = childComp
 						loopComp.env = loopEnv
 					} else {
-						c.error(n, fmt.Errorf("unexpected node type: %T", c.children[n][i]))
+						// Internal error - shouldn't happen in normal usage
 						continue
 					}
 				} else {
@@ -540,11 +705,10 @@ func (c *chtmlComponent) evalFor(n *Node) iter.Seq[*chtmlComponent] {
 					break
 				}
 			}
-		}
+		}, nil
 	default:
-		c.error(n, fmt.Errorf("c:for expression must return slice, array, or map, got %v", v.Kind()))
 		c.closeChildren(n, 0)
-		return func(yield func(*chtmlComponent) bool) {}
+		return nil, newComponentError(n, fmt.Errorf("c:for expression must return slice, array, or map, got %v", v.Kind()))
 	}
 }
 
@@ -558,13 +722,147 @@ func (c *chtmlComponent) newChildComponent(doc *Node, env map[string]any) *chtml
 		renderComments: c.renderComments,
 		hidden:         c.hidden,
 		children:       make(map[*Node][]Component),
-		errs:           nil, // child component starts with no errors
 	}
 }
 
-func (c *chtmlComponent) scopeHasVar(v string) bool {
-	_, ok := c.scope.Vars()[v]
-	return ok
+// bindVar temporarily binds a variable in the environment and returns a cleanup function.
+// If name is empty, returns a no-op cleanup function.
+// The cleanup function restores the previous value (or deletes the var if it didn't exist).
+func (c *chtmlComponent) bindVar(name string, value any) func() {
+	if name == "" {
+		return func() {}
+	}
+	oldValue, existed := c.env[name]
+	c.env[name] = value
+	return func() {
+		if existed {
+			c.env[name] = oldValue
+		} else {
+			delete(c.env, name)
+		}
+	}
+}
+
+// fmtShapeError formats a shape validation error with path context.
+func fmtShapeError(path, expected string, v any) error {
+	if path == "" {
+		return fmt.Errorf("expected %s, got %T", expected, v)
+	}
+	return fmt.Errorf("at %s: expected %s, got %T", path, expected, v)
+}
+
+// validateShape checks if a value structurally matches the expected shape.
+// It returns an error if the value cannot be cast to the shape.
+//
+// Semantics:
+//   - Missing fields in objects are allowed (will be zero-filled by convertToRenderShape)
+//   - Extra fields in objects are allowed (structural subtyping)
+//   - nil values are allowed for any shape (will be zero-filled)
+//   - ShapeNumber accepts strings (actual parsing/validation happens in convertToRenderShape)
+//   - ShapeString accepts any value (will be stringified)
+//
+// The path parameter tracks the location for nested error messages (e.g., "[0].field").
+func validateShape(v any, shape *Shape, path string) error {
+	if shape == nil || shape == Any {
+		return nil // Any accepts everything
+	}
+
+	// Handle nil values - they're only valid if the shape allows them
+	if v == nil || isTypedNil(v) {
+		// nil is acceptable for any shape (will be zero-filled)
+		return nil
+	}
+
+	switch shape.Kind {
+	case ShapeBool:
+		if _, ok := v.(bool); !ok {
+			return fmtShapeError(path, "bool", v)
+		}
+		return nil
+
+	case ShapeString:
+		// String accepts any value (will be stringified)
+		return nil
+
+	case ShapeNumber:
+		switch v.(type) {
+		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+			return nil
+		case time.Duration:
+			// time.Duration is int64 under the hood
+			return nil
+		case string:
+			// Strings are accepted here; actual numeric parsing and validation
+			// happens in convertToRenderShape. Invalid strings like "hello"
+			// will fail there, not here. This allows form inputs and JSON
+			// string numbers to pass shape validation.
+			return nil
+		default:
+			return fmtShapeError(path, "number", v)
+		}
+
+	case ShapeArray:
+		rv := reflect.ValueOf(v)
+		if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
+			return fmtShapeError(path, "array", v)
+		}
+		// Validate each element
+		for i := 0; i < rv.Len(); i++ {
+			elem := rv.Index(i).Interface()
+			elemPath := fmt.Sprintf("%s[%d]", path, i)
+			if err := validateShape(elem, shape.Elem, elemPath); err != nil {
+				return err
+			}
+		}
+		return nil
+
+	case ShapeObject:
+		rv := reflect.ValueOf(v)
+		// Dereference pointers to get the underlying type
+		for rv.Kind() == reflect.Ptr {
+			if rv.IsNil() {
+				return nil // nil pointer is acceptable (will be zero-filled)
+			}
+			rv = rv.Elem()
+		}
+		// Handle map[string]any
+		if m, ok := v.(map[string]any); ok {
+			if shape.Fields != nil {
+				// Validate each declared field
+				for k, fieldShape := range shape.Fields {
+					fieldPath := path
+					if fieldPath == "" {
+						fieldPath = k
+					} else {
+						fieldPath = fmt.Sprintf("%s.%s", path, k)
+					}
+					if val, exists := m[k]; exists {
+						if err := validateShape(val, fieldShape, fieldPath); err != nil {
+							return err
+						}
+					}
+					// Missing fields are allowed (will be zero-filled)
+				}
+			}
+			return nil
+		}
+		// Handle structs and pointers to structs - allow them to pass through
+		if rv.Kind() == reflect.Struct {
+			return nil
+		}
+		// Other object-like types are acceptable
+		if rv.Kind() == reflect.Map {
+			return nil
+		}
+		return fmtShapeError(path, "object", v)
+
+	case ShapeHtml, ShapeHtmlAttr:
+		// HTML shapes accept various types (will be converted)
+		return nil
+
+	default:
+		return nil // Unknown shapes are permissive
+	}
 }
 
 func convertToRenderShape(v any, shape *Shape) (any, error) {
@@ -603,6 +901,9 @@ func convertToRenderShape(v any, shape *Shape) (any, error) {
 		switch vv := v.(type) {
 		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
 			return vv, nil
+		case time.Duration:
+			// time.Duration is int64 under the hood
+			return int64(vv), nil
 		case string:
 			// Accept numeric strings (e.g. from http forms) and convert to float64
 			// Downstream code may convert to specific int/float types as needed.
