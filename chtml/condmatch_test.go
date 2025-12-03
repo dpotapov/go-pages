@@ -436,3 +436,79 @@ func TestCondMatchEdgeCases(t *testing.T) {
 		})
 	}
 }
+
+// structWithResponse is a test struct with expr-tagged fields that matches { response: { code: number } }
+type structWithResponse struct {
+	Response structResponse `expr:"response"`
+}
+
+type structResponse struct {
+	Code int `expr:"code"`
+}
+
+// structWithoutResponse is a test struct that does NOT have a "response" field
+type structWithoutResponse struct {
+	Message string `expr:"message"`
+	Status  int    `expr:"status"`
+}
+
+func TestCondMatchStructWithExprTags(t *testing.T) {
+	tests := []struct {
+		name string
+		text string
+		want any
+		vars map[string]any
+	}{
+		{
+			name: "struct with expr tags matches object shape",
+			text: `<p c:if="err is { response: { code: number } } as e">code: ${ e.response.code }</p><p c:else>no match</p>`,
+			want: "<p>code: 404</p>",
+			vars: map[string]any{"err": &structWithResponse{Response: structResponse{Code: 404}}},
+		},
+		{
+			name: "struct without matching fields does not match",
+			text: `<p c:if="err is { response: { code: number } }">matched</p><p c:else>no match</p>`,
+			want: "<p>no match</p>",
+			vars: map[string]any{"err": &structWithoutResponse{Message: "error", Status: 500}},
+		},
+		{
+			name: "struct with partial fields does not match",
+			text: `<p c:if="err is { response: { code: number } }">matched</p><p c:else>no match</p>`,
+			want: "<p>no match</p>",
+			// This struct has "response" but response doesn't have "code"
+			vars: map[string]any{"err": struct {
+				Response struct {
+					Message string `expr:"message"`
+				} `expr:"response"`
+			}{Response: struct {
+				Message string `expr:"message"`
+			}{Message: "test"}}},
+		},
+		{
+			name: "struct with deeper nesting matches",
+			text: `<p c:if="data is { user: { profile: { name: string } } } as d">name: ${ d.user.profile.name }</p><p c:else>no match</p>`,
+			want: "<p>name: Alice</p>",
+			vars: map[string]any{"data": struct {
+				User struct {
+					Profile struct {
+						Name string `expr:"name"`
+					} `expr:"profile"`
+				} `expr:"user"`
+			}{User: struct {
+				Profile struct {
+					Name string `expr:"name"`
+				} `expr:"profile"`
+			}{Profile: struct {
+				Name string `expr:"name"`
+			}{Name: "Alice"}}}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := testRenderCase(tt.text, tt.want, tt.vars, nil); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+}
