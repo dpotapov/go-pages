@@ -579,8 +579,26 @@ func matchShape(v any, shape *Shape) bool {
 			return true
 		}
 
-		// Handle structs and other object types
-		if rv.Kind() == reflect.Struct || rv.Kind() == reflect.Map {
+		// Handle structs - check required fields if specified
+		if rv.Kind() == reflect.Struct {
+			if shape.Fields == nil {
+				return true // no specific fields required
+			}
+			// Check that all required fields exist and match their shapes
+			for k, fieldShape := range shape.Fields {
+				val, found := getStructFieldValue(rv, k)
+				if !found {
+					return false
+				}
+				if !matchShape(val, fieldShape) {
+					return false
+				}
+			}
+			return true
+		}
+
+		// Handle other map types (non map[string]any)
+		if rv.Kind() == reflect.Map {
 			return true
 		}
 
@@ -593,6 +611,48 @@ func matchShape(v any, shape *Shape) bool {
 	default:
 		return true
 	}
+}
+
+// getStructFieldValue retrieves a field value from a struct by name.
+// It checks expr tag, json tag, and snake_case conversion of field names.
+// Returns the value and true if found, or nil and false if not found.
+func getStructFieldValue(rv reflect.Value, name string) (any, bool) {
+	rt := rv.Type()
+	for i := 0; i < rt.NumField(); i++ {
+		f := rt.Field(i)
+		if f.PkgPath != "" { // unexported
+			continue
+		}
+
+		// Check if field name matches (expr tag, json tag, or snake_case)
+		fieldName := f.Tag.Get("expr")
+		if fieldName == "" {
+			fieldName = f.Tag.Get("json")
+			// json tag may include options (e.g., ",omitempty")
+			if idx := strings.IndexByte(fieldName, ','); idx >= 0 {
+				fieldName = fieldName[:idx]
+			}
+		}
+		if fieldName == "" {
+			fieldName = toSnakeCase(f.Name)
+		}
+		if fieldName == "-" || fieldName == "" {
+			continue
+		}
+
+		if fieldName == name {
+			fv := rv.Field(i)
+			// Dereference pointers
+			for fv.Kind() == reflect.Ptr {
+				if fv.IsNil() {
+					return nil, true // field exists but is nil
+				}
+				fv = fv.Elem()
+			}
+			return fv.Interface(), true
+		}
+	}
+	return nil, false
 }
 
 // evalFor evaluates the loop expression (c:for) for the given node and updates the environment
