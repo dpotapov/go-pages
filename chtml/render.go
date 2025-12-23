@@ -575,6 +575,13 @@ func matchShape(v any, shape *Shape) bool {
 						return false
 					}
 				}
+			} else if shape.Elem != nil {
+				// Check that all values match the element shape
+				for _, val := range m {
+					if !matchShape(val, shape.Elem) {
+						return false
+					}
+				}
 			}
 			return true
 		}
@@ -1015,6 +1022,12 @@ func convertToRenderShape(v any, shape *Shape) (any, error) {
 						}
 					} else {
 						m[k] = zeroValueForShape(fs)
+					}
+				}
+			} else if shape.Elem != nil {
+				for k, val := range m {
+					if conv, err := convertToRenderShape(val, shape.Elem); err == nil {
+						m[k] = conv
 					}
 				}
 			}
