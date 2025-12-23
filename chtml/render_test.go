@@ -996,6 +996,12 @@ func TestCElementTypeCasting(t *testing.T) {
 			vars:     nil,
 			want:     `<div><span>Text</span>123</div>`,
 		},
+		{
+			name:     "map with value shape zero-filling",
+			template: `<c var="m {_: {a: string, b: bool}}">${{"key1": {a: "val"}}}</c><p>${m.key1.a}|${m.key1.b}</p>`,
+			vars:     nil,
+			want:     `<p>val|false</p>`,
+		},
 	}
 
 	for _, tt := range tests {
