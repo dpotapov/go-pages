@@ -672,6 +672,58 @@ func (t *testImporter) Import(name string) (Component, error) {
 	return nil, ErrComponentNotFound
 }
 
+type captureContextComponent struct {
+	got CHTMLContext
+}
+
+var _ Component = (*captureContextComponent)(nil)
+
+func (c *captureContextComponent) Render(s Scope) (any, error) {
+	if cs, ok := s.(CHTMLScope); ok {
+		c.got = cs.CHTMLContext()
+	}
+	return nil, nil
+}
+
+func (c *captureContextComponent) InputShape() *Shape  { return nil }
+func (c *captureContextComponent) OutputShape() *Shape { return nil }
+
+type captureContextImporter struct {
+	comp *captureContextComponent
+}
+
+func (i *captureContextImporter) Import(name string) (Component, error) {
+	if name == "markdown" {
+		return i.comp, nil
+	}
+	return nil, ErrComponentNotFound
+}
+
+func TestRenderImportSetsCHTMLContext(t *testing.T) {
+	importer := &captureContextImporter{comp: &captureContextComponent{}}
+
+	doc, err := ParseWithSource("docs/page.chtml", strings.NewReader(`<c:markdown file="./README.md" />`), importer)
+	if err != nil {
+		t.Fatalf("parse with source: %v", err)
+	}
+
+	comp := NewComponent(doc, &ComponentOptions{Importer: importer})
+	if _, err := comp.Render(NewBaseScope(nil)); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+
+	got := importer.comp.got
+	if got.CallerFile != "docs/page.chtml" {
+		t.Fatalf("caller file = %q, want %q", got.CallerFile, "docs/page.chtml")
+	}
+	if got.CallerDir != "docs" {
+		t.Fatalf("caller dir = %q, want %q", got.CallerDir, "docs")
+	}
+	if got.ImportName != "markdown" {
+		t.Fatalf("import name = %q, want %q", got.ImportName, "markdown")
+	}
+}
+
 // MyString is a custom string type for testing convertibility.
 type MyString string
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path"
 	"reflect"
 	"strconv"
 	"strings"
@@ -40,14 +41,37 @@ type Scope interface {
 	Touch()
 }
 
+// CHTMLContext describes invocation metadata for imported components.
+// CallerFile and CallerDir refer to the source component that invoked the import.
+type CHTMLContext struct {
+	CallerFile string
+	CallerDir  string
+	ImportName string
+}
+
+// CHTMLScope is an optional Scope extension that exposes invocation metadata.
+type CHTMLScope interface {
+	Scope
+	CHTMLContext() CHTMLContext
+}
+
+// CHTMLScopeSetter is an optional Scope extension used by the renderer to
+// propagate CHTML invocation metadata to child scopes.
+type CHTMLScopeSetter interface {
+	SetCHTMLContext(CHTMLContext)
+}
+
 // BaseScope is a base implementation of the Scope interface. For extra functionality, this type
 // can be wrapped (embedded) in a custom scope implementation.
 type BaseScope struct {
 	vars    map[string]any
 	touched chan struct{}
+	ctx     CHTMLContext
 }
 
 var _ Scope = (*BaseScope)(nil)
+var _ CHTMLScope = (*BaseScope)(nil)
+var _ CHTMLScopeSetter = (*BaseScope)(nil)
 
 func NewBaseScope(vars map[string]any) *BaseScope {
 	t := make(chan struct{}, 1)
@@ -62,6 +86,7 @@ func (s *BaseScope) Spawn(vars map[string]any) Scope {
 	return &BaseScope{
 		vars:    vars,
 		touched: s.touched, // all children share the same channel to notify root scope
+		ctx:     s.ctx,
 	}
 }
 
@@ -74,6 +99,18 @@ func (s *BaseScope) Touch() {
 	case s.touched <- struct{}{}:
 	default:
 	}
+}
+
+func (s *BaseScope) CHTMLContext() CHTMLContext {
+	return s.ctx
+}
+
+func (s *BaseScope) SetCHTMLContext(ctx CHTMLContext) {
+	// Derive caller directory from caller file for convenience when omitted.
+	if ctx.CallerDir == "" && ctx.CallerFile != "" {
+		ctx.CallerDir = path.Dir(ctx.CallerFile)
+	}
+	s.ctx = ctx
 }
 
 func (s *BaseScope) Touched() <-chan struct{} {
