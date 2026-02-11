@@ -3,6 +3,7 @@ package chtml
 import (
 	"fmt"
 	"iter"
+	"path"
 	"reflect"
 	"sort"
 	"strconv"
@@ -214,8 +215,22 @@ func (c *chtmlComponent) renderImport(n *Node) (any, error) {
 		}
 	}
 
+	ctx := CHTMLContext{
+		CallerFile: n.Source.File,
+		ImportName: strings.TrimPrefix(n.Data.RawString(), "c:"),
+	}
+	if ctx.CallerFile != "" {
+		ctx.CallerDir = path.Dir(ctx.CallerFile)
+	}
+	if ctx.ImportName == "" {
+		ctx.ImportName = n.Data.RawString()
+	}
+
 	// Create a new Scope for the imported component
 	s := c.scope.Spawn(vars)
+	if setter, ok := s.(CHTMLScopeSetter); ok {
+		setter.SetCHTMLContext(ctx)
+	}
 
 	// try to use an existing instance of the component:
 	var comp Component

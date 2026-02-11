@@ -72,6 +72,23 @@ func TestBaseScope_Touch(t *testing.T) {
 	}
 }
 
+func TestBaseScope_CHTMLContext(t *testing.T) {
+	parent := NewBaseScope(nil)
+	parent.SetCHTMLContext(CHTMLContext{
+		CallerFile: "docs/page.chtml",
+		ImportName: "markdown",
+	})
+
+	if got, want := parent.CHTMLContext().CallerDir, "docs"; got != want {
+		t.Fatalf("parent caller dir = %q, want %q", got, want)
+	}
+
+	child := parent.Spawn(map[string]any{}).(*BaseScope)
+	if diff := cmp.Diff(parent.CHTMLContext(), child.CHTMLContext()); diff != "" {
+		t.Fatalf("child context mismatch (-want +got):\n%s", diff)
+	}
+}
+
 func TestUnmarshalScope(t *testing.T) {
 	tests := []struct {
 		name      string
