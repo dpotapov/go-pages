@@ -83,6 +83,12 @@ type Handler struct {
 	// If not set, the whole template is rendered.
 	FragmentSelector func(*http.Request) string
 
+	// Vary lists request header names that should be included in the Vary response
+	// header for every page response. Set this to the headers read by FragmentSelector
+	// so that HTTP caches store separate entries for fragment and full-page responses.
+	// For example, when using HTMXFragmentSelector set Vary to []string{"HX-Target"}.
+	Vary []string
+
 	// AssetCollector manages static assets like CSS and JS.
 	AssetCollector AssetCollector
 }
@@ -281,6 +287,10 @@ func (h *Handler) render(w io.Writer, comp chtml.Component, scope *scope) error 
 					rw.Header().Add(k, v)
 				}
 			}
+		}
+
+		for _, v := range h.Vary {
+			rw.Header().Add("Vary", v)
 		}
 
 		if scope.globals.statusCode != 0 {
